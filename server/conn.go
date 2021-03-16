@@ -37,10 +37,18 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
+	"github.com/pingcap/tidb/types"
 	"io"
+	"io/ioutil"
+	"math/rand"
 	"net"
 	"runtime"
 	"runtime/pprof"
@@ -85,6 +93,12 @@ const (
 	connStatusShutdown     // Closed by server.
 	connStatusWaitShutdown // Notified by server to close.
 )
+
+const ProtocolVersionNumber = 196608 // 3.0
+const sslRequestNumber = 80877103
+const cancelRequestCode = 80877102
+const gssEncReqNumber = 80877104
+const ProtocolSSL = false
 
 var (
 	queryTotalCountOk = [...]prometheus.Counter{
@@ -220,50 +234,6 @@ func (cc *clientConn) authSwitchRequest(ctx context.Context) ([]byte, error) {
 	return resp, nil
 }
 
-// handshake works like TCP handshake, but in a higher level, it first writes initial packet to client,
-// during handshake, client and server negotiate compatible features and do authentication.
-// After handshake, client can send sql query to server.
-func (cc *clientConn) handshake(ctx context.Context) error {
-	if err := cc.writeInitialHandshake(ctx); err != nil {
-		if errors.Cause(err) == io.EOF {
-			logutil.Logger(ctx).Debug("Could not send handshake due to connection has be closed by client-side")
-		} else {
-			logutil.Logger(ctx).Debug("Write init handshake to client fail", zap.Error(errors.SuspendStack(err)))
-		}
-		return err
-	}
-	if err := cc.readOptionalSSLRequestAndHandshakeResponse(ctx); err != nil {
-		err1 := cc.writeError(ctx, err)
-		if err1 != nil {
-			logutil.Logger(ctx).Debug("writeError failed", zap.Error(err1))
-		}
-		return err
-	}
-	data := cc.alloc.AllocWithLen(4, 32)
-	data = append(data, mysql.OKHeader)
-	data = append(data, 0, 0)
-	if cc.capability&mysql.ClientProtocol41 > 0 {
-		data = dumpUint16(data, mysql.ServerStatusAutocommit)
-		data = append(data, 0, 0)
-	}
-
-	err := cc.writePacket(data)
-	cc.pkt.sequence = 0
-	if err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("write response to client failed", zap.Error(err))
-		return err
-	}
-
-	err = cc.flush(ctx)
-	if err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
-		return err
-	}
-	return err
-}
-
 func (cc *clientConn) Close() error {
 	cc.server.rwlock.Lock()
 	delete(cc.server.clients, cc.connectionID)
@@ -332,8 +302,33 @@ func (cc *clientConn) writeInitialHandshake(ctx context.Context) error {
 	return cc.flush(ctx)
 }
 
+// readPacket Read general messages of postgresql protocol
+// PostgreSQL modified
 func (cc *clientConn) readPacket() ([]byte, error) {
-	return cc.pkt.readPacket()
+	msgType := make([]byte, 1)
+	if _, err := io.ReadFull(cc.bufReadConn, msgType); err != nil {
+		return nil, err
+	}
+
+	// 后面四个字节为长度，包括自己
+	msgLength := make([]byte, 4)
+
+	if _, err := io.ReadFull(cc.bufReadConn, msgLength); err != nil{
+		return nil, err
+	}
+
+	msgLen := binary.BigEndian.Uint32(msgLength)
+
+	// 获取请求的具体信息
+	msg := make([]byte, msgLen - 4)
+
+	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil {
+		return nil, err
+	}
+
+	// 注意 PgSQL 的报文最后会有一个 0 作为结束符需要删除掉
+	data := append(msgType, msg...)
+	return data[:len(data)-1], nil
 }
 
 func (cc *clientConn) writePacket(data []byte) error {
@@ -914,6 +909,7 @@ func (cc *clientConn) addMetrics(cmd byte, startTime time.Time, err error) {
 // dispatch handles client request based on command which is the first byte of the data.
 // It also gets a token from server which is used to limit the concurrently handling clients.
 // The most frequently used command is ComQuery.
+// PostgreSQL Modified
 func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 	defer func() {
 		// reset killed for each request
@@ -982,59 +978,28 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 
 	dataStr := string(hack.String(data))
 	switch cmd {
-	case mysql.ComPing, mysql.ComStmtClose, mysql.ComStmtSendLongData, mysql.ComStmtReset,
-		mysql.ComSetOption, mysql.ComChangeUser:
-		cc.ctx.SetProcessInfo("", t, cmd, 0)
-	case mysql.ComInitDB:
-		cc.ctx.SetProcessInfo("use "+dataStr, t, cmd, 0)
-	}
-
-	switch cmd {
-	case mysql.ComSleep:
-		// TODO: According to mysql document, this command is supposed to be used only internally.
-		// So it's just a temp fix, not sure if it's done right.
-		// Investigate this command and write test case later.
-		return nil
-	case mysql.ComQuit:
-		return io.EOF
-	case mysql.ComQuery: // Most frequently used command.
-		// For issue 1989
-		// Input payload may end with byte '\0', we didn't find related mysql document about it, but mysql
-		// implementation accept that case. So trim the last '\0' here as if the payload an EOF string.
-		// See http://dev.mysql.com/doc/internals/en/com-query.html
+	case 'Q':            /* simple query */
 		if len(data) > 0 && data[len(data)-1] == 0 {
 			data = data[:len(data)-1]
 			dataStr = string(hack.String(data))
 		}
 		return cc.handleQuery(ctx, dataStr)
-	case mysql.ComPing:
-		return cc.writeOK(ctx)
-	case mysql.ComInitDB:
-		if err := cc.useDB(ctx, dataStr); err != nil {
-			return err
-		}
-		return cc.writeOK(ctx)
-	case mysql.ComFieldList:
-		return cc.handleFieldList(ctx, dataStr)
-	case mysql.ComStmtPrepare:
-		return cc.handleStmtPrepare(ctx, dataStr)
-	case mysql.ComStmtExecute:
-		return cc.handleStmtExecute(ctx, data)
-	case mysql.ComStmtFetch:
-		return cc.handleStmtFetch(ctx, data)
-	case mysql.ComStmtClose:
-		return cc.handleStmtClose(data)
-	case mysql.ComStmtSendLongData:
-		return cc.handleStmtSendLongData(data)
-	case mysql.ComStmtReset:
-		return cc.handleStmtReset(ctx, data)
-	case mysql.ComSetOption:
-		return cc.handleSetOption(ctx, data)
-	case mysql.ComChangeUser:
-		return cc.handleChangeUser(ctx, data)
+	case 'P':            /* parse */
+	case 'B':            /* bind */
+	case 'E':            /* execute */
+	case 'F':            /* fastpath function call */
+	case 'C':            /* close */
+	case 'D':            /* describe */
+	case 'H':            /* flush */
+	case 'S':            /* sync */
+	case 'X':
+	case 'd':            /* copy data */
+	case 'c':            /* copy done */
+	case 'f':            /* copy fail */
 	default:
 		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 	}
+	return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 }
 
 func (cc *clientConn) useDB(ctx context.Context, db string) (err error) {
@@ -1068,33 +1033,18 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 }
 
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
-	enclen := 0
-	if len(msg) > 0 {
-		enclen = lengthEncodedIntSize(uint64(len(msg))) + len(msg)
-	}
-
-	data := cc.alloc.AllocWithLen(4, 32+enclen)
-	data = append(data, mysql.OKHeader)
-	data = dumpLengthEncodedInt(data, affectedRows)
-	data = dumpLengthEncodedInt(data, lastInsertID)
-	if cc.capability&mysql.ClientProtocol41 > 0 {
-		data = dumpUint16(data, status)
-		data = dumpUint16(data, warnCnt)
-	}
-	if enclen > 0 {
-		// although MySQL manual says the info message is string<EOF>(https://dev.mysql.com/doc/internals/en/packet-OK_Packet.html),
-		// it is actually string<lenenc>
-		data = dumpLengthEncodedString(data, []byte(msg))
-	}
-
-	err := cc.writePacket(data)
-	if err != nil {
+	if err := cc.WriteCommandComplete(); err != nil {
 		return err
 	}
 
-	return cc.flush(ctx)
+	return cc.WriteReadForQuery(ctx, status)
 }
 
+// writeError 向客户端写回错误信息
+// 这里需要将MySQL错误信息转换为PgSQL格式
+// PgSQL 错误信息报文格式: https://www.postgresql.org/docs/13/protocol-error-fields.html
+// MySLQ 错误信息报文格式: https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html
+// PostgreSQL Modified
 func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	var (
 		m  *mysql.SQLError
@@ -1115,20 +1065,23 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	}
 
 	cc.lastCode = m.Code
-	data := cc.alloc.AllocWithLen(4, 16+len(m.Message))
-	data = append(data, mysql.ErrHeader)
-	data = append(data, byte(m.Code), byte(m.Code>>8))
-	if cc.capability&mysql.ClientProtocol41 > 0 {
-		data = append(data, '#')
-		data = append(data, m.State...)
+
+	errorResponse := pgproto3.ErrorResponse{
+		Severity:            "ERROR",
+		SeverityUnlocalized: "",
+		Code:                "28P01",
+		Message:             m.Message,
+		Detail:              "",
+		Hint:                "",
+		Position:            0,
+		InternalPosition:    0,
+		Line:                0,
 	}
 
-	data = append(data, m.Message...)
-
-	err := cc.writePacket(data)
-	if err != nil {
+	if _, err := cc.pkt.bufWriter.Write(errorResponse.Encode(nil)); err != nil {
 		return err
 	}
+
 	return cc.flush(ctx)
 }
 
@@ -1557,11 +1510,8 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary b
 	} else {
 		err = cc.writeChunks(ctx, rs, binary, serverStatus)
 	}
-	if err != nil {
-		return err
-	}
 
-	return cc.flush(ctx)
+	return err
 }
 
 func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16) error {
@@ -1583,8 +1533,8 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 // writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
 // binary specifies the way to dump data. It throws any error while dumping data.
 // serverStatus, a flag bit represents server information
+// PostgreSQL Modified
 func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
-	data := cc.alloc.AllocWithLen(4, 1024)
 	req := rs.NewChunk()
 	gotColumnInfo := false
 	var stmtDetail *execdetails.StmtExecDetails
@@ -1602,7 +1552,8 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			// We need to call Next before we get columns.
 			// Otherwise, we will get incorrect columns info.
 			columns := rs.Columns()
-			err = cc.writeColumnInfo(columns, serverStatus)
+			//err = cc.writeColumnInfo(columns, serverStatus)
+			err = cc.WriteRowDescription(columns)
 			if err != nil {
 				return err
 			}
@@ -1615,16 +1566,12 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		start := time.Now()
 		reg := trace.StartRegion(ctx, "WriteClientConn")
 		for i := 0; i < rowCount; i++ {
-			data = data[0:4]
 			if binary {
-				data, err = dumpBinaryRow(data, rs.Columns(), req.GetRow(i))
+				// todo writebinary
 			} else {
-				data, err = dumpTextRow(data, rs.Columns(), req.GetRow(i))
+				err = cc.WriteRowData(rs.Columns(), req.GetRow(i))
 			}
 			if err != nil {
-				return err
-			}
-			if err = cc.writePacket(data); err != nil {
 				return err
 			}
 		}
@@ -1633,7 +1580,12 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		}
 		reg.End()
 	}
-	return cc.writeEOF(serverStatus)
+
+	if err := cc.WriteCommandComplete(); err != nil {
+		return err
+	}
+
+	return cc.WriteReadForQuery(ctx, serverStatus)
 }
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
@@ -1859,4 +1811,644 @@ func (cc getLastStmtInConn) PProfLabel() string {
 	default:
 		return ""
 	}
+}
+
+//-----------------------------------------------------------------
+// Handshake PostgreSQL 握手流程
+// 1. postgresql SQL 会先发送一个 SSLRequest报文 询问是否开启SSL加密
+// 2. 如果需要开启则服务端回复一个 'S' 否则回复一个 'N'
+// 3. 当回复为 'S' 时，客户端则进行SSL起始握手（先不做实现），后面所有通信都使用SSL加密
+// 4. 完成SSL起始握手或者在2中直接回复 'N'后, 客户端向服务端发送 StartupMessage 启动包
+// 5. 服务端接收到启动包判断是否需要授权信息，若需要则发送 AuthenticationRequest
+// 6. 在认证过程中可以采用多种认证方式，不同方式交流不同，最终结束于服务端发送的 AuthenticationOk 或者 ErrorResponse
+// 7. 服务端验证完成后发送一些参数信息，即 ParameterStatus ，包括 server_version ， client_encoding 和 DateStyle 等。
+// 8. 服务端最后发送一个 ReadyForQuery 表示一切准备就绪，可以进行创建连接成功
+// 9. 从 7 发送完 AuthenticationOk 和 ErrorResponse 到最后发送 ReadyForQuery 客户端不会发送信息，会一直等待
+// 10. 客户端接收到 ReadyForQuery 后开始与服务端进行正常通信
+func (cc *clientConn) handshake(ctx context.Context) error {
+	// 第一次接收的启动包并不是真正的启动包
+	// 一般会先接收 SSLRequest 报文，决定是否开启 SSL 后，才会再次接收 StartUpMessage
+	m, err := cc.ReceiveStartupMessage()
+	if err != nil{
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	switch m.(type){
+	case *pgproto3.CancelRequest:
+		// todo 结束连接
+		return err
+	case *pgproto3.SSLRequest:
+		if err := cc.handleSSLRequest(ctx);err != nil{
+			logutil.Logger(ctx).Debug(err.Error())
+		}
+		return err
+	default:
+		err = errors.New("received is not a SSLRequest packet")
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+}
+
+//接收到来自客户端的SSLRequest之后，服务端需要对其进行一定的处理
+func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
+
+	if ProtocolSSL{
+		tlsConfig,err := loadSSLCertificates()
+		if err != nil {
+			logutil.Logger(ctx).Debug(err.Error())
+			return err
+		}
+
+		// 写回 'S' 表示使用 SSL 连接
+		if err := cc.WriteSSLRequest('S', ctx); err != nil {
+			logutil.Logger(ctx).Debug(err.Error())
+			return err
+		}
+
+		//将现有的连接升级为SSL连接
+		if err := cc.upgradeToTLS(tlsConfig);err != nil{
+			logutil.Logger(ctx).Debug(err.Error())
+			return err
+		}
+
+	}else {
+		// 写回 'S' 表示使用 SSL 连接
+		if err := cc.WriteSSLRequest('N', ctx); err != nil {
+			logutil.Logger(ctx).Debug(err.Error())
+			return err
+		}
+	}
+
+	// 接收完 SSLRequest 包后接收 StartupMessage
+	// 重新接收启动包并进行用户验证
+	if err := cc.ReceiveStartupMessageAndAuthentication(ctx); err != nil{
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	// 发送 ParameterStatus
+	if err := cc.WriteParameterStatus(); err != nil {
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	// 发送 ReadyForQuery 表示一切准备就绪。"I"表示空闲(没有在事务中)
+	if err := cc.WriteReadForQuery(ctx, mysql.ServerStatusAutocommit); err != nil{
+		logutil.Logger(ctx).Debug("write ReadyForQuery to client failed：" + err.Error())
+		return err
+	}
+
+	return nil
+}
+
+// ReceiveStartupMessage receives the initial connection message. This method is used of the normal Receive method
+// because the initial connection message is "special" and does not include the message type as the first byte. This
+// will return either a StartupMessage, SSLRequest, GSSEncRequest, or CancelRequest.
+func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) {
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(cc.bufReadConn, header); err != nil{
+		return nil, err
+	}
+	msgLen := int(binary.BigEndian.Uint32(header) - 4)
+
+	msg := make([]byte, msgLen)
+	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil{
+		return nil, err
+	}
+
+	code := binary.BigEndian.Uint32(msg)
+
+	switch code {
+	case ProtocolVersionNumber:
+		startMessage := &pgproto3.StartupMessage{}
+		if err := startMessage.Decode(msg); err != nil{
+			return nil, err
+		}
+		return startMessage, nil
+	case sslRequestNumber:
+		sslRequest := &pgproto3.SSLRequest{}
+		if err := sslRequest.Decode(msg); err != nil {
+			return nil, err
+		}
+		return sslRequest, nil
+	case cancelRequestCode:
+		cancelRequest := &pgproto3.CancelRequest{}
+		if err := cancelRequest.Decode(msg); err != nil{
+			return nil, err
+		}
+		return cancelRequest, nil
+	case gssEncReqNumber:
+		gssEncRequest := &pgproto3.GSSEncRequest{}
+		if err := gssEncRequest.Decode(msg); err != nil{
+			return nil, err
+		}
+		return gssEncRequest, nil
+	default:
+		return nil, errors.New("unknown startup message code: " + string(code))
+	}
+}
+
+// PgOpenSessionAndDoAuth 需要在SSL Request确认之后在调用
+// 接收客户端StartupMessage，获取客户端信息，初始化Session并进行用户认证
+// 初始化Session时，由于TiDB中存在MySQL协议使用，会有许多参数和 PgSQL 有差异，这里会自定义部分参数直接赋值给Session
+// 用户认证时，客服端可能会断开连接，等待用户输入密码后再重新建立连接，需要注意
+// 最后发送 AuthenticationOK 或 ErrorResponse 来表式认证成功或失败
+func (cc *clientConn) ReceiveStartupMessageAndAuthentication(ctx context.Context) error {
+
+	// 接收 StartupPacket
+	startupMessage, err := cc.ReceiveStartupMessage()
+	if err != nil{
+		return errors.New(" " + err.Error())
+	}
+
+	// 如果不是startupMessage 则报错并退出连接
+	msg, ok := startupMessage.(*pgproto3.StartupMessage)
+	if !ok {
+		return errors.New("received is not a StartupMessage")
+	}
+
+	cc.user = msg.Parameters["user"]
+	cc.dbname = msg.Parameters["database"]
+
+	// 这里获取到的启动包后会发现只有部分参数
+	// 而MySQL协议会需求更多的参数
+	// 所以添加部分常量作为参数 参照客户端为 Mysql 5.6.47
+	resp := handshakeResponse41{
+		Capability: uint32(8365701),
+		Collation: uint8(28),  //gbk_chinese_ci
+		User: msg.Parameters["user"],
+		DBName: msg.Parameters["database"],
+		Attrs: map[string]string{
+			"_os":"Win64",
+			"_client_name":"libmysql",
+			"_pid":"3692",
+			"_thread":"480",
+			"_platform":"x86_64",
+			"program_name":"mysql",
+			"_client_version":"5.6.47",
+		},
+	}
+
+	cc.capability = resp.Capability & cc.server.capability
+	cc.user = resp.User
+	cc.dbname = resp.DBName
+	cc.collation = resp.Collation
+	cc.attrs = resp.Attrs
+
+	if err := cc.PgOpenSessionAndDoAuth(ctx); err!= nil{
+		logutil.Logger(ctx).Warn("open new session failure", zap.Error(err))
+		return err
+	}
+
+	return err
+}
+
+// PgOpenSessionAndDoAuth 对应 openSessionAndDoAuth
+// 初始化Session 并进行用户认证
+// PgSQL 和 MySQL 存在差异，PgSQL客户端只有在收到服务端的 Auth Request 才会将密码发送过来
+// 而 Mysql 客户端一开始如果存在密码则会将密码直接一起发送到服务端
+func (cc *clientConn) PgOpenSessionAndDoAuth(ctx context.Context) error {
+	var tlsStatePtr *tls.ConnectionState
+	if cc.tlsConn != nil {
+		tlsState := cc.tlsConn.ConnectionState()
+		tlsStatePtr = &tlsState
+	}
+	var err error
+	cc.ctx, err = cc.server.driver.OpenCtx(uint64(cc.connectionID), cc.capability, cc.collation, cc.dbname, tlsStatePtr)
+	if err != nil {
+		return err
+	}
+
+	if err = cc.server.checkConnectionCount(); err != nil {
+		return err
+	}
+
+	//hasPassword := "YES"
+	//if len(authData) == 0 {
+	//	hasPassword = "NO"
+	//}
+
+	// 直接不带密码 也没有认证信息
+	hasPassword := "NO"
+
+	host, err := cc.PeerHost(hasPassword)
+	if err != nil {
+		return err
+	}
+
+	if err := cc.DoAuth(ctx); err != nil {
+		return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
+	}
+
+	//if !cc.ctx.Auth(&auth.UserIdentity{Username: cc.user, Hostname: host}, authData, cc.salt) {
+	//	return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
+	//}
+
+	if cc.dbname != "" {
+		err = cc.useDB(context.Background(), cc.dbname)
+		if err != nil {
+			return err
+		}
+	}
+	cc.ctx.SetSessionManager(cc.server)
+	return nil
+}
+
+// DoAuth 进行用户认证
+func (cc *clientConn) DoAuth(ctx context.Context) error {
+
+	// todo 查询是否需要密码，当不需要密码时直接发送 AuthenticationOK
+
+	// 认证需要先发送一个 auth request 给客户端请求密码
+	// 认证形式： AuthenticationKerberosV5 AuthenticationCleartextPassword AuthenticationCryptPassword AuthenticationMD5Password
+	// AuthenticationSCMCredential AuthenticationGSS AuthenticationSSPI AuthenticationGSSContinue
+	// 当客户端发送密码后进行验证
+	// 最后认证成功
+
+	// 首先发送一个 authRequest, 这里使用 MD5 加密要求
+	// 前端必须返回一个 MD5 加密的密码进行验证
+	// salt 为随机生成的 4 个字节
+	a := make([]byte, 4)
+	rand.Read(a)
+	salt := [4]byte{a[0], a[1], a[2], a[3]}
+	authRequest := pgproto3.AuthenticationMD5Password{Salt: salt}
+	_, err := cc.pkt.bufWriter.Write(authRequest.Encode(nil))
+	if err != nil {
+		return errors.New("write AuthenticationMD5Password to client failed: " + err.Error())
+	}
+
+	if err := cc.flush(ctx); err != nil {
+		err = errors.SuspendStack(err)
+		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
+		return err
+	}
+
+	// 当发送完成 AuthRequest 后，客户端（SQL Shell）会退出该连接
+	// 然后等待用户重新输入了密码后再次建立连接
+	// 当前仅在 SQL Shell 上运行，至少在 SQL Shell 中存在该问题
+	// 所以在这里进行一个字节的读取时需要判断，当错误为 EOF 时直接正常结束即可
+
+	// 读取客户端发来的密码
+	// 格式： 'p' + len + 'password' + '0'
+	// 长度 = len + password + 1
+	msgType := make([]byte, 1)
+	if _, err := io.ReadFull(cc.bufReadConn, msgType); err != nil {
+		if err.Error() == "EOF" {
+			return err
+		} else {
+			return errors.New("read packet failed：" + err.Error())
+		}
+	}
+	if msgType[0] != 'p' {
+		return errors.New("received is not a password packet" + string(msgType[0]))
+	}
+	pwMessageLen := make([]byte, 4)
+	if _, err := io.ReadFull(cc.bufReadConn, pwMessageLen); err != nil {
+		return errors.New("read packet failed：" + err.Error())
+	}
+
+	pdMessage := make([]byte, int(binary.BigEndian.Uint32(pwMessageLen)-4))
+	if _, err := io.ReadFull(cc.bufReadConn, pdMessage); err != nil {
+		return err
+	}
+
+	// todo 获取用户名对应的密码进行比较
+	// 测试阶段先假设该数据库密码为 password123
+	// 密码加密方式： 'md5'+md5Sum(md5Sum(password + user) + salt)
+	// 注意： 字符串为16进制 string 两次 md5Sum 输出的值都需要转为16进制的 string 类型再继续运算
+	password := "password123"
+	x := md5.Sum([]byte(password + cc.user))
+	user := hex.EncodeToString(x[:]) + string(salt[:])
+	y := md5.Sum([]byte(user))
+	pd := "md5" + hex.EncodeToString(y[:])
+	if pd == string(pdMessage[:len(pdMessage)-1]) {
+		// 发送密码认证成功 AuthenticationOk
+		return cc.WriteAuthenticationOK(ctx)
+	}
+	// 发送密码认证失败 ErrorResponse
+	// 字段意义解释： https://www.postgresql.org/docs/13/protocol-error-fields.html
+	errorResponse := pgproto3.ErrorResponse{
+		Severity:            "ERROR",
+		SeverityUnlocalized: "",
+		Code:                "28P01",
+		Message:             "invalid password",
+		Detail:              "",
+		Hint:                "",
+		Position:            0,
+		InternalPosition:    0,
+		Line:                0,
+	}
+	if _, err := cc.pkt.bufWriter.Write(errorResponse.Encode(nil)); err != nil {
+		return errors.New("write ErrorResponse to client failed：" + err.Error())
+	}
+
+	if err := cc.flush(ctx); err != nil {
+		err = errors.SuspendStack(err)
+		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
+		return err
+	}
+
+	err = errors.New("access denied: invalid password")
+
+	return err
+}
+
+// WriteSSLRequest
+// 服务端回复 'S'，表示同意SSL握手
+// 服务端回复 'N'，表示不使用SSL握手
+func (cc *clientConn) WriteSSLRequest(pgRequestSSL byte, ctx context.Context) error {
+	if _,err := cc.pkt.bufWriter.Write([]byte{pgRequestSSL}); err != nil{
+		return err
+	}
+
+	return cc.flush(ctx)
+}
+
+// WriteParameterStatus 用于写回一些参数给客户端 ParameterStatus
+// pgAdmin 需要 client_encoding 这个参数
+func (cc *clientConn) WriteParameterStatus() error {
+	parameters := map[string]string{
+		"client_encoding": "UTF8",
+		"DateStyle": "ISO, YMD",
+		"integer_datetimes": "on",
+		"is_superuser": "on",
+		"server_encoding": "UTF8",
+		"server_version": "8.3.11",
+		"TimeZone": "PRC",
+	}
+
+	for k ,v := range parameters{
+		parameterStatus := &pgproto3.ParameterStatus{Name: k, Value: v}
+		if _, err := cc.pkt.bufWriter.Write(parameterStatus.Encode(nil)); err != nil{
+			return errors.New("write ParameterStatus to client failed: " + err.Error())
+		}
+	}
+	return nil
+}
+
+// WriteAuthenticationOK 向客户端写回 AuthenticationOK
+func (cc *clientConn) WriteAuthenticationOK(ctx context.Context) error {
+	authOK := &pgproto3.AuthenticationOk{}
+	if _, err := cc.pkt.bufWriter.Write(authOK.Encode(nil)); err != nil{
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	return cc.flush(ctx)
+}
+
+//WriteRowDescription 向客户端写回 RowDescription
+//需要将ColumnInfo 转换为 RowDescription
+//这里只写向缓存，并不发送
+func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
+	if len(columns) <= 0 || columns == nil {
+		return errors.New("columnInfos is empty")
+	}
+	rowDescription := convertColumnInfoToRowDescription(columns)
+
+	if _, err := cc.pkt.bufWriter.Write(rowDescription.Encode(nil)); err != nil{
+		return err
+	}
+	return nil
+}
+
+// WriteRowData 向客户端写回 RowData
+// 一行一行的写入 对标 dumpTextRow() 方法
+// 这里只写向缓存，并不发送
+func (cc *clientConn) WriteRowData(columns []*ColumnInfo, row chunk.Row) error {
+	data := make([][]byte, len(columns))
+	tmp := make([]byte, 0, 20)
+	for i, col := range columns {
+		if row.IsNull(i) {
+			data = append(data, []byte("null"))
+			continue
+		}
+		switch col.Type {
+		case mysql.TypeTiny, mysql.TypeShort, mysql.TypeInt24, mysql.TypeLong:
+			tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
+			data[i] = tmp
+		case mysql.TypeYear:
+			year := row.GetInt64(i)
+			tmp = nil
+			if year == 0 {
+				tmp = append(tmp, '0', '0', '0', '0')
+			} else {
+				tmp = strconv.AppendInt(tmp, year, 10)
+			}
+			data[i] = tmp
+		case mysql.TypeLonglong:
+			if mysql.HasUnsignedFlag(uint(columns[i].Flag)) {
+				tmp = strconv.AppendUint(nil, row.GetUint64(i), 10)
+			} else {
+				tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
+			}
+			data[i] = tmp
+		case mysql.TypeFloat:
+			prec := -1
+			if columns[i].Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
+				prec = int(col.Decimal)
+			}
+			tmp = appendFormatFloat(nil, float64(row.GetFloat32(i)), prec, 32)
+			data[i] = tmp
+		case mysql.TypeDouble:
+			prec := types.UnspecifiedLength
+			if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
+				prec = int(col.Decimal)
+			}
+			tmp = appendFormatFloat(nil, row.GetFloat64(i), prec, 64)
+			data[i] = tmp
+		case mysql.TypeNewDecimal:
+			data[i] = hack.Slice(row.GetMyDecimal(i).String())
+		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
+			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
+			data[i] = row.GetBytes(i)
+		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
+			data[i] = hack.Slice(row.GetTime(i).String())
+		case mysql.TypeDuration:
+			dur := row.GetDuration(i, int(col.Decimal))
+			data[i] = hack.Slice(dur.String())
+		case mysql.TypeEnum:
+			data[i] = hack.Slice(row.GetEnum(i).String())
+		case mysql.TypeSet:
+			data[i] = hack.Slice(row.GetSet(i).String())
+		case mysql.TypeJSON:
+			data[i] = hack.Slice(row.GetJSON(i).String())
+		default:
+			return errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
+		}
+	}
+	dataRow := pgproto3.DataRow{Values: data }
+
+	if _, err := cc.pkt.bufWriter.Write(dataRow.Encode(nil)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WriteCommandComplete 向客户端写回 CommandComplete 表示一次查询已经完成
+// 在 WriteCommandComplete 之后需要向客户端写回 WriteReadForQuery 发送服务端状态
+// 这里只写向缓存，并不发送
+func (cc *clientConn) WriteCommandComplete() error {
+	stmtType := strings.ToUpper(cc.ctx.GetSessionVars().StmtCtx.StmtType)
+	affectedRows := strconv.FormatUint(cc.ctx.AffectedRows(),10)
+	var msg string
+
+	// 如果是 INSERT 语句 则需要返回 table oid
+	// 当表存在 oid 时返回 oid, 不存在则 默认为 0
+	// mysql 中暂且不知道是否存在oid，现在默认为 0
+	if stmtType == "INSERT" {
+		msg = stmtType + " 0 " + affectedRows
+	} else {
+		msg = stmtType + " " + affectedRows
+	}
+	commandComplete := pgproto3.CommandComplete{CommandTag: []byte(msg)}
+	if _, err := cc.pkt.bufWriter.Write(commandComplete.Encode(nil)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WriteReadForQuery 向客户端写回 ReadyForQuery
+// status 为当前后端事务状态码。"I"表示空闲(没有在事务中)、"T"表示在事务中；"E"表示在失败的事务中(事务块结束前查询都回被驳回)
+func (cc *clientConn) WriteReadForQuery(ctx context.Context, status uint16) error {
+	pgStatus, err := convertMySQLServerStatusToPgSQLServerStatus(status)
+	if err != nil {
+		return err
+	}
+
+	readForReady := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
+	if _, err := cc.pkt.bufWriter.Write(readForReady.Encode(nil)); err != nil{
+		return err
+	}
+
+	return cc.flush(ctx)
+}
+
+// convertColumnInfoToRowDescription 将 MySQL 的字段结构信息 转换为 PgSQL 的字段结构信息
+// 将 ColumnInfo 转换为 RowDescription
+func convertColumnInfoToRowDescription(columns []*ColumnInfo) pgproto3.RowDescription {
+	// todo 完善两者字段结构信息的转换
+
+	fieldDescriptions := make([]pgproto3.FieldDescription, len(columns))
+	for index, _ := range columns {
+		fieldDescriptions[index] = pgproto3.FieldDescription{
+			Name:                 []byte(columns[index].Name),
+			TableOID:             0,
+			TableAttributeNumber: 0,
+			DataTypeOID:          convertMySQLDataTypeToPgSQLDataType(columns[index].Type),
+			DataTypeSize:         int16(columns[index].ColumnLength),
+			TypeModifier:         0,
+			Format:               0,
+		}
+	}
+
+	return pgproto3.RowDescription{Fields: fieldDescriptions}
+}
+
+// convertMySQLDataTypeToPgSQLDataType 将 MySQL 数据类型 转换为 PgSQL 数据类型
+// MySQL 数据类型为 Uint8 PgSQL数据类型为OID Uint32
+// MySQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/pingcap/parser@v0.0.0-20210108074737-814a888e05e2/mysql/type.go:17
+// PgSQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/jackc/pgtype@v1.6.2/pgtype.go:16
+func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
+	// todo 完善 mysql 和 pgsql 对应的数据类型
+
+	switch mysqlType {
+	case mysql.TypeUnspecified:
+		return pgtype.UnknownOID
+	case mysql.TypeTiny:
+		return pgtype.Int2OID
+	case mysql.TypeShort:
+		return pgtype.Int2OID
+	case mysql.TypeLong:
+		return pgtype.Int4OID
+	case mysql.TypeFloat:
+		return pgtype.Float4OID
+	case mysql.TypeDouble:
+		return pgtype.Float8OID
+	case mysql.TypeNull:  //未找到对应类型
+		return pgtype.UnknownOID
+	case mysql.TypeTimestamp:
+		return pgtype.TimestampOID
+	case mysql.TypeLonglong:
+		return pgtype.Int8OID
+	case mysql.TypeInt24:  //未找到对应类型
+		return pgtype.UnknownOID
+	case mysql.TypeDate:
+		return pgtype.DateOID
+	case mysql.TypeDuration:
+		return pgtype.UnknownOID  //未找到对应类型
+	case mysql.TypeDatetime:
+		return pgtype.TimestampOID
+	case mysql.TypeYear:
+		return pgtype.UnknownOID //未找到对应类型
+	case mysql.TypeNewDate:
+		return pgtype.DateOID
+	case mysql.TypeVarchar:
+		return pgtype.VarcharOID
+	case mysql.TypeBit:
+		return pgtype.BitOID
+	case mysql.TypeJSON:
+		return pgtype.JSONOID
+	case mysql.TypeNewDecimal:
+		return pgtype.UnknownOID  //未找到对应类型
+	case mysql.TypeEnum:
+		return pgtype.UnknownOID  //未找到对应类型
+	case mysql.TypeSet:
+		return pgtype.UnknownOID  //未找到对应类型
+	case mysql.TypeTinyBlob:
+		return pgtype.ByteaOID
+	case mysql.TypeMediumBlob:
+		return pgtype.ByteaOID
+	case mysql.TypeLongBlob:
+		return pgtype.ByteaOID
+	case mysql.TypeBlob:
+		return pgtype.ByteaOID
+	case mysql.TypeVarString:
+		return pgtype.TextOID
+	case mysql.TypeString:
+		return pgtype.TextOID
+	case mysql.TypeGeometry:
+		return pgtype.UnknownOID  //未找到对应类型
+	default:
+		return pgtype.UnknownOID
+	}
+}
+
+// convertMySQLServerStatusToPgSQLServerStatus 将 MySQL 服务器状态转为 PgSQL 服务器状态
+// PgSQL 的状态有三种 'I' 表示处于空闲中 'T' 表示处于事务中 'E' 表示事务失败中
+// 而在 MySQL 中则存在多种状态，
+func convertMySQLServerStatusToPgSQLServerStatus(mysqlStatus uint16) (byte,error) {
+	// todo 完善 mysql 和 pgsql 对应的状态
+
+	switch mysqlStatus {
+	case mysql.ServerStatusInTrans:
+		return 'T', nil
+	default:
+		return 'I', nil
+	}
+}
+
+// loadSSLCertificates 服务端加载证书
+func loadSSLCertificates()(tlsConfig *tls.Config,err error){
+	tlsCert ,err := tls.LoadX509KeyPair("server/certs/pgserver.crt","server/certs/pgserver.key")
+	if err!=nil {
+		println("Load X509 failed"+err.Error())
+	}
+	clientAutoPolicy := tls.RequireAndVerifyClientCert
+
+	//建立受信任的CA池
+	caCert,err :=ioutil.ReadFile("server/certs/pgroot.crt")
+	if err != nil {
+		println("read ca file filed"+err.Error())
+		return nil,nil
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCert)
+	tlsConfig = &tls.Config{
+		ClientAuth: clientAutoPolicy,
+		ClientCAs: certPool,
+		Certificates: []tls.Certificate{tlsCert},
+	}
+	return tlsConfig,nil
 }
