@@ -283,6 +283,11 @@ func (b *baseBuiltinFunc) getArgs() []Expression {
 	return b.args
 }
 
+// Args 获取方法参数
+func (b *baseBuiltinFunc) Args() []Expression {
+	return b.args
+}
+
 func (b *baseBuiltinFunc) vecEvalInt(input *chunk.Chunk, result *chunk.Column) error {
 	return errors.Errorf("baseBuiltinFunc.vecEvalInt() should never be called, please contact the TiDB team for help")
 }
