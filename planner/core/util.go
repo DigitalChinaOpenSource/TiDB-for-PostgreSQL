@@ -167,6 +167,12 @@ func (s *baseSchemaProducer) Schema() *expression.Schema {
 	return s.schema
 }
 
+// TableSchema 获取insert计划的表结构
+//PGSQL Modified
+func (s *Insert) TableSchema() *expression.Schema {
+	return s.tableSchema
+}
+
 // SetSchema implements the Plan.SetSchema interface.
 func (s *baseSchemaProducer) SetSchema(schema *expression.Schema) {
 	s.schema = schema
