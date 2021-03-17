@@ -539,6 +539,8 @@ type builtinFunc interface {
 	// Clone returns a copy of itself.
 	Clone() builtinFunc
 
+	Args() []Expression
+
 	CollationInfo
 }
 

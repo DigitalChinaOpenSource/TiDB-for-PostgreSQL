@@ -985,6 +985,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		}
 		return cc.handleQuery(ctx, dataStr)
 	case 'P':            /* parse */
+		return cc.handleStmtPrepare(ctx, dataStr)
 	case 'B':            /* bind */
 	case 'E':            /* execute */
 	case 'F':            /* fastpath function call */

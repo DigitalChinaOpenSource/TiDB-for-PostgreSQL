@@ -195,6 +195,13 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	if err != nil {
 		return err
 	}
+
+	switch p.(type) {
+	case *plannercore.Insert:
+		SetInsertParamTypeArray(p.(*plannercore.Insert), &prepared.Params)
+	case *plannercore.PhysicalTableReader:
+	}
+
 	if _, ok := stmt.(*ast.SelectStmt); ok {
 		e.Fields = colNames2ResultFields(p.Schema(), p.OutputNames(), vars.CurrentDB)
 	}
