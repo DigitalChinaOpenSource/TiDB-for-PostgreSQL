@@ -201,9 +201,12 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	}
 
 	switch p.(type) {
-	case *plannercore.Insert:
-		SetInsertParamTypeArray(p.(*plannercore.Insert), &prepared.Params)
-	case *plannercore.PhysicalTableReader:
+		case *plannercore.Insert:
+			SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
+		case *plannercore.LogicalProjection:
+			SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
+		case *plannercore.Delete:
+			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
 	}
 
 	if _, ok := stmt.(*ast.SelectStmt); ok {
@@ -230,7 +233,7 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 //	insertPlan：计划结构体
 //	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
 // PGSQL Modified
-func SetInsertParamTypeArray(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) (paramType []byte) {
+func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
 	//if insertPlan, ok := insertPlan.(*plannercore.Insert); ok {
 	if insertPlan.SelectPlan != nil {
 		if selectPlan, ok := insertPlan.SelectPlan.(*plannercore.PhysicalTableReader); ok {
@@ -247,17 +250,10 @@ func SetInsertParamTypeArray(insertPlan *plannercore.Insert, paramExprs *[]ast.P
 		}
 	} else {
 		//当前计划的tableSchema，也就是表结构。
-		ts := insertPlan.TableSchema()
-		insertPlan.Schema()
-		cols := ts.Columns
-		//将要插入字段的各个类型翻入到数组中，以待下文通过
-		colsType := make([]byte,0)
-		for index := range cols {
-			colsType = append(colsType,cols[index].RetType.Tp)
-		}
+		paramIndex := 0
+		cols := insertPlan.GetTableSchema().Columns
 		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
 		lists := insertPlan.Lists
-
 		//遍历lists，将参数类型都
 		for i := range lists {
 			list := lists[i]
@@ -265,14 +261,14 @@ func SetInsertParamTypeArray(insertPlan *plannercore.Insert, paramExprs *[]ast.P
 				cst := list[j].(*expression.Constant)
 				//Kind()将返回Datum对象的k成员，我们通过这个标志知道这个参数是传进来值了，还是暂时用？占位。
 				if cst.Value.Kind() == 0 {
-					//等于0就意味着？占位，没有传实际值。
-					paramType = append(paramType,colsType[j])
+					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok{
+						paramMakerExpr.TexprNode.Type = *(cols[j].RetType)
+						paramIndex++
+					}
 				}
 			}
 		}
 	}
-	//}
-	return paramType
 }
 
 // DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
@@ -339,6 +335,29 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 		return true
 	} else {
 		return false
+	}
+}
+
+// SetSelectParamType 当语句为select，获取其参数类型并设置到prepared.Param中去
+func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
+	schemaProducer := projection.GetLogicalSchemaProducer()
+	childPlan := schemaProducer.GetBaseLogicalPlan().Children()
+	if selection, ok := childPlan[0].(*plannercore.LogicalSelection); ok {
+		if ds, ok := (selection.GetBaseLogicalPlan()).Children()[0].(*plannercore.DataSource); ok {
+			DeepFirstTravsalTree(selection.Conditions,params,&ds.Columns)
+		}
+	}
+}
+
+// SetDeleteParamType 为delete语句设置参数类型
+func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
+	if tableReader, ok := delete.SelectPlan.(*plannercore.PhysicalTableReader); ok {
+		plans := tableReader.TablePlans
+		if scan, ok := plans[0].(*plannercore.PhysicalTableScan); ok {
+			if selection, ok := plans[1].(*plannercore.PhysicalSelection); ok {
+				DeepFirstTravsalTree(selection.Conditions,params,&scan.Columns)
+			}
+		}
 	}
 }
 

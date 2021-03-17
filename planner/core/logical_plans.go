@@ -257,6 +257,12 @@ func (p *LogicalJoin) ExtractJoinKeys(childIdx int) *expression.Schema {
 	return expression.NewSchema(joinKeys...)
 }
 
+// GetLogicalSchemaProducer 获取LogicalProjection计划中的私有属性：logicalSchemaProducer
+// PGSQL Modified
+func (p *LogicalProjection) GetLogicalSchemaProducer() logicalSchemaProducer {
+	return p.logicalSchemaProducer
+}
+
 // LogicalProjection represents a select fields plan.
 type LogicalProjection struct {
 	logicalSchemaProducer
@@ -404,6 +410,11 @@ func (p *LogicalSelection) ExtractCorrelatedCols() []*expression.CorrelatedColum
 		corCols = append(corCols, expression.ExtractCorColumns(cond)...)
 	}
 	return corCols
+}
+
+// GetBaseLogicalPlan 获取selectionPlan私有属性：baseLogicalPlan
+func (p *LogicalSelection) GetBaseLogicalPlan() *baseLogicalPlan {
+	return &p.baseLogicalPlan
 }
 
 // LogicalApply gets one row from outer executor and gets one row from inner executor according to outer row.
