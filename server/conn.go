@@ -326,9 +326,8 @@ func (cc *clientConn) readPacket() ([]byte, error) {
 		return nil, err
 	}
 
-	// 注意 PgSQL 的报文最后会有一个 0 作为结束符需要删除掉
 	data := append(msgType, msg...)
-	return data[:len(data)-1], nil
+	return data, nil
 }
 
 func (cc *clientConn) writePacket(data []byte) error {
@@ -985,14 +984,45 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		}
 		return cc.handleQuery(ctx, dataStr)
 	case 'P':            /* parse */
+		parse := pgproto3.Parse{}
+		if err := parse.Decode(data); err != nil {
+			return err
+		}
+		cc.writeParseComplete()
+		return cc.flush(ctx)
 	case 'B':            /* bind */
+		bind := pgproto3.Bind{}
+		if err := bind.Decode(data); err != nil {
+			return err
+		}
+		cc.writeBindComplete()
+		return cc.flush(ctx)
 	case 'E':            /* execute */
+		execute := pgproto3.Execute{}
+		if err := execute.Decode(data); err != nil {
+			return err
+		}
+		return cc.writeCommandComplete()
 	case 'F':            /* fastpath function call */
 	case 'C':            /* close */
 	case 'D':            /* describe */
+		desc := pgproto3.Describe{}
+		if err := desc.Decode(data); err != nil {
+			return err
+		}
+		params := []uint32{
+			pgtype.VarcharOID,
+			pgtype.VarcharOID,
+			pgtype.Int4OID,
+		}
+		cc.writeParameterDescription(params)
+		cc.writeNoData()
+		return cc.flush(ctx)
 	case 'H':            /* flush */
 	case 'S':            /* sync */
+		return cc.writeReadForQuery(ctx,'I')
 	case 'X':
+		return nil
 	case 'd':            /* copy data */
 	case 'c':            /* copy done */
 	case 'f':            /* copy fail */
@@ -1033,11 +1063,11 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 }
 
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
-	if err := cc.WriteCommandComplete(); err != nil {
+	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
 
-	return cc.WriteReadForQuery(ctx, status)
+	return cc.writeReadForQuery(ctx, status)
 }
 
 // writeError 向客户端写回错误信息
@@ -1569,7 +1599,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			if binary {
 				// todo writebinary
 			} else {
-				err = cc.WriteRowData(rs.Columns(), req.GetRow(i))
+				err = cc.writeRowData(rs.Columns(), req.GetRow(i))
 			}
 			if err != nil {
 				return err
@@ -1581,11 +1611,11 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		reg.End()
 	}
 
-	if err := cc.WriteCommandComplete(); err != nil {
+	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
 
-	return cc.WriteReadForQuery(ctx, serverStatus)
+	return cc.writeReadForQuery(ctx, serverStatus)
 }
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
@@ -1828,6 +1858,7 @@ func (cc getLastStmtInConn) PProfLabel() string {
 func (cc *clientConn) handshake(ctx context.Context) error {
 	// 第一次接收的启动包并不是真正的启动包
 	// 一般会先接收 SSLRequest 报文，决定是否开启 SSL 后，才会再次接收 StartUpMessage
+	// 如果接收的第一个包就为启动包，则为危险连接（可处理）
 	m, err := cc.ReceiveStartupMessage()
 	if err != nil{
 		logutil.Logger(ctx).Debug(err.Error())
@@ -1839,12 +1870,11 @@ func (cc *clientConn) handshake(ctx context.Context) error {
 		// todo 结束连接
 		return err
 	case *pgproto3.SSLRequest:
-		if err := cc.handleSSLRequest(ctx);err != nil{
-			logutil.Logger(ctx).Debug(err.Error())
-		}
-		return err
+		return cc.handleSSLRequest(ctx)
+	case *pgproto3.StartupMessage:
+		return cc.handleStartupMessage(ctx, m.(*pgproto3.StartupMessage))
 	default:
-		err = errors.New("received is not a SSLRequest packet")
+		err = errors.New("received is not a expected packet")
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -1852,7 +1882,6 @@ func (cc *clientConn) handshake(ctx context.Context) error {
 
 //接收到来自客户端的SSLRequest之后，服务端需要对其进行一定的处理
 func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
-
 	if ProtocolSSL{
 		tlsConfig,err := loadSSLCertificates()
 		if err != nil {
@@ -1861,7 +1890,7 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 		}
 
 		// 写回 'S' 表示使用 SSL 连接
-		if err := cc.WriteSSLRequest('S', ctx); err != nil {
+		if err := cc.writeSSLRequest('S', ctx); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
@@ -1871,31 +1900,89 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
-
 	}else {
-		// 写回 'S' 表示使用 SSL 连接
-		if err := cc.WriteSSLRequest('N', ctx); err != nil {
+		// 写回 'N' 表示不使用 SSL 连接
+		if err := cc.writeSSLRequest('N', ctx); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
 	}
 
-	// 接收完 SSLRequest 包后接收 StartupMessage
-	// 重新接收启动包并进行用户验证
-	if err := cc.ReceiveStartupMessageAndAuthentication(ctx); err != nil{
+	// 完成 SSL 确认后需要正式接收 StartupMessage
+	m, err := cc.ReceiveStartupMessage()
+	if err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
 
+	msg, ok := m.(*pgproto3.StartupMessage);
+
+	// 如果接收到的包不为启动包则报错
+	if !ok {
+		err := errors.New("received is not a StartupMessage")
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	// 接收完 SSLRequest 包后接收 StartupMessage
+	if err := cc.handleStartupMessage(ctx, msg); err != nil {
+		logutil.Logger(ctx).Debug(err.Error())
+		return err
+	}
+
+	return nil
+}
+
+// handleStartupMessage 处理 StartupMessage 请求
+// 接收客户端StartupMessage，获取客户端信息，初始化Session并进行用户认证
+// 初始化Session时，由于TiDB中存在MySQL协议使用，会有许多参数和 PgSQL 有差异，这里会自定义部分参数直接赋值给Session
+// 用户认证时，客服端可能会断开连接，等待用户输入密码后再重新建立连接，需要注意
+// 最后发送 AuthenticationOK 或 ErrorResponse 来表式认证成功或失败
+func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *pgproto3.StartupMessage) error {
+	// 获取用户名和数据库名称
+	cc.user = startupMessage.Parameters["user"]
+	cc.dbname = startupMessage.Parameters["database"]
+
+	// 这里获取到的启动包后会发现只有部分参数
+	// 而MySQL协议会需求更多的参数
+	// 所以添加部分常量作为参数 参照客户端为 Mysql 5.6.47
+	resp := handshakeResponse41{
+		Capability: uint32(8365701),
+		Collation: uint8(28),  //gbk_chinese_ci
+		User: startupMessage.Parameters["user"],
+		DBName: startupMessage.Parameters["database"],
+		Attrs: map[string]string{
+			"_os":"Win64",
+			"_client_name":"libmysql",
+			"_pid":"3692",
+			"_thread":"480",
+			"_platform":"x86_64",
+			"program_name":"mysql",
+			"_client_version":"5.6.47",
+		},
+	}
+
+	cc.capability = resp.Capability & cc.server.capability
+	cc.user = resp.User
+	cc.dbname = resp.DBName
+	cc.collation = resp.Collation
+	cc.attrs = resp.Attrs
+
+	// 初始化Session并进行用户验证
+	if err := cc.PgOpenSessionAndDoAuth(ctx); err!= nil{
+		logutil.Logger(ctx).Warn("open new session failure", zap.Error(err))
+		return err
+	}
+
 	// 发送 ParameterStatus
-	if err := cc.WriteParameterStatus(); err != nil {
+	if err := cc.writeParameterStatus(); err != nil{
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
 
 	// 发送 ReadyForQuery 表示一切准备就绪。"I"表示空闲(没有在事务中)
-	if err := cc.WriteReadForQuery(ctx, mysql.ServerStatusAutocommit); err != nil{
-		logutil.Logger(ctx).Debug("write ReadyForQuery to client failed：" + err.Error())
+	if err := cc.writeReadForQuery(ctx, mysql.ServerStatusAutocommit); err != nil{
+		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
 
@@ -1949,63 +2036,8 @@ func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) 
 	}
 }
 
-// PgOpenSessionAndDoAuth 需要在SSL Request确认之后在调用
-// 接收客户端StartupMessage，获取客户端信息，初始化Session并进行用户认证
-// 初始化Session时，由于TiDB中存在MySQL协议使用，会有许多参数和 PgSQL 有差异，这里会自定义部分参数直接赋值给Session
-// 用户认证时，客服端可能会断开连接，等待用户输入密码后再重新建立连接，需要注意
-// 最后发送 AuthenticationOK 或 ErrorResponse 来表式认证成功或失败
-func (cc *clientConn) ReceiveStartupMessageAndAuthentication(ctx context.Context) error {
-
-	// 接收 StartupPacket
-	startupMessage, err := cc.ReceiveStartupMessage()
-	if err != nil{
-		return errors.New(" " + err.Error())
-	}
-
-	// 如果不是startupMessage 则报错并退出连接
-	msg, ok := startupMessage.(*pgproto3.StartupMessage)
-	if !ok {
-		return errors.New("received is not a StartupMessage")
-	}
-
-	cc.user = msg.Parameters["user"]
-	cc.dbname = msg.Parameters["database"]
-
-	// 这里获取到的启动包后会发现只有部分参数
-	// 而MySQL协议会需求更多的参数
-	// 所以添加部分常量作为参数 参照客户端为 Mysql 5.6.47
-	resp := handshakeResponse41{
-		Capability: uint32(8365701),
-		Collation: uint8(28),  //gbk_chinese_ci
-		User: msg.Parameters["user"],
-		DBName: msg.Parameters["database"],
-		Attrs: map[string]string{
-			"_os":"Win64",
-			"_client_name":"libmysql",
-			"_pid":"3692",
-			"_thread":"480",
-			"_platform":"x86_64",
-			"program_name":"mysql",
-			"_client_version":"5.6.47",
-		},
-	}
-
-	cc.capability = resp.Capability & cc.server.capability
-	cc.user = resp.User
-	cc.dbname = resp.DBName
-	cc.collation = resp.Collation
-	cc.attrs = resp.Attrs
-
-	if err := cc.PgOpenSessionAndDoAuth(ctx); err!= nil{
-		logutil.Logger(ctx).Warn("open new session failure", zap.Error(err))
-		return err
-	}
-
-	return err
-}
-
 // PgOpenSessionAndDoAuth 对应 openSessionAndDoAuth
-// 初始化Session 并进行用户认证
+// 初始化 Session 并进行用户认证
 // PgSQL 和 MySQL 存在差异，PgSQL客户端只有在收到服务端的 Auth Request 才会将密码发送过来
 // 而 Mysql 客户端一开始如果存在密码则会将密码直接一起发送到服务端
 func (cc *clientConn) PgOpenSessionAndDoAuth(ctx context.Context) error {
@@ -2124,7 +2156,7 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 	pd := "md5" + hex.EncodeToString(y[:])
 	if pd == string(pdMessage[:len(pdMessage)-1]) {
 		// 发送密码认证成功 AuthenticationOk
-		return cc.WriteAuthenticationOK(ctx)
+		return cc.writeAuthenticationOK(ctx)
 	}
 	// 发送密码认证失败 ErrorResponse
 	// 字段意义解释： https://www.postgresql.org/docs/13/protocol-error-fields.html
@@ -2154,10 +2186,10 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 	return err
 }
 
-// WriteSSLRequest
+// writeSSLRequest
 // 服务端回复 'S'，表示同意SSL握手
 // 服务端回复 'N'，表示不使用SSL握手
-func (cc *clientConn) WriteSSLRequest(pgRequestSSL byte, ctx context.Context) error {
+func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) error {
 	if _,err := cc.pkt.bufWriter.Write([]byte{pgRequestSSL}); err != nil{
 		return err
 	}
@@ -2165,9 +2197,9 @@ func (cc *clientConn) WriteSSLRequest(pgRequestSSL byte, ctx context.Context) er
 	return cc.flush(ctx)
 }
 
-// WriteParameterStatus 用于写回一些参数给客户端 ParameterStatus
+// writeParameterStatus 用于写回一些参数给客户端 ParameterStatus
 // pgAdmin 需要 client_encoding 这个参数
-func (cc *clientConn) WriteParameterStatus() error {
+func (cc *clientConn) writeParameterStatus() error {
 	parameters := map[string]string{
 		"client_encoding": "UTF8",
 		"DateStyle": "ISO, YMD",
@@ -2187,14 +2219,13 @@ func (cc *clientConn) WriteParameterStatus() error {
 	return nil
 }
 
-// WriteAuthenticationOK 向客户端写回 AuthenticationOK
-func (cc *clientConn) WriteAuthenticationOK(ctx context.Context) error {
+// writeAuthenticationOK 向客户端写回 AuthenticationOK
+func (cc *clientConn) writeAuthenticationOK(ctx context.Context) error {
 	authOK := &pgproto3.AuthenticationOk{}
 	if _, err := cc.pkt.bufWriter.Write(authOK.Encode(nil)); err != nil{
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
-
 	return cc.flush(ctx)
 }
 
@@ -2213,10 +2244,10 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 	return nil
 }
 
-// WriteRowData 向客户端写回 RowData
+// writeRowData 向客户端写回 RowData
 // 一行一行的写入 对标 dumpTextRow() 方法
 // 这里只写向缓存，并不发送
-func (cc *clientConn) WriteRowData(columns []*ColumnInfo, row chunk.Row) error {
+func (cc *clientConn) writeRowData(columns []*ColumnInfo, row chunk.Row) error {
 	data := make([][]byte, len(columns))
 	tmp := make([]byte, 0, 20)
 	for i, col := range columns {
@@ -2286,10 +2317,10 @@ func (cc *clientConn) WriteRowData(columns []*ColumnInfo, row chunk.Row) error {
 	return nil
 }
 
-// WriteCommandComplete 向客户端写回 CommandComplete 表示一次查询已经完成
-// 在 WriteCommandComplete 之后需要向客户端写回 WriteReadForQuery 发送服务端状态
+// writeCommandComplete 向客户端写回 CommandComplete 表示一次查询已经完成
+// 在 writeCommandComplete 之后需要向客户端写回 writeReadForQuery 发送服务端状态
 // 这里只写向缓存，并不发送
-func (cc *clientConn) WriteCommandComplete() error {
+func (cc *clientConn) writeCommandComplete() error {
 	stmtType := strings.ToUpper(cc.ctx.GetSessionVars().StmtCtx.StmtType)
 	affectedRows := strconv.FormatUint(cc.ctx.AffectedRows(),10)
 	var msg string
@@ -2309,9 +2340,47 @@ func (cc *clientConn) WriteCommandComplete() error {
 	return nil
 }
 
-// WriteReadForQuery 向客户端写回 ReadyForQuery
+// writeParseComplete 向客户端写回 ParseComplete 表示解析命令完成
+func (cc *clientConn) writeParseComplete() error {
+	parseComplete := pgproto3.ParseComplete{}
+	_, err := cc.pkt.bufWriter.Write(parseComplete.Encode(nil))
+	return err
+}
+
+// writeParameterDescription 向客户端写回 ParameterDescription
+func (cc *clientConn) writeParameterDescription(paramOid []uint32) error {
+	parameterDescription := pgproto3.ParameterDescription{
+		ParameterOIDs: paramOid,
+	}
+	_, err := cc.pkt.bufWriter.Write(parameterDescription.Encode(nil))
+	return err
+}
+
+// writeNoData 向客户端写回 NoData 表示语句无数据返回
+func (cc *clientConn) writeNoData() error {
+	noData := pgproto3.NoData{}
+	_, err := cc.pkt.bufWriter.Write(noData.Encode(nil))
+	return err
+}
+
+// writeBindComplete 向客户端写回 BindComplete 表示绑定命令完成
+func (cc *clientConn) writeBindComplete() error {
+	bindComplete := pgproto3.BindComplete{}
+	_, err := cc.pkt.bufWriter.Write(bindComplete.Encode(nil))
+	return err
+}
+
+// writeCloseComplete 向客户端写回 BindComplete 表示绑定命令完成
+func (cc *clientConn) writeCloseComplete() error {
+	closeComplete  := pgproto3.CloseComplete{}
+	_, err := cc.pkt.bufWriter.Write(closeComplete.Encode(nil))
+	return err
+}
+
+// writeReadForQuery 向客户端写回 ReadyForQuery
 // status 为当前后端事务状态码。"I"表示空闲(没有在事务中)、"T"表示在事务中；"E"表示在失败的事务中(事务块结束前查询都回被驳回)
-func (cc *clientConn) WriteReadForQuery(ctx context.Context, status uint16) error {
+// 调用该方法后会清空缓存，发送缓存中的所有报文
+func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) error {
 	pgStatus, err := convertMySQLServerStatusToPgSQLServerStatus(status)
 	if err != nil {
 		return err

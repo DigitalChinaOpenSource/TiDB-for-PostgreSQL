@@ -88,6 +88,12 @@ type logicalSchemaProducer struct {
 	baseLogicalPlan
 }
 
+// GetBaseLogicalPlan 获取logicalSchemaProducer的私有属性：baseLogicalPlan
+// PGSQL Modified
+func (s *logicalSchemaProducer) GetBaseLogicalPlan() *baseLogicalPlan {
+	return &(s.baseLogicalPlan)
+}
+
 // Schema implements the Plan.Schema interface.
 func (s *logicalSchemaProducer) Schema() *expression.Schema {
 	if s.schema == nil {
@@ -165,6 +171,12 @@ func (s *baseSchemaProducer) Schema() *expression.Schema {
 		s.schema = expression.NewSchema()
 	}
 	return s.schema
+}
+
+// TableSchema 获取insert计划的表结构
+//PGSQL Modified
+func (s *Insert) GetTableSchema() *expression.Schema {
+	return s.tableSchema
 }
 
 // SetSchema implements the Plan.SetSchema interface.
