@@ -2111,6 +2111,11 @@ var builtinGlobalVariable = []string{
 	variable.TiDBEnableRateLimitAction,
 	variable.TiDBMemoryUsageAlarmRatio,
 	variable.TiDBMultiStatementMode,
+
+	/* 三个Pg系统变量: */
+	variable.PgClientMinMessage,
+	variable.PgDateStyle,
+	variable.PgClientEncoding,
 }
 
 var (
