@@ -57,6 +57,7 @@ type TiDBContext struct {
 }
 
 // TiDBStatement implements PreparedStatement.
+// PGSQL Modified
 type TiDBStatement struct {
 	id          uint32
 	numParams   int
@@ -65,6 +66,8 @@ type TiDBStatement struct {
 	ctx         *TiDBContext
 	rs          ResultSet
 	sql         string
+	// columnsExists 作为拓展查询是否有行数据的标志
+	columnsExists bool
 }
 
 // ID implements PreparedStatement ID method.
@@ -180,6 +183,19 @@ func (ts *TiDBStatement) Close() error {
 	}
 	return nil
 }
+
+// SetColumnExistStatus 设置 TiDBStatement 中是否有行数据返回的标志
+// PGSQL Modified
+func (ts *TiDBStatement) SetColumnExistStatus(exist bool) {
+	ts.columnsExists = exist
+}
+
+// GetColumnExistStatus 获取 TiDBStatement 中是否有行数据返回的标志
+// PGSQL Modified
+func (ts *TiDBStatement) GetColumnExistStatus() bool {
+	return ts.columnsExists
+}
+
 
 // OpenCtx implements IDriver.
 func (qd *TiDBDriver) OpenCtx(connID uint64, capability uint32, collation uint8, dbname string, tlsState *tls.ConnectionState) (QueryCtx, error) {
