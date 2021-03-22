@@ -103,6 +103,7 @@ type QueryCtx interface {
 }
 
 // PreparedStatement is the interface to use a prepared statement.
+// PGSQL Modified
 type PreparedStatement interface {
 	// ID returns statement ID
 	ID() int
@@ -136,6 +137,12 @@ type PreparedStatement interface {
 
 	// Close closes the statement.
 	Close() error
+
+	// SetColumnExistStatus 设置statement中是否有行数据返回的标志
+	SetColumnExistStatus(exist bool)
+
+	// GetColumnExistStatus 获取statement中是否有行数据返回的标志
+	GetColumnExistStatus() bool
 }
 
 // ResultSet is the result set of an query.

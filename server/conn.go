@@ -45,6 +45,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
+	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/types"
 	"io"
 	"io/ioutil"
@@ -59,6 +60,7 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
+	"hash/fnv"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
@@ -995,6 +997,10 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		if err := bind.Decode(data); err != nil {
 			return err
 		}
+		//实际处理 bind 过程的逻辑
+		if err := cc.handBind(ctx, bind); err != nil {
+			return err
+		}
 		cc.writeBindComplete()
 		return cc.flush(ctx)
 	case 'E':            /* execute */
@@ -1015,6 +1021,9 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 			pgtype.VarcharOID,
 			pgtype.Int4OID,
 		}
+		if err := cc.handDescription(ctx, desc); err != nil {
+			return nil
+		}
 		cc.writeParameterDescription(params)
 		cc.writeNoData()
 		return cc.flush(ctx)
@@ -1030,6 +1039,15 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 	}
 	return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
+}
+
+// 将pg报文携带的唯一ID（字符串）转换成唯一的int型ID，以便于兼容到原本tidb的stmtID类型
+// 实际上是一个hash方法
+//PGSQL Modified
+func ChangePgStmtID2Uint32(pg string) uint32 {
+	h := fnv.New32()
+	h.Write([]byte(pg))
+	return h.Sum32()
 }
 
 func (cc *clientConn) useDB(ctx context.Context, db string) (err error) {
@@ -2356,6 +2374,15 @@ func (cc *clientConn) writeParameterDescription(paramOid []uint32) error {
 	return err
 }
 
+// todo 完善写回row description函数，填充fields
+//func (cc *clientConn) wirteRowDescription(field []FieldDescription) error {
+//	rowDescription := pgproto3.RowDescription{
+//		Fields: field,
+//	}
+//	_, err := cc.pkt.bufWriter.Write(rowDescription.Encode(nil))
+//	return err
+//}
+
 // writeNoData 向客户端写回 NoData 表示语句无数据返回
 func (cc *clientConn) writeNoData() error {
 	noData := pgproto3.NoData{}
@@ -2392,6 +2419,54 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	}
 
 	return cc.flush(ctx)
+}
+
+// handBind 处理pgsql拓展查询协议过程中的bind过程
+// ctx：上下文
+// bind： pg客户端发来的bind包
+// PGSQL Modified
+func (cc *clientConn) handBind(ctx context.Context, bind pgproto3.Bind) (err error) {
+	//调用自定义hash函数，获取stmtID（字符串类型）唯一对应的int数值。
+	stmtID := ChangePgStmtID2Uint32(bind.PreparedStatement)
+	stmt := cc.ctx.GetStatement(int(stmtID))
+	if stmt == nil {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_bind")
+	}
+	var (
+		nullBitmaps []byte
+		paramTypes  []byte
+		paramValues []byte
+	)
+	// 在之前的Parse阶段，各字段的类型就已经设置好了。
+	if cachedStmt, ok := cc.ctx.GetSessionVars().PreparedStmts[0].(*plannercore.CachedPrepareStmt); ok {
+		cachedParams := cachedStmt.PreparedAst.Params
+		for i := range cachedParams {
+			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+		}
+	}
+	stmt.SetParamsType(paramTypes)
+	//todo pg与tidb param格式不一样，转换一下啊
+	pktParams := bind.Parameters
+	for i := range pktParams {
+		paramValues = append(paramValues, pktParams[i]...)
+	}
+
+	numParams := stmt.NumParams()
+	args := make([]types.Datum, numParams)
+
+	err = parseExecArgs(cc.ctx.GetSessionVars().StmtCtx, args, stmt.BoundParams(), nullBitmaps, stmt.GetParamsType(), paramValues)
+	stmt.Reset()
+	if err != nil {
+		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
+	}
+
+	return nil
+}
+
+func (cc *clientConn) handDescription(ctx context.Context, desc pgproto3.Describe) error {
+
+	return nil
 }
 
 // convertColumnInfoToRowDescription 将 MySQL 的字段结构信息 转换为 PgSQL 的字段结构信息
