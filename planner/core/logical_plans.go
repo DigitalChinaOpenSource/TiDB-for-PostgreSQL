@@ -153,6 +153,11 @@ type LogicalJoin struct {
 	equalCondOutCnt float64
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // Shallow shallow copies a LogicalJoin struct.
 func (p *LogicalJoin) Shallow() *LogicalJoin {
 	join := *p
@@ -287,6 +292,20 @@ type LogicalProjection struct {
 	AvoidColumnEvaluator bool
 }
 
+// SetParamType 设置参数类型
+// todo 表 column信息获取的地方不太合适，目前是从p.schema.Columns中获取，实际上这只是投影的字段，不是该表的全部字段。但是目前也没找到好的办法获取到全部字段，
+func (p *LogicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	if childPlan := p.children; childPlan != nil {
+		for i := range childPlan {
+			paramMarkerIndex,err = childPlan[i].SetParamType(paramExprs,&p.schema.Columns,paramMarkerIndex)
+			if err != nil {
+				return paramMarkerIndex,err
+			}
+		}
+	}
+	return paramMarkerIndex,err
+}
+
 // ExtractCorrelatedCols implements LogicalPlan interface.
 func (p *LogicalProjection) ExtractCorrelatedCols() []*expression.CorrelatedColumn {
 	corCols := make([]*expression.CorrelatedColumn, 0, len(p.Exprs))
@@ -322,6 +341,11 @@ type LogicalAggregation struct {
 	// noCopPushDown indicates if planner must not push this agg down to coprocessor.
 	// It is true when the agg is in the outer child tree of apply.
 	noCopPushDown bool
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalAggregation) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // HasDistinct shows whether LogicalAggregation has functions with distinct.
@@ -403,6 +427,22 @@ type LogicalSelection struct {
 	Conditions []expression.Expression
 }
 
+// SetParamType 当计划为logic select时，先遍历子计划中的参数类型，再从condition成员中获取参数类型
+func (p *LogicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	if childPlan := p.children; childPlan != nil {
+		for i := range childPlan {
+			paramMarkerIndex, err = childPlan[i].SetParamType(paramExprs,cols,paramMarkerIndex)
+			if err != nil {
+				return paramMarkerIndex, err
+			}
+		}
+	}
+	if p.Conditions != nil {
+		paramMarkerIndex = DeepFirstTravsalTree(p.Conditions,paramExprs,cols,paramMarkerIndex)
+	}
+	return paramMarkerIndex,err
+}
+
 // ExtractCorrelatedCols implements LogicalPlan interface.
 func (p *LogicalSelection) ExtractCorrelatedCols() []*expression.CorrelatedColumn {
 	corCols := make([]*expression.CorrelatedColumn, 0, len(p.Conditions))
@@ -440,11 +480,21 @@ type LogicalMaxOneRow struct {
 	baseLogicalPlan
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalTableDual represents a dual table plan.
 type LogicalTableDual struct {
 	logicalSchemaProducer
 
 	RowCount int
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalTableDual) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // LogicalMemTable represents a memory table or virtual table
@@ -470,6 +520,11 @@ type LogicalMemTable struct {
 	QueryTimeRange QueryTimeRange
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalMemTable) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalUnionScan is only used in non read-only txn.
 type LogicalUnionScan struct {
 	baseLogicalPlan
@@ -477,6 +532,11 @@ type LogicalUnionScan struct {
 	conditions []expression.Expression
 
 	handleCol *expression.Column
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalUnionScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // DataSource represents a tableScan without condition push down.
@@ -530,6 +590,11 @@ type DataSource struct {
 	isForUpdateRead bool
 }
 
+// SetParamType 设置参数类型
+func (p *DataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // ExtractCorrelatedCols implements LogicalPlan interface.
 func (ds *DataSource) ExtractCorrelatedCols() []*expression.CorrelatedColumn {
 	corCols := make([]*expression.CorrelatedColumn, 0, len(ds.pushedDownConds))
@@ -551,6 +616,11 @@ type TiKVSingleGather struct {
 	Index         *model.IndexInfo
 }
 
+// SetParamType 设置参数类型
+func (p *TiKVSingleGather) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalTableScan is the logical table scan operator for TiKV.
 type LogicalTableScan struct {
 	logicalSchemaProducer
@@ -558,6 +628,11 @@ type LogicalTableScan struct {
 	Handle      *expression.Column
 	AccessConds expression.CNFExprs
 	Ranges      []*ranger.Range
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalTableScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // LogicalIndexScan is the logical index scan operator for TiKV.
@@ -577,6 +652,11 @@ type LogicalIndexScan struct {
 	FullIdxColLens []int
 	IdxCols        []*expression.Column
 	IdxColLens     []int
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalIndexScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // MatchIndexProp checks if the indexScan can match the required property.
@@ -918,6 +998,11 @@ type LogicalUnionAll struct {
 	logicalSchemaProducer
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalUnionAll) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalPartitionUnionAll represents the LogicalUnionAll plan is for partition table.
 type LogicalPartitionUnionAll struct {
 	LogicalUnionAll
@@ -928,6 +1013,11 @@ type LogicalSort struct {
 	baseLogicalPlan
 
 	ByItems []*util.ByItems
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // ExtractCorrelatedCols implements LogicalPlan interface.
@@ -948,6 +1038,11 @@ type LogicalTopN struct {
 	Count   uint64
 
 	limitHints limitHintInfo
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // ExtractCorrelatedCols implements LogicalPlan interface.
@@ -974,6 +1069,11 @@ type LogicalLimit struct {
 	limitHints limitHintInfo
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalLock represents a select lock plan.
 type LogicalLock struct {
 	baseLogicalPlan
@@ -981,6 +1081,11 @@ type LogicalLock struct {
 	Lock             ast.SelectLockType
 	tblID2Handle     map[int64][]*expression.Column
 	partitionedTable []table.PartitionedTable
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalLock) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // WindowFrame represents a window function frame.
@@ -1011,6 +1116,11 @@ type LogicalWindow struct {
 	PartitionBy     []property.Item
 	OrderBy         []property.Item
 	Frame           *WindowFrame
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalWindow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }
 
 // ExtractCorrelatedCols implements LogicalPlan interface.
@@ -1100,9 +1210,19 @@ type LogicalShow struct {
 	ShowContents
 }
 
+// SetParamType 设置参数类型
+func (p *LogicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
+}
+
 // LogicalShowDDLJobs is for showing DDL job list.
 type LogicalShowDDLJobs struct {
 	logicalSchemaProducer
 
 	JobNumber int64
+}
+
+// SetParamType 设置参数类型
+func (p *LogicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
+	return paramMarkerIndex,err
 }

@@ -232,29 +232,22 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
 //	insertPlan：计划结构体
 //	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
+// 目前支持的sql句式：
+// insert into table1 values(xxx,xxx), (yyy,yyy)
+// insert into table1 where condition1 and condition2 and ...
+// insert into table1 where condition2 or condition and
+// todo 复杂嵌套条件情况还未支持
 // PGSQL Modified
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
-	//if insertPlan, ok := insertPlan.(*plannercore.Insert); ok {
+	paramIndex := 0
 	if insertPlan.SelectPlan != nil {
-		if selectPlan, ok := insertPlan.SelectPlan.(*plannercore.PhysicalTableReader); ok {
-			//获取子查询中各字段类型的map，给下文获取参数类型提供参照。
-			if tableScan, ok := selectPlan.TablePlans[0].(*plannercore.PhysicalTableScan); ok {
-				cols := tableScan.Columns
-				//从condition中获取参数类型
-				if selection, ok := selectPlan.TablePlans[1].(*plannercore.PhysicalSelection); ok {
-					conditions := selection.Conditions
-					//调用递归方法，获取参数类型，填充到paramType数组
-					DeepFirstTravsalTree(conditions, paramExprs, &cols)
-				}
-			}
-		}
+		insertPlan.SelectPlan.SetParamType(paramExprs, nil, paramIndex)
 	} else {
 		//当前计划的tableSchema，也就是表结构。
 		paramIndex := 0
 		cols := insertPlan.GetTableSchema().Columns
 		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
 		lists := insertPlan.Lists
-		//遍历lists，将参数类型都
 		for i := range lists {
 			list := lists[i]
 			for j := range list {
@@ -278,7 +271,6 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 // paramExprs：prepared.Param，我们需要往里面设置参数类型。
 // cols：select计划查询的字段信息
 // PGSQL Modified
-// todo 完善多层select嵌套的情况。
 func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo){
 	paramIndex := 0
 	if len(exprs) > 1 {
@@ -340,24 +332,14 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 
 // SetSelectParamType 当语句为select，获取其参数类型并设置到prepared.Param中去
 func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
-	schemaProducer := projection.GetLogicalSchemaProducer()
-	childPlan := schemaProducer.GetBaseLogicalPlan().Children()
-	if selection, ok := childPlan[0].(*plannercore.LogicalSelection); ok {
-		if ds, ok := (selection.GetBaseLogicalPlan()).Children()[0].(*plannercore.DataSource); ok {
-			DeepFirstTravsalTree(selection.Conditions,params,&ds.Columns)
-		}
-	}
+	projection.SetParamType(params,nil,0)
 }
 
 // SetDeleteParamType 为delete语句设置参数类型
 func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
-	if tableReader, ok := delete.SelectPlan.(*plannercore.PhysicalTableReader); ok {
-		plans := tableReader.TablePlans
-		if scan, ok := plans[0].(*plannercore.PhysicalTableScan); ok {
-			if selection, ok := plans[1].(*plannercore.PhysicalSelection); ok {
-				DeepFirstTravsalTree(selection.Conditions,params,&scan.Columns)
-			}
-		}
+	paramIndex := 0
+	if delete.SelectPlan != nil {
+		delete.SelectPlan.SetParamType(params,nil,paramIndex)
 	}
 }
 
