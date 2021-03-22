@@ -1,91 +1,53 @@
-![](docs/logo_with_text.png)
+DCTiDB的开发，需要引入我们自己修改过后的DCParser，而不是github.com/pingcap/parser，所以，这里需要变更引用。
 
-[![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/pingcap/tidb/blob/master/LICENSE)
-[![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.org/pingcap/tidb.svg?branch=master)](https://travis-ci.org/pingcap/tidb)
-[![Go Report Card](https://goreportcard.com/badge/github.com/pingcap/tidb)](https://goreportcard.com/report/github.com/pingcap/tidb)
-[![GitHub release](https://img.shields.io/github/tag/pingcap/tidb.svg?label=release)](https://github.com/pingcap/tidb/releases)
-[![GitHub release date](https://img.shields.io/github/release-date/pingcap/tidb.svg)](https://github.com/pingcap/tidb/releases)
-[![CircleCI Status](https://circleci.com/gh/pingcap/tidb.svg?style=shield)](https://circleci.com/gh/pingcap/tidb)
-[![Coverage Status](https://codecov.io/gh/pingcap/tidb/branch/master/graph/badge.svg)](https://codecov.io/gh/pingcap/tidb)
-[![GoDoc](https://img.shields.io/badge/Godoc-reference-blue.svg)](https://godoc.org/github.com/pingcap/tidb)
+步骤如下：
 
-- [**Slack Channel**](https://pingcap.com/tidbslack/)
-- **Twitter**: [@PingCAP](https://twitter.com/PingCAP)
-- [**Reddit**](https://www.reddit.com/r/TiDB/)
-- **Mailing list**: [Google Group](https://groups.google.com/forum/#!forum/tidb-user)
-- [**Blog**](https://www.pingcap.com/blog/)
-- [**For support, please contact PingCAP**](http://bit.ly/contact_us_via_github)
+##### 1.首先配置go module为打开模式（这个其实无关紧要，但是开着更好）
 
-## What is TiDB?
+`go env -w GO111MODULE=on`
 
-TiDB ("Ti" stands for Titanium) is an open-source NewSQL database that supports Hybrid Transactional and Analytical Processing (HTAP) workloads. It is MySQL compatible and features horizontal scalability, strong consistency, and high availability.
 
-- __Horizontal Scalability__
 
-    TiDB expands both SQL processing and storage by simply adding new nodes. This makes infrastructure capacity planning both easier and more cost-effective than traditional relational databases which only scale vertically.
+##### 2.配置go module中的私有仓库地址
 
-- __MySQL Compatible Syntax__
+`go env -w GOPRIVATE="newgitlab.digitalchina.com"`
 
-    TiDB acts like it is a MySQL 5.7 server to your applications. You can continue to use all of the existing MySQL client libraries, and in many cases, you will not need to change a single line of code in your application. Because TiDB is built from scratch, not a MySQL fork, please check out the list of [known compatibility differences](https://pingcap.com/docs/v3.0/reference/mysql-compatibility/).
 
-- __Distributed Transactions with Strong Consistency__
 
-    TiDB internally shards table into small range-based chunks that we refer to as "regions". Each region defaults to approximately 100MiB in size, and TiDB uses a Two-phase commit internally to ensure that regions are maintained in a transactionally consistent way.
+##### 3.因为拉取gitlab私有代码会默认http格式下载，所以需要更改一下拉取方式
 
-- __Cloud Native__
+`git config --global url."git@newgitlab.digitalchina.com:qiruia/dcparser.git".insteadOf "https://newgitlab.digitalchina.com/qiruia/dcparser.git"`
 
-    TiDB is designed to work in the cloud -- public, private, or hybrid -- making deployment, provisioning, operations, and maintenance simple.
 
-    The storage layer of TiDB, called TiKV, [became](https://www.cncf.io/blog/2018/08/28/cncf-to-host-tikv-in-the-sandbox/) a [Cloud Native Computing Foundation](https://www.cncf.io/) member project in 2018. The architecture of the TiDB platform also allows SQL processing and storage to be scaled independently of each other in a very cloud-friendly manner.
 
-- __Minimize ETL__
+##### 4.Gitlab—>Settings—>Access Tokens，然后创建一个personal access token，这里权限最好选择只读(read_repository)。
+注明：以上三步做完可以先测试一下，这一步不一定是必须的
 
-    TiDB is designed to support both transaction processing (OLTP) and analytical processing (OLAP) workloads. This means that while you may have traditionally transacted on MySQL and then Extracted, Transformed and Loaded (ETL) data into a column store for analytical processing, this step is no longer required.
+`git config --global http.extraheader "PRIVATE-TOKEN: YOUR_PRIVATE_TOKEN"`
 
-- __High Availability__
 
-    TiDB uses the Raft consensus algorithm to ensure that data is highly available and safely replicated throughout storage in Raft groups. In the event of failure, a Raft group will automatically elect a new leader for the failed member, and self-heal the TiDB cluster without any required manual intervention. Failure and self-healing operations are also transparent to applications.
 
-For more details and latest updates, see [official TiDB blog](https://www.pingcap.com/blog/).
+##### 5.在CMD中运行
 
-## Adopters
+`go get newgitlab.digitalchina.com/qiruia/dcparser`
 
-View the current list of in-production TiDB adopters [here](https://pingcap.com/docs/adopters/).
 
-## Roadmap
 
-Read the [Roadmap](https://pingcap.com/docs/ROADMAP).
+拉取会报错，但是拉到本地的GOPATH中就行，不用理会。
 
-## Quick start
+报错原因是这个newgitlab.digitalchina.com/qiruia/dcparser 的真正名字是 github.com/pingcap/parser，dcparser那个只是个路径地址名字；
 
-Read the [Quick Start Guide](https://pingcap.com/docs/QUICKSTART), which includes deployment methods using Ansible, Docker, and Kubernetes.
+模块的名字是由每个项目中go.mod第一行的module决定的，这里不做修改，改了的话，包的名字就变了，那包里面的变量名称也就变了，对于别的项目来说，这个包中的变量名是包的name.variable，由于TiDB中依赖项太多，改不过来，就不给它更名了。
 
-## Getting Help
+##### 6.在dctidb的go.mod 后面添加
 
-- [**Stack Overflow**](https://stackoverflow.com/questions/tagged/tidb)
-- [**User Group (Chinese)**](https://asktug.com)
+`replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser latest`
 
-## Documentation
+运行代码，会自动拉取最新的dcparser，但是有一点需要注意，代码运行，会将latest覆盖，修改为 v0.0.0-commitTime-commitHash这样的形势，所以在每一次dcparser更新的时候，我们都得重新修改go.mod，将latest添加上去，覆盖掉版本号，让它重新拉取。
 
-+ [English](https://pingcap.com/docs)
-+ [简体中文](https://pingcap.com/docs-cn)
+最后说明一下为什么要将DCParser放在我自己的仓库：
 
-## Architecture
+由于基地这边代码管理是：wuhan/groupName/projectName，但是go module中不认，它只能识别到 wuhan/groupName，最后的projectName会被砍掉，最终会去执行 go get url/wuhan/groupName.git，但是那里面没有代码。所以，go get后面的地址得是：url/groupName/projectName，这样的一个形式。然后折中一下，先放在我的仓库中去了。
+也许有解决办法，但我现在不知道怎么解决。
 
-![architecture](./docs/architecture.png)
-
-## Contributing
-
-[<img src="docs/contribution-map.png" alt="contribution-map" width="180">](https://github.com/pingcap/tidb-map/blob/master/maps/contribution-map.md#tidb-is-an-open-source-distributed-htap-database-compatible-with-the-mysql-protocol)
-
-Contributions are welcomed and greatly appreciated. See
-[CONTRIBUTING.md](https://github.com/pingcap/community/blob/master/CONTRIBUTING.md)
-for details on submitting patches and the contribution workflow. For more contributing information, click on the contributor icon above.
-
-## License
-TiDB is under the Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
-
-## Acknowledgments
-- Thanks [cznic](https://github.com/cznic) for providing some great open source tools.
-- Thanks [GolevelDB](https://github.com/syndtr/goleveldb), [BoltDB](https://github.com/boltdb/bolt), and [RocksDB](https://github.com/facebook/rocksdb) for their powerful storage engines.
+开发还是在 wuhan/DCTiDB/DCParser 这个项目中开发，只不过会在DCParser更新时，将这个仓库的代码拉下来，然后推到 qiruia/dcparser 这个仓库中。

@@ -8,7 +8,6 @@ require (
 	github.com/blacktear23/go-proxyprotocol v0.0.0-20180807104634-af7a81e8dd0d
 	github.com/cheggaaa/pb/v3 v3.0.4 // indirect
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548
 	github.com/cznic/sortutil v0.0.0-20181122101858-f5f958428db8
 	github.com/danjacques/gofslock v0.0.0-20191023191349-0a45f885bc37
@@ -90,5 +89,7 @@ require (
 	sourcegraph.com/sourcegraph/appdash v0.0.0-20190731080439-ebfcffb1b5c0
 	sourcegraph.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
 )
+
+replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210318090948-625049667500
 
 go 1.13
