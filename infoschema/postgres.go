@@ -11,8 +11,12 @@ var (
 	PgCatalogName = model.NewCIStr("postgres")
 )
 
+type PgDBInfo struct {
+	model.DBInfo
+}
+
 func init(){
-	dbID:=PgCatalogDBID
+	dbID := PgCatalogDBID
 	pgCatalogTables := make([]*model.TableInfo, 0, len(pgTableNameToColumns))
 	for name, cols := range pgTableNameToColumns {
 		tableInfo := buildTableMeta(name, cols)
