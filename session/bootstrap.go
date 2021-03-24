@@ -1303,6 +1303,143 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateExprPushdownBlacklist)
 	// Create opt_rule_blacklist table.
 	mustExecute(s, CreateOptRuleBlacklist)
+
+	// Create postgres Database
+	mustExecute(s,"CREATE DATABASE IF NOT EXISTS postgres;")
+	// Create postgres pg_aggregate Table
+	mustExecute(s, CreateTablePgAggregate)
+	// Create postgres pg_am Table
+	mustExecute(s, CreateTablePgAm)
+	// Create postgres pg_amop Table
+	mustExecute(s, CreateTablePgAmop)
+	// Create postgres pg_amproc Table
+	mustExecute(s, CreateTablePgAmproc)
+	// Create postgres pg_attrdef Table
+	mustExecute(s, CreateTablePgAttrdef)
+	// Create postgres pg_attribute Table
+	mustExecute(s, CreateTablePgAttribute)
+	// Create postgres pg_auth_members Table
+	mustExecute(s, CreateTablePgAuthMembers)
+	// Create postgres pg_authid Table
+	mustExecute(s, CreateTablePgAuthId)
+	// Create postgres pg_cast Table
+	mustExecute(s, CreateTablePgCast)
+	// Create postgres pg_calss Table
+	mustExecute(s, CreateTablePgClass)
+	// Create postgres pg_collation Table
+	mustExecute(s, CreateTablePgCollation)
+	// Create postgres pg_constraint Table
+	mustExecute(s, CreateTablePgConstraint)
+	// Create postgres pg_conversion Table
+	mustExecute(s, CreateTablePgConversion)
+	// Create postgres pg_database Table
+	mustExecute(s, CreateTablePgDatabase)
+	// Create postgres pg_db_role_setting Table
+	mustExecute(s, CreateTablePgDbRoleSetting)
+	// Create postgres pg_default_acl Table
+	mustExecute(s, CreateTablePgDefaultAcl)
+	// Create postgres pg_depend Table
+	mustExecute(s, CreateTablePgDepend)
+	// Create postgres pg_description Table
+	mustExecute(s, CreateTablePgDescription)
+	// Create postgres pg_enum Table
+	mustExecute(s, CreateTablePgEnum)
+	// Create postgres pg_event_trigger Table
+	mustExecute(s, CreateTablePgEventTrigger)
+	// Create postgres pg_extension Table
+	mustExecute(s, CreateTablePgExtension)
+	// Create postgres pg_foreign_data_wrapper Table
+	mustExecute(s, CreateTablePgForeignDataWrapper)
+	// Create postgres pg_foreign_server Table
+	mustExecute(s, CreateTablePgForeignServer)
+	// Create postgres pg_foreign_table Table
+	mustExecute(s, CreateTablePgForeignTable)
+	// Create postgres pg_index Table
+	mustExecute(s, CreateTablePgIndex)
+	// Create postgres pg_inherits Table
+	mustExecute(s, CreateTablePgInherits)
+	// Create postgres pg_init_privs Table
+	mustExecute(s, CreateTablePgInitPrivs)
+	// Create postgres pg_language Table
+	mustExecute(s, CreateTablePgLanguage)
+	// Create postgres pg_largeobject Table
+	mustExecute(s, CreateTablePgLargeObject)
+	// Create postgres pg_largeobject_metadata Table
+	mustExecute(s, CreateTablePgLargeObjectMetadata)
+	// Create postgres pg_namespace Table
+	mustExecute(s, CreateTablePgNamespace)
+	// Create postgres pg_opclass Table
+	mustExecute(s, CreateTablePgOpclass)
+	// Create postgres pg_operator Table
+	mustExecute(s, CreateTablePgOperator)
+	// Create postgres pg_opfamily Table
+	mustExecute(s, CreateTablePgOpFamily)
+	// Create postgres pg_partitioned_table Table
+	mustExecute(s, CreateTablePgPartitionedTable)
+	// Create postgres pg_policy Table
+	mustExecute(s, CreateTablePgPolicy)
+	// Create postgres pg_proc Table
+	mustExecute(s, CreateTablePgProc)
+	// Create postgres pg_publication Table
+	mustExecute(s, CreateTablePgPublication)
+	// Create postgres pg_publication_rel Table
+	mustExecute(s, CreateTablePgPublicationRel)
+	// Create postgres pg_range Table
+	mustExecute(s, CreateTablePgRange)
+	// Create postgres pg_replication_origin Table
+	mustExecute(s, CreateTablePgReplicationOrigin)
+	// Create postgres pg_rewrite Table
+	mustExecute(s, CreateTablePgRewrite)
+	// Create postgres pg_seclabel Table
+	mustExecute(s, CreateTablePgSeclabel)
+	// Create postgres pg_sequence Table
+	mustExecute(s, CreateTablePgSequence)
+	// Create postgres pg_shdepend Table
+	mustExecute(s, CreateTablePgShdepend)
+	// Create postgres pg_shdescription Table
+	mustExecute(s, CreateTablePgShdescription)
+	// Create postgres pg_shseclabel Table
+	mustExecute(s, CreateTablePgShseclabel)
+	// Create postgres pg_statistic Table
+	mustExecute(s, CreateTablePgStatistic)
+	// Create postgres pg_statistic_ext Table
+	mustExecute(s, CreateTablePgStatisticExt)
+	// Create postgres pg_statistic_ext_data Table
+	mustExecute(s, CreateTablePgStatisticExtData)
+	// Create postgres pg_subscription Table
+	mustExecute(s, CreateTablePgSubscription)
+	// Create postgres pg_subscription_rel Table
+	mustExecute(s, CreateTablePgSubscriptionRel)
+	// Create postgres pg_tablespace Table
+	mustExecute(s, CreateTablePgTablespace)
+	// Create postgres pg_transform Table
+	mustExecute(s, CreateTablePgTransform)
+	// Create postgres pg_trigger Table
+	mustExecute(s, CreateTablePgTrigger)
+	// Create postgres pg_ts_config Table
+	mustExecute(s, CreateTablePgTsConfig)
+	// Create postgres pg_ts_config_map Table
+	mustExecute(s, CreateTablePgTsConfigMap)
+	// Create postgres pg_ts_dict Table
+	mustExecute(s, CreateTablePgTsDict)
+	// Create postgres pg_ts_parser Table
+	mustExecute(s, CreateTablePgTsParser)
+	// Create postgres pg_ts_template Table
+	mustExecute(s, CreateTablePgTsTemplate)
+	// Create postgres pg_type Table
+	mustExecute(s, CreateTablePgType)
+	// Create postgres pg_user_mapping Table
+	mustExecute(s, CreateTablePgUserMapping)
+
+	mustExecute(s, "USE postgres;")
+	// Create postgres pg_roles View
+	mustExecute(s, CreateViewPgRoles)
+	// Create postgres pg_shadow View
+	mustExecute(s, CreateViewPgShadow)
+	// Create postgres pg_user View
+	mustExecute(s, CreateViewPgUser)
+	// Create postgres pg_group View
+	mustExecute(s, CreateViewPgGroup)
 }
 
 // doDMLWorks executes DML statements in bootstrap stage.
@@ -1350,6 +1487,12 @@ func doDMLWorks(s Session) {
 	writeDefaultExprPushDownBlacklist(s)
 
 	writeStmtSummaryVars(s)
+
+	mustExecute(s, DataForTablePgAggregate)
+
+	mustExecute(s, DataForTablePgAuthMembers)
+
+	mustExecute(s, DataForTablePgType)
 
 	_, err := s.Execute(context.Background(), "COMMIT")
 	if err != nil {
