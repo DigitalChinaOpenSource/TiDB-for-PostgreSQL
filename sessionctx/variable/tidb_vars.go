@@ -36,7 +36,17 @@ import (
 */
 
 // TiDB system variable names that only in session scope.
+// 增加了三个pg的系统变量 PgDateStyle PgClientMinMessage PgClientEncoding
 const (
+	//PgDatestyle is the pg database system variable
+	PgDateStyle ="datestyle"
+
+	//PgClientMinMessage is the pg database system variable
+	PgClientMinMessage = "client_min_messages"
+
+	//PgClientEncoding is the pg database system_variable
+	PgClientEncoding = "client_encoding"
+
 	TiDBDDLSlowOprThreshold = "ddl_slow_threshold"
 
 	// tidb_snapshot is used for reading history data, the default value is empty string.
