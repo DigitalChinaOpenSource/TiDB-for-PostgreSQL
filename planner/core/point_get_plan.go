@@ -71,8 +71,8 @@ type PointGetPlan struct {
 }
 
 // PGSQL Modified
-func (pointGet *PointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (int, error) {
-	return paramMarkerIndex, nil
+func (pointGet *PointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
+	return nil
 }
 
 type nameValuePair struct {
@@ -252,8 +252,8 @@ type BatchPointGetPlan struct {
 }
 
 // PGSQL Modified
-func (p *BatchPointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (int, error) {
-	return paramMarkerIndex, nil
+func (p *BatchPointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
+	return nil
 }
 
 // attach2Task makes the current physical plan as the father of task's physicalPlan and updates the cost of

@@ -15,10 +15,8 @@ package executor
 
 import (
 	"context"
-	"github.com/pingcap/parser/model"
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/pingcap/errors"
@@ -239,9 +237,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // todo 复杂嵌套条件情况还未支持
 // PGSQL Modified
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
-	paramIndex := 0
 	if insertPlan.SelectPlan != nil {
-		insertPlan.SelectPlan.SetParamType(paramExprs, nil, paramIndex)
+		insertPlan.SelectPlan.SetParamType(paramExprs)
 	} else {
 		//当前计划的tableSchema，也就是表结构。
 		paramIndex := 0
@@ -264,72 +261,6 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 	}
 }
 
-// DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
-// 其分为两种情况，一种是 condition1 and condition2 and condition 3，其参数放在select子计划中的Condition成员中，是一个数组
-// 另一种情况是 condition1 or condition2 and condition3 。其参数构造成了一个树，需要深度优先遍历
-// exprs：select子计划的参数，可能是个数组，也可能是个树
-// paramExprs：prepared.Param，我们需要往里面设置参数类型。
-// cols：select计划查询的字段信息
-// PGSQL Modified
-func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo){
-	paramIndex := 0
-	if len(exprs) > 1 {
-		// sql where condition like this : x = aaa and y > bbb and z < ccc
-		for i := range exprs {
-			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
-				if setOk := SetParamTypes(scalar.Function.Args(), paramExprs, cols, paramIndex); setOk{
-					paramIndex++
-				}
-			}
-		}
-	} else if len(exprs) == 1 {
-		// sql where condition like this : x = aaa or y < bbb and z = zzz
-		// the struct is a tree , not even array, we should use deep-first traversal to resolve
-		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
-			DoDeepFirstTraverSal(scalar.Function.Args(), paramExprs, cols, paramIndex)
-		}
-	}
-}
-
-// DoDeepFirstTraverSal 深度优先遍历树形结构的参数，设置到paramExprs中去
-// PGSQL Modified
-func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo, paramIndex int) int {
-	//left不是终结点，还可以往下遍历
-	if left, ok := args[0].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(left.Function.Args(), paramExprs, cols, paramIndex)
-	}
-	// 右子树不是终结点，还可以往下遍历
-	if right, ok := args[1].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(right.Function.Args(), paramExprs, cols, paramIndex)
-	}
-	//深度优先遍历，先往下一直遍历，知道叶子节点在做具体的处理逻辑，也就是判断节点参数类型。
-	//程序到达这里，args左右子树就是column和constant了。
-	if setOk := SetParamTypes(args, paramExprs, cols, paramIndex); setOk {
-		paramIndex++
-	}
-	return paramIndex
-}
-
-// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
-// PGSQL Modified
-func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo, paramIndex int) bool {
-	if constant, ok := args[1].(*expression.Constant); ok && constant.Value.Kind() == 0 {
-		if column, ok := args[0].(*expression.Column); ok {
-			nameSplit := strings.Split(column.OrigName,".")
-			shortName := nameSplit[len(nameSplit) - 1]
-			for i := range *cols {
-				if paramMarker, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); (*cols)[i].Name.O == shortName && ok {
-					paramMarker.TexprNode.Type = (*cols)[i].FieldType
-					break
-				}
-			}
-		}
-		return true
-	} else {
-		return false
-	}
-}
-
 // SetSelectParamType 当语句为select，获取其参数类型并设置到prepared.Param中去
 func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
 	projection.SetParamType(params,nil,0)
@@ -337,9 +268,8 @@ func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast
 
 // SetDeleteParamType 为delete语句设置参数类型
 func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
-	paramIndex := 0
 	if delete.SelectPlan != nil {
-		delete.SelectPlan.SetParamType(params,nil,paramIndex)
+		delete.SelectPlan.SetParamType(params)
 	}
 }
 

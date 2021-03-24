@@ -90,6 +90,6 @@ require (
 	sourcegraph.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
 )
 
-replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210318090948-625049667500
+replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210319072222-9a19d5845aa5
 
 go 1.13

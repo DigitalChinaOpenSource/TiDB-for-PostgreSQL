@@ -75,14 +75,23 @@ type PhysicalTableReader struct {
 	StoreType kv.StoreType
 }
 
-// PGSQL Modified
-// 在tableReader计划中获取参数类型，目前考虑的sql比较简单，也就是在tablereader的tabplan有个selection子计划，调用子计划的setParamType方法即可
-// 注意处理 paramExprs 的里面各参数类型的index
-func (tableReader *PhysicalTableReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	if tablePlan := tableReader.tablePlan; tablePlan != nil {
-		paramMarkerIndex,err = tablePlan.SetParamType(paramExprs, &tableReader.physicalSchemaProducer.schema.Columns, paramMarkerIndex)
+// SetParamType 在tableReader计划中获取参数类型
+func (tr *PhysicalTableReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childPlans := tr.children; childPlans != nil {
+		for _, childPlan := range childPlans {
+			if err = childPlan.SetParamType(paramExprs); err != nil {
+				return err
+			}
+		}
 	}
-	return paramMarkerIndex, err
+	if tablePlans := tr.TablePlans; tablePlans != nil {
+		for _, tablePlan := range tablePlans {
+			if err = tablePlan.SetParamType(paramExprs); err != nil {
+				return err
+			}
+		}
+	}
+	return err
 }
 
 // GetTablePlan exports the tablePlan.
@@ -143,8 +152,8 @@ type PhysicalIndexReader struct {
 }
 
 //PGSQL Modified
-func (p *PhysicalIndexReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalIndexReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // SetSchema overrides PhysicalPlan SetSchema interface.
@@ -191,8 +200,8 @@ type PhysicalIndexLookUpReader struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalIndexLookUpReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalIndexLookUpReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalIndexMergeReader is the reader using multiple indexes in tidb.
@@ -210,8 +219,8 @@ type PhysicalIndexMergeReader struct {
 }
 
 //PGSQL Modified
-func (p *PhysicalIndexMergeReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalIndexMergeReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalIndexScan represents an index scan plan.
@@ -255,8 +264,8 @@ type PhysicalIndexScan struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalIndexScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalIndexScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalMemTable reads memory table.
@@ -272,8 +281,8 @@ type PhysicalMemTable struct {
 
 // PGSQL Modified
 // SetParamType 设置参数类型
-func (men *PhysicalMemTable) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
-	return currParamMarkerIndex, err
+func (men *PhysicalMemTable) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalTableScan represents a table scan plan.
@@ -316,14 +325,14 @@ type PhysicalTableScan struct {
 	isChildOfIndexLookUp bool
 }
 
-// PGSQL Modified
-func (ts *PhysicalTableScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
+// SetParamType 根据PhysicalTableScan计划设置参数类型
+func (ts *PhysicalTableScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childrenPlan := ts.children; childrenPlan != nil {
 		for i := range childrenPlan {
-			paramMarkerIndex,err = childrenPlan[i].SetParamType(paramExprs,cols,paramMarkerIndex)
+			err = childrenPlan[i].SetParamType(paramExprs)
 		}
 	}
-	return paramMarkerIndex, err
+	return err
 }
 
 
@@ -380,10 +389,17 @@ type PhysicalProjection struct {
 	AvoidColumnEvaluator bool
 }
 
-// PGSQL Modified
-// SetParamType 设置参数类型，需要考虑具体计划内部参数体哦阿健的分布
-func (p *PhysicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+// SetParamType 为PhysicalProjection计划设置参数类型
+func (p *PhysicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childPlans := p.children; childPlans != nil {
+		for _,childPlan := range childPlans {
+			err = childPlan.SetParamType(paramExprs)
+			if err != nil {
+				return nil
+			}
+		}
+	}
+	return err
 }
 
 // PhysicalTopN is the physical operator of topN.
@@ -396,8 +412,8 @@ type PhysicalTopN struct {
 }
 
 // PGSQL Modified
-func (lt *PhysicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (lt *PhysicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalApply represents apply plan, only used for subquery.
@@ -408,8 +424,8 @@ type PhysicalApply struct {
 }
 
 // PGSQL Modified
-func (la *PhysicalApply) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (la *PhysicalApply) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 type basePhysicalJoin struct {
@@ -440,9 +456,17 @@ type PhysicalHashJoin struct {
 	UseOuterToBuild bool
 }
 
-// PGSQL Modified
-func (p *PhysicalHashJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+// SetParamType 为PhysicalHashJoin计划设置参数
+func (p *PhysicalHashJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childPlans := p.children; childPlans != nil {
+		for _, childPlan := range childPlans {
+			err = childPlan.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return err
 }
 
 // NewPhysicalHashJoin creates a new PhysicalHashJoin from LogicalJoin.
@@ -495,8 +519,8 @@ type PhysicalIndexJoin struct {
 }
 
 // PGSQL Modified
-func (indexJoin *PhysicalIndexJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (indexJoin *PhysicalIndexJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalIndexMergeJoin represents the plan of index look up merge join.
@@ -534,8 +558,8 @@ type PhysicalMergeJoin struct {
 }
 
 //PGSQL Modified
-func (join *PhysicalMergeJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (join *PhysicalMergeJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalBroadCastJoin only works for TiFlash Engine, which broadcast the small table to every replica of probe side of tables.
@@ -545,8 +569,8 @@ type PhysicalBroadCastJoin struct {
 }
 
 // PGSQL Modified
-func (lock *PhysicalBroadCastJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (lock *PhysicalBroadCastJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalLock is the physical operator of lock, which is used for `select ... for update` clause.
@@ -560,8 +584,8 @@ type PhysicalLock struct {
 }
 
 // PGSQL Modified
-func (lock *PhysicalLock) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (lock *PhysicalLock) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalLimit is the physical operator of Limit.
@@ -573,8 +597,8 @@ type PhysicalLimit struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalUnionAll is the physical operator of UnionAll.
@@ -583,8 +607,8 @@ type PhysicalUnionAll struct {
 }
 
 // PGSQL Modified
-func (unionAll *PhysicalUnionAll) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (unionAll *PhysicalUnionAll) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 type basePhysicalAgg struct {
@@ -595,8 +619,8 @@ type basePhysicalAgg struct {
 }
 
 // PGSQL Modified
-func (agg *basePhysicalAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
-	return currParamMarkerIndex, err
+func (agg *basePhysicalAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 func (p *basePhysicalAgg) numDistinctFunc() (num int) {
@@ -629,8 +653,8 @@ type PhysicalHashAgg struct {
 }
 
 // PGSQL Modified
-func (agg *PhysicalHashAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (agg *PhysicalHashAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // NewPhysicalHashAgg creates a new PhysicalHashAgg from a LogicalAggregation.
@@ -649,8 +673,8 @@ type PhysicalStreamAgg struct {
 
 // SetParamType
 // PGSQL Modified
-func (agg *PhysicalStreamAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (agg *PhysicalStreamAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalSort is the physical operator of sort, which implements a memory sort.
@@ -661,8 +685,8 @@ type PhysicalSort struct {
 }
 
 // PGSQL Modified
-func (ls *PhysicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (ls *PhysicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // NominalSort asks sort properties for its child. It is a fake operator that will not
@@ -678,8 +702,8 @@ type NominalSort struct {
 }
 
 //PGSQL Modified
-func (sort *NominalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (sort *NominalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalUnionScan represents a union scan operator.
@@ -692,8 +716,8 @@ type PhysicalUnionScan struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalUnionScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalUnionScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // IsPartition returns true and partition ID if it works on a partition.
@@ -718,76 +742,75 @@ type PhysicalSelection struct {
 
 // PGSQL Modified
 // SetParamType 设置paramExprs参数类型，需要考虑具体计划内部参数的分布
-func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	if childrenPlan := p.children; childrenPlan != nil {
-		for i := range childrenPlan {
-			plan := childrenPlan[i]
-			if paramMarkerIndex ,err = plan.SetParamType(paramExprs,cols,paramMarkerIndex); err != nil {
-				return paramMarkerIndex, err
+func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childPlans := p.children; childPlans != nil {
+		for _,childPlan := range childPlans {
+			if err = childPlan.SetParamType(paramExprs); err != nil {
+				return err
 			}
 		}
 	}
 
 	if p.Conditions != nil {
-		paramMarkerIndex = DeepFirstTravsalTree(p.Conditions,paramExprs,cols,paramMarkerIndex)
+		DeepFirstTravsalTree(p.Conditions,paramExprs,&p.Schema().Columns)
 	}
-	return paramMarkerIndex, err
+	return err
 }
 
-//深度优先遍历条件节点，获取到参数类型数组
-// todo 完善多层select嵌套的情况。
-func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column,paramIndex int) int {
+// DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
+// 其分为两种情况，一种是 condition1 and condition2 and condition 3，其参数放在select子计划中的Condition成员中，是一个数组
+// 另一种情况是 condition1 or condition2 and condition3 。其参数构造成了一个树，需要深度优先遍历
+// exprs：select子计划的参数，可能是个数组，也可能是个树
+// paramExprs：prepared.Param，我们需要往里面设置参数类型。
+// cols：select计划查询的字段信息
+// PGSQL Modified
+func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
 	if len(exprs) > 1 {
 		// sql where condition like this : x = aaa and y > bbb and z < ccc
 		for i := range exprs {
 			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
-				if setOk := SetParamTypes(scalar.Function.Args(), paramExprs, cols, paramIndex); setOk{
-					paramIndex++
-				}
+				SetParamTypes(scalar.Function.Args(), paramExprs, cols)
 			}
 		}
 	} else if len(exprs) == 1 {
 		// sql where condition like this : x = aaa or y < bbb and z = zzz
 		// the struct is a tree , not even array, we should use deep-first traversal to resolve
 		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
-			paramIndex = DoDeepFirstTraverSal(scalar.Function.Args(), paramExprs, cols, paramIndex)
+			DoDeepFirstTraverSal(scalar.Function.Args(), paramExprs, cols)
 		}
 	}
-	return paramIndex
 }
 
-// 深度优先遍历树
-func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramIndex int) int {
+// DoDeepFirstTraverSal 深度优先遍历树形结构的参数，设置到paramExprs中去
+// PGSQL Modified
+func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
 	//left不是终结点，还可以往下遍历
 	if left, ok := args[0].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(left.Function.Args(), paramExprs, cols, paramIndex)
+		DoDeepFirstTraverSal(left.Function.Args(), paramExprs, cols)
 	}
 	// 右子树不是终结点，还可以往下遍历
 	if right, ok := args[1].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(right.Function.Args(), paramExprs, cols, paramIndex)
+		DoDeepFirstTraverSal(right.Function.Args(), paramExprs, cols)
 	}
 	//深度优先遍历，先往下一直遍历，知道叶子节点在做具体的处理逻辑，也就是判断节点参数类型。
-	//程序到达这里，args左右子树就是column和constant了。
-	if setOk := SetParamTypes(args, paramExprs, cols, paramIndex); setOk {
-		paramIndex++
-	}
-	return paramIndex
+	SetParamTypes(args, paramExprs, cols)
 }
 
-// SetParamTypes 设置参数类型，根据给出的column信息和当前节点信息对比，找到其参数类型
-func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramIndex int) bool {
-	if constant, ok := args[1].(*expression.Constant); ok && constant.Value.Kind() == 0 {
+// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
+func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
+	if constant, ok := args[1].(*expression.Constant); ok {
 		if column, ok := args[0].(*expression.Column); ok {
-			for i := range *cols {
-				if paramMarker, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); (*cols)[i].OrigName == column.OrigName && ok {
-					paramMarker.TexprNode.Type = *(*cols)[i].RetType
-					break
+		cycle:
+			for _, col := range *cols {
+				for _,expr := range *paramExprs {
+					if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == column.OrigName &&
+						paramMarker.Offset == constant.Offset {
+						paramMarker.TexprNode.Type = *col.RetType
+						break cycle
+					}
 				}
 			}
 		}
-		return true
-	} else {
-		return false
 	}
 }
 
@@ -797,8 +820,8 @@ type PhysicalMaxOneRow struct {
 }
 
 // PGSQL Modified
-func (maxOneRow *PhysicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (maxOneRow *PhysicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalTableDual is the physical operator of dual.
@@ -813,8 +836,8 @@ type PhysicalTableDual struct {
 }
 
 //PGSQL Modified
-func (p *PhysicalTableDual) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalTableDual) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // OutputNames returns the outputting names of each column.
@@ -838,8 +861,8 @@ type PhysicalWindow struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalWindow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalWindow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalShuffle represents a shuffle plan.
@@ -862,8 +885,8 @@ type PhysicalShuffle struct {
 }
 
 // PGSQL Modified
-func (shuffle *PhysicalShuffle) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (shuffle *PhysicalShuffle) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PartitionSplitterType is the type of `Shuffle` executor splitter, which splits data source into partitions.
@@ -884,8 +907,8 @@ type PhysicalShuffleDataSourceStub struct {
 }
 
 // PGSQL Modified
-func (p *PhysicalShuffleDataSourceStub) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currIndex int, err error) {
-	return currIndex, err
+func (p *PhysicalShuffleDataSourceStub) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // CollectPlanStatsVersion uses to collect the statistics version of the plan.
@@ -919,8 +942,8 @@ type PhysicalShow struct {
 }
 
 // PGSQL Modified
-func (show *PhysicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
-	return currParamMarkerIndex,err
+func (show *PhysicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // PhysicalShowDDLJobs is for showing DDL job list.
@@ -931,8 +954,8 @@ type PhysicalShowDDLJobs struct {
 }
 
 //PGSQL Modified
-func (ddl *PhysicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error) {
-	return currParamMarkerIndex, err
+func (ddl *PhysicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
 }
 
 // BuildMergeJoinPlan builds a PhysicalMergeJoin from the given fields. Currently, it is only used for test purpose.

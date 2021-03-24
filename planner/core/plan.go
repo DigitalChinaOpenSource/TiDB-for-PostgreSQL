@@ -248,7 +248,7 @@ type PhysicalPlan interface {
 	// currParamMarkerIndex：通过 paramMarkerIndex 以及该方法内部设置的参数类型树，将下一次调用这个方法该从数组哪个位置开始设置
 	// err：过程中的异常报错
 	// PGSQL Modified
-	SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error)
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 type baseLogicalPlan struct {
