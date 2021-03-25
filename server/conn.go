@@ -45,10 +45,10 @@ import (
 	"fmt"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
-	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/types"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"net"
 	"runtime"
@@ -60,7 +60,6 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
-	"hash/fnv"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
@@ -990,45 +989,35 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		if err := parse.Decode(data); err != nil {
 			return err
 		}
-		cc.writeParseComplete()
-		return cc.flush(ctx)
+		return cc.handleStmtPrepare(ctx,parse)
 	case 'B':            /* bind */
 		bind := pgproto3.Bind{}
 		if err := bind.Decode(data); err != nil {
 			return err
 		}
-		//实际处理 bind 过程的逻辑
-		if err := cc.handBind(ctx, bind); err != nil {
-			return err
-		}
-		cc.writeBindComplete()
-		return cc.flush(ctx)
+		return cc.handleStmtBind(ctx, bind)
 	case 'E':            /* execute */
 		execute := pgproto3.Execute{}
 		if err := execute.Decode(data); err != nil {
 			return err
 		}
-		return cc.writeCommandComplete()
+		return cc.handleStmtExecute(ctx, execute)
 	case 'F':            /* fastpath function call */
 	case 'C':            /* close */
+		c := pgproto3.Close{}
+		if err := c.Decode(data); err != nil {
+			return err
+		}
+		return cc.handleStmtClose(ctx, c)
 	case 'D':            /* describe */
 		desc := pgproto3.Describe{}
 		if err := desc.Decode(data); err != nil {
 			return err
 		}
-		params := []uint32{
-			pgtype.VarcharOID,
-			pgtype.VarcharOID,
-			pgtype.Int4OID,
-		}
-		if err := cc.handDescription(ctx, desc); err != nil {
-			return nil
-		}
-		cc.writeParameterDescription(params)
-		cc.writeNoData()
-		return cc.flush(ctx)
+		return cc.handleStmtDescription(ctx, desc)
 	case 'H':            /* flush */
 	case 'S':            /* sync */
+		// todo 获取事务状态再返回
 		return cc.writeReadForQuery(ctx,'I')
 	case 'X':
 		return nil
@@ -1039,15 +1028,6 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 	}
 	return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
-}
-
-// 将pg报文携带的唯一ID（字符串）转换成唯一的int型ID，以便于兼容到原本tidb的stmtID类型
-// 实际上是一个hash方法
-//PGSQL Modified
-func ChangePgStmtID2Uint32(pg string) uint32 {
-	h := fnv.New32()
-	h.Write([]byte(pg))
-	return h.Sum32()
 }
 
 func (cc *clientConn) useDB(ctx context.Context, db string) (err error) {
@@ -1114,10 +1094,11 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 
 	cc.lastCode = m.Code
 
+	// https://www.postgresql.org/docs/13/errcodes-appendix.html
 	errorResponse := pgproto3.ErrorResponse{
 		Severity:            "ERROR",
 		SeverityUnlocalized: "",
-		Code:                "28P01",
+		Code:                "XX000",
 		Message:             m.Message,
 		Detail:              "",
 		Hint:                "",
@@ -1554,7 +1535,9 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary b
 	}()
 	var err error
 	if mysql.HasCursorExistsFlag(serverStatus) {
-		err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
+		// todo writeChunksWithFetchSize
+		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
+		return nil
 	} else {
 		err = cc.writeChunks(ctx, rs, binary, serverStatus)
 	}
@@ -1584,7 +1567,15 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 // PostgreSQL Modified
 func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
 	req := rs.NewChunk()
+
 	gotColumnInfo := false
+	isPrepareStmt := rs.IsPrepareStmt()
+
+	// 当为预处理查询执行时，在执行完成后不需要返回 RowDescription
+	if isPrepareStmt {
+		gotColumnInfo = true
+	}
+
 	var stmtDetail *execdetails.StmtExecDetails
 	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
 	if stmtDetailRaw != nil {
@@ -1615,9 +1606,9 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		reg := trace.StartRegion(ctx, "WriteClientConn")
 		for i := 0; i < rowCount; i++ {
 			if binary {
-				// todo writebinary
+				err = cc.writeBinaryRowData(rs.Columns(), req.GetRow(i))
 			} else {
-				err = cc.writeRowData(rs.Columns(), req.GetRow(i))
+				err = cc.writeTextRowData(rs.Columns(), req.GetRow(i))
 			}
 			if err != nil {
 				return err
@@ -1628,9 +1619,13 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		}
 		reg.End()
 	}
-
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
+	}
+
+	// 当为预处理查询执行时，在执行完成后不需要返回 ReadyForQuery
+	if isPrepareStmt {
+		return nil
 	}
 
 	return cc.writeReadForQuery(ctx, serverStatus)
@@ -2247,9 +2242,9 @@ func (cc *clientConn) writeAuthenticationOK(ctx context.Context) error {
 	return cc.flush(ctx)
 }
 
-//WriteRowDescription 向客户端写回 RowDescription
-//需要将ColumnInfo 转换为 RowDescription
-//这里只写向缓存，并不发送
+// WriteRowDescription 向客户端写回 RowDescription
+// 需要将ColumnInfo 转换为 RowDescription
+// 这里只写向缓存，并不发送
 func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 	if len(columns) <= 0 || columns == nil {
 		return errors.New("columnInfos is empty")
@@ -2262,10 +2257,66 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 	return nil
 }
 
-// writeRowData 向客户端写回 RowData
-// 一行一行的写入 对标 dumpTextRow() 方法
+// writeBinaryRowData 向客户端以 Binary 格式写回 RowData
+// 每次只写入一行数据
 // 这里只写向缓存，并不发送
-func (cc *clientConn) writeRowData(columns []*ColumnInfo, row chunk.Row) error {
+func (cc *clientConn) writeBinaryRowData(columns []*ColumnInfo, row chunk.Row) (err error) {
+	data := make([][]byte, len(columns))
+	for i := range columns {
+		if row.IsNull(i) {
+			continue
+		}
+		switch columns[i].Type {
+		case mysql.TypeTiny:
+			data[i] = make([]byte, 1)
+			data[i][0] = byte(row.GetInt64(i))
+		case mysql.TypeShort, mysql.TypeYear:
+			data[i] = make([]byte, 2)
+			binary.BigEndian.PutUint16(data[i], uint16(row.GetInt64(i)))
+		case mysql.TypeInt24, mysql.TypeLong:
+			data[i] = make([]byte, 4)
+			binary.BigEndian.PutUint32(data[i], uint32(row.GetInt64(i)))
+		case mysql.TypeLonglong:
+			data[i] = make([]byte, 8)
+			binary.BigEndian.PutUint64(data[i], row.GetUint64(i))
+		case mysql.TypeFloat:
+			data[i] = make([]byte, 4)
+			binary.BigEndian.PutUint32(data[i], math.Float32bits(row.GetFloat32(i)))
+		case mysql.TypeDouble:
+			data[i] = make([]byte, 8)
+			binary.BigEndian.PutUint64(data[i], math.Float64bits(row.GetFloat64(i)))
+		case mysql.TypeNewDecimal:
+			data[i] = hack.Slice(row.GetMyDecimal(i).String())
+		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
+			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
+			data[i] = row.GetBytes(i)
+		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
+			data[i] = make([]byte, 0)
+			data[i] = dumpBinaryDateTimeByBigEndian(data[i], row.GetTime(i))
+		case mysql.TypeDuration:
+			data[i] = dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
+		case mysql.TypeEnum:
+			data[i] = hack.Slice(row.GetEnum(i).String())
+		case mysql.TypeSet:
+			data[i] = hack.Slice(row.GetSet(i).String())
+		case mysql.TypeJSON:
+			data[i] = hack.Slice(row.GetJSON(i).String())
+		default:
+			return errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
+		}
+	}
+	dataRow := pgproto3.DataRow{Values: data }
+
+	if _, err := cc.pkt.bufWriter.Write(dataRow.Encode(nil)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// writeTextRowData 向客户端以 Text 格式写回 RowData
+// 每次只写入一行数据
+// 这里只写向缓存，并不发送
+func (cc *clientConn) writeTextRowData(columns []*ColumnInfo, row chunk.Row) error {
 	data := make([][]byte, len(columns))
 	tmp := make([]byte, 0, 20)
 	for i, col := range columns {
@@ -2374,15 +2425,6 @@ func (cc *clientConn) writeParameterDescription(paramOid []uint32) error {
 	return err
 }
 
-// todo 完善写回row description函数，填充fields
-//func (cc *clientConn) wirteRowDescription(field []FieldDescription) error {
-//	rowDescription := pgproto3.RowDescription{
-//		Fields: field,
-//	}
-//	_, err := cc.pkt.bufWriter.Write(rowDescription.Encode(nil))
-//	return err
-//}
-
 // writeNoData 向客户端写回 NoData 表示语句无数据返回
 func (cc *clientConn) writeNoData() error {
 	noData := pgproto3.NoData{}
@@ -2419,54 +2461,6 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	}
 
 	return cc.flush(ctx)
-}
-
-// handBind 处理pgsql拓展查询协议过程中的bind过程
-// ctx：上下文
-// bind： pg客户端发来的bind包
-// PGSQL Modified
-func (cc *clientConn) handBind(ctx context.Context, bind pgproto3.Bind) (err error) {
-	//调用自定义hash函数，获取stmtID（字符串类型）唯一对应的int数值。
-	stmtID := ChangePgStmtID2Uint32(bind.PreparedStatement)
-	stmt := cc.ctx.GetStatement(int(stmtID))
-	if stmt == nil {
-		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_bind")
-	}
-	var (
-		nullBitmaps []byte
-		paramTypes  []byte
-		paramValues []byte
-	)
-	// 在之前的Parse阶段，各字段的类型就已经设置好了。
-	if cachedStmt, ok := cc.ctx.GetSessionVars().PreparedStmts[0].(*plannercore.CachedPrepareStmt); ok {
-		cachedParams := cachedStmt.PreparedAst.Params
-		for i := range cachedParams {
-			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
-		}
-	}
-	stmt.SetParamsType(paramTypes)
-	//todo pg与tidb param格式不一样，转换一下啊
-	pktParams := bind.Parameters
-	for i := range pktParams {
-		paramValues = append(paramValues, pktParams[i]...)
-	}
-
-	numParams := stmt.NumParams()
-	args := make([]types.Datum, numParams)
-
-	err = parseExecArgs(cc.ctx.GetSessionVars().StmtCtx, args, stmt.BoundParams(), nullBitmaps, stmt.GetParamsType(), paramValues)
-	stmt.Reset()
-	if err != nil {
-		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
-	}
-
-	return nil
-}
-
-func (cc *clientConn) handDescription(ctx context.Context, desc pgproto3.Describe) error {
-
-	return nil
 }
 
 // convertColumnInfoToRowDescription 将 MySQL 的字段结构信息 转换为 PgSQL 的字段结构信息
