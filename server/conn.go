@@ -2258,6 +2258,7 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 }
 
 // writeBinaryRowData 向客户端以 Binary 格式写回 RowData
+// MySQL 报文协议为小端序，在 PgSQL 中报文为大端序
 // 每次只写入一行数据
 // 这里只写向缓存，并不发送
 func (cc *clientConn) writeBinaryRowData(columns []*ColumnInfo, row chunk.Row) (err error) {

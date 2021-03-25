@@ -60,9 +60,9 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	stmt, _, _, err := cc.ctx.Prepare(parser.Query)
 
 	vars := cc.ctx.GetSessionVars()
-	var	paramTypes []byte
 
-	// 在之前的Parse阶段，各字段的类型就已经设置好了。
+	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
+	var	paramTypes []byte
 	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
 		cachedParams := cachedStmt.PreparedAst.Params
 		for i := range cachedParams {
@@ -88,6 +88,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (err error) {
 	vars := cc.ctx.GetSessionVars()
 
+	// 当为临时预处理查询，默认设置 Name 为 0
 	if bind.PreparedStatement == ""{
 		bind.PreparedStatement = "0"
 	}
@@ -160,6 +161,7 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	}
 	numParams := stmt.NumParams()
 
+	// 将解析阶段解析出的参数类型获取到，并转换为PgSQL数据类型传回到客户端
 	paramsType := stmt.GetParamsType()
 	pgType := make([]uint32, numParams)
 	for i,_ := range paramsType{
@@ -193,6 +195,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
 	vars := cc.ctx.GetSessionVars()
 
+	// 当为临时预处理查询，默认设置 Name 为 0
 	if execute.Portal == "" {
 		execute.Portal = "0"
 	}
@@ -213,7 +216,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
 	if rs == nil {
-		return cc.writeOK(ctx)
+		return cc.writeCommandComplete()
 	}
 
 	err = cc.writeResultset(ctx, rs, true, 0, 0)
@@ -287,6 +290,7 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 	return stmtID, fetchSize, nil
 }
 
+// parseBindArgs 将客户端传来的参数值解析为 Datum 结构
 func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind) error {
 	// todo 传参为文本 text 格式时候的处理
 
