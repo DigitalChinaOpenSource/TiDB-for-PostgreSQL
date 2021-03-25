@@ -144,11 +144,25 @@ func dumpUint16(buffer []byte, n uint16) []byte {
 	return buffer
 }
 
+func dumpUint16ByBigEndian(buffer []byte, n uint16) []byte {
+	buffer = append(buffer, byte(n>>8))
+	buffer = append(buffer, byte(n))
+	return buffer
+}
+
 func dumpUint32(buffer []byte, n uint32) []byte {
 	buffer = append(buffer, byte(n))
 	buffer = append(buffer, byte(n>>8))
 	buffer = append(buffer, byte(n>>16))
 	buffer = append(buffer, byte(n>>24))
+	return buffer
+}
+
+func dumpUint32ByBigEndian(buffer []byte, n uint32) []byte {
+	buffer = append(buffer, byte(n>>24))
+	buffer = append(buffer, byte(n>>16))
+	buffer = append(buffer, byte(n>>8))
+	buffer = append(buffer, byte(n))
 	return buffer
 }
 
@@ -161,6 +175,18 @@ func dumpUint64(buffer []byte, n uint64) []byte {
 	buffer = append(buffer, byte(n>>40))
 	buffer = append(buffer, byte(n>>48))
 	buffer = append(buffer, byte(n>>56))
+	return buffer
+}
+
+func dumpUint64ByBigEndian(buffer []byte, n uint64) []byte {
+	buffer = append(buffer, byte(n>>56))
+	buffer = append(buffer, byte(n>>48))
+	buffer = append(buffer, byte(n>>40))
+	buffer = append(buffer, byte(n>>32))
+	buffer = append(buffer, byte(n>>24))
+	buffer = append(buffer, byte(n>>16))
+	buffer = append(buffer, byte(n>>8))
+	buffer = append(buffer, byte(n))
 	return buffer
 }
 
@@ -203,6 +229,38 @@ func dumpBinaryTime(dur time.Duration) (data []byte) {
 	return
 }
 
+// dumpBinaryTimeByBigEndian 将时间转为大端序字节流
+func dumpBinaryTimeByBigEndian(dur time.Duration) (data []byte) {
+	if dur == 0 {
+		data = tinyIntCache[0]
+		return
+	}
+	data = make([]byte, 13)
+	data[0] = 12
+	if dur < 0 {
+		data[1] = 1
+		dur = -dur
+	}
+	days := dur / (24 * time.Hour)
+	dur -= days * 24 * time.Hour
+	data[2] = byte(days)
+	hours := dur / time.Hour
+	dur -= hours * time.Hour
+	data[6] = byte(hours)
+	minutes := dur / time.Minute
+	dur -= minutes * time.Minute
+	data[7] = byte(minutes)
+	seconds := dur / time.Second
+	dur -= seconds * time.Second
+	data[8] = byte(seconds)
+	if dur == 0 {
+		data[0] = 8
+		return data[:9]
+	}
+	binary.BigEndian.PutUint32(data[9:13], uint32(dur/time.Microsecond))
+	return
+}
+
 func dumpBinaryDateTime(data []byte, t types.Time) []byte {
 	year, mon, day := t.Year(), t.Month(), t.Day()
 	switch t.Type() {
@@ -236,6 +294,43 @@ func dumpBinaryDateTime(data []byte, t types.Time) []byte {
 			data = append(data, byte(mon), byte(day))
 		}
 	}
+	return data
+}
+
+func dumpBinaryDateTimeByBigEndian(data []byte, t types.Time) []byte {
+	year, mon, day := t.Year(), t.Month(), t.Day()
+	switch t.Type() {
+	case mysql.TypeTimestamp, mysql.TypeDatetime:
+		if t.IsZero() {
+			// All zero.
+			data = append(data, 0)
+		} else if t.Microsecond() != 0 {
+			// Has micro seconds.
+			data = append(data, 11)
+			data = dumpUint16ByBigEndian(data, uint16(year))
+			data = append(data, byte(mon), byte(day), byte(t.Hour()), byte(t.Minute()), byte(t.Second()))
+			data = dumpUint32ByBigEndian(data, uint32(t.Microsecond()))
+		} else if t.Hour() != 0 || t.Minute() != 0 || t.Second() != 0 {
+			// Has HH:MM:SS
+			data = append(data, 7)
+			data = dumpUint16ByBigEndian(data, uint16(year))
+			data = append(data, byte(mon), byte(day), byte(t.Hour()), byte(t.Minute()), byte(t.Second()))
+		} else {
+			// Only YY:MM:DD
+			data = append(data, 4)
+			data = dumpUint16ByBigEndian(data, uint16(year))
+			data = append(data, byte(mon), byte(day))
+		}
+	case mysql.TypeDate:
+		if t.IsZero() {
+			data = append(data, 0)
+		} else {
+			data = append(data, 4)
+			data = dumpUint16ByBigEndian(data, uint16(year)) //year
+			data = append(data, byte(mon), byte(day))
+		}
+	}
+
 	return data
 }
 

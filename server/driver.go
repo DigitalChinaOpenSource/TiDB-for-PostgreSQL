@@ -138,11 +138,19 @@ type PreparedStatement interface {
 	// Close closes the statement.
 	Close() error
 
-	// SetColumnExistStatus 设置statement中是否有行数据返回的标志
-	SetColumnExistStatus(exist bool)
+	// SetColumnInfo 设置statement中返回行数据信息
+	SetColumnInfo(columns []*ColumnInfo)
 
-	// GetColumnExistStatus 获取statement中是否有行数据返回的标志
-	GetColumnExistStatus() bool
+	// GetColumnInfo 获取statement中返回行数据信息
+	GetColumnInfo() []*ColumnInfo
+
+	// SetArgs 在bind阶段绑定参数具体值
+	SetArgs(args []types.Datum)
+
+	// GetArgs 获取Args的具体值
+	GetArgs() []types.Datum
+
+
 }
 
 // ResultSet is the result set of an query.
@@ -153,6 +161,7 @@ type ResultSet interface {
 	StoreFetchedRows(rows []chunk.Row)
 	GetFetchedRows() []chunk.Row
 	Close() error
+	IsPrepareStmt() bool
 }
 
 // fetchNotifier represents notifier will be called in COM_FETCH.

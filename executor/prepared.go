@@ -220,6 +220,10 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	}
 	if e.name != "" {
 		vars.PreparedStmtNameToID[e.name] = e.ID
+	} else {
+		// 当没有 Stmt 没有Name时，则表示该预处理语句为临时语句，我们会分配 0 作为其 Name
+		// 后面在获取临时预处理语句 ID 的时候，通过 0 获取
+		vars.PreparedStmtNameToID["0"] = e.ID
 	}
 
 	normalized, digest := parser.NormalizeDigest(prepared.Stmt.Text())
