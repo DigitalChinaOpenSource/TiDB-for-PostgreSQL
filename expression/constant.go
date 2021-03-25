@@ -55,6 +55,7 @@ func NewNull() *Constant {
 }
 
 // Constant stands for a constant value.
+// PGSQL Modified
 type Constant struct {
 	Value   types.Datum
 	RetType *types.FieldType
@@ -68,6 +69,9 @@ type Constant struct {
 	hashcode    []byte
 
 	collationInfo
+
+	// 保存参数偏移量的变量，用于在树的遍历过程中，通过这个偏移量和prepared.Params结构中的变量比较从而获取其类型
+	Offset int
 }
 
 // ParamMarker indicates param provided by COM_STMT_EXECUTE.

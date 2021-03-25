@@ -698,12 +698,14 @@ func DatumToConstant(d types.Datum, tp byte) *Constant {
 }
 
 // ParamMarkerExpression generate a getparam function expression.
+// PGSQL Modified
+// 保存了参数的偏移量即从driver.ParamMarkerExpr中获取Offset保存到Constant结构体中。
 func ParamMarkerExpression(ctx sessionctx.Context, v *driver.ParamMarkerExpr) (Expression, error) {
 	useCache := ctx.GetSessionVars().StmtCtx.UseCache
 	isPointExec := ctx.GetSessionVars().StmtCtx.PointExec
 	tp := types.NewFieldType(mysql.TypeUnspecified)
 	types.DefaultParamTypeForValue(v.GetValue(), tp)
-	value := &Constant{Value: v.Datum, RetType: tp}
+	value := &Constant{Value: v.Datum, RetType: tp, Offset: v.Offset}
 	if useCache || isPointExec {
 		value.ParamMarker = &ParamMarker{
 			order: v.Order,
