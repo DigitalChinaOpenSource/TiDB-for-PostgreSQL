@@ -17,6 +17,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pingcap/errors"
@@ -186,7 +187,9 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// We try to build the real statement of preparedStmt.
 	for i := range prepared.Params {
 		param := prepared.Params[i].(*driver.ParamMarkerExpr)
-		param.Datum.SetNull()
+		//param.Datum.SetNull()
+		//每个datum设置类型为interface，保证计划中的条件都会存在不会被优化掉。
+		param.Datum.SetInterfaceType()
 		param.InExecute = false
 	}
 	var p plannercore.Plan
@@ -205,6 +208,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 			SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
 		case *plannercore.Delete:
 			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
+		case *plannercore.Update:
+			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	}
 
 	if _, ok := stmt.(*ast.SelectStmt); ok {
@@ -230,30 +235,28 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
 //	insertPlan：计划结构体
 //	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
-// 目前支持的sql句式：
-// insert into table1 values(xxx,xxx), (yyy,yyy)
-// insert into table1 where condition1 and condition2 and ...
-// insert into table1 where condition2 or condition and
-// todo 复杂嵌套条件情况还未支持
-// PGSQL Modified
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
 	if insertPlan.SelectPlan != nil {
 		insertPlan.SelectPlan.SetParamType(paramExprs)
 	} else {
-		//当前计划的tableSchema，也就是表结构。
 		paramIndex := 0
+		//当前计划的tableSchema，也就是表结构。
 		cols := insertPlan.GetTableSchema().Columns
+		// 这里有参数传进来的顺序。
+		orderedColumns := insertPlan.Columns
 		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
-		lists := insertPlan.Lists
-		for i := range lists {
-			list := lists[i]
+		for _, list := range insertPlan.Lists {
 			for j := range list {
-				cst := list[j].(*expression.Constant)
-				//Kind()将返回Datum对象的k成员，我们通过这个标志知道这个参数是传进来值了，还是暂时用？占位。
-				if cst.Value.Kind() == 0 {
-					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok{
-						paramMakerExpr.TexprNode.Type = *(cols[j].RetType)
-						paramIndex++
+				if cst := list[j].(*expression.Constant); cst.Offset != 0 {
+					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
+						for _, col := range cols {
+							nameSplit := strings.Split(col.OrigName,".")
+							shortName := nameSplit[len(nameSplit) - 1]
+							if shortName == orderedColumns[j].Name.O {
+								paramMakerExpr.TexprNode.Type = *col.RetType
+								paramIndex++
+							}
+						}
 					}
 				}
 			}
@@ -261,15 +264,41 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 	}
 }
 
-// SetSelectParamType 当语句为select，获取其参数类型并设置到prepared.Param中去
+// SetSelectParamType 从select计划中获取参数类型
 func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
-	projection.SetParamType(params,nil,0)
+	projection.SetParamType(params)
 }
 
-// SetDeleteParamType 为delete语句设置参数类型
+// SetDeleteParamType 从delete计划中获取参数类型
 func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
 	if delete.SelectPlan != nil {
 		delete.SelectPlan.SetParamType(params)
+	}
+}
+
+// SetUpdateParamType 从update计划获取参数类型
+func SetUpdateParamType(update *plannercore.Update, params *[]ast.ParamMarkerExpr) {
+	if list := update.OrderedList; list != nil {
+		for _,l := range list {
+			SetUpdateParamTypes(l,params,&update.SelectPlan.Schema().Columns)
+		}
+	}
+	update.SelectPlan.SetParamType(params)
+}
+
+// SetUpdateParamTypes 这里是处理 update table set name = ?, age = ?这样的位置的参数的
+func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
+	if constant, ok := assignmnet.Expr.(*expression.Constant); ok {
+	cycle:
+		for _, col := range *cols {
+			for _,expr := range *paramExprs {
+				if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == assignmnet.Col.OrigName &&
+					paramMarker.Offset == constant.Offset {
+					paramMarker.TexprNode.Type = *col.RetType
+					break cycle
+				}
+			}
+		}
 	}
 }
 

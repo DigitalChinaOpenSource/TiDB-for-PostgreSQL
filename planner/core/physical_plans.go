@@ -75,7 +75,7 @@ type PhysicalTableReader struct {
 	StoreType kv.StoreType
 }
 
-// SetParamType 在tableReader计划中获取参数类型
+// SetParamType 从tableReader计划中获取参数类型
 func (tr *PhysicalTableReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := tr.children; childPlans != nil {
 		for _, childPlan := range childPlans {
@@ -151,7 +151,7 @@ type PhysicalIndexReader struct {
 	OutputColumns []*expression.Column
 }
 
-//PGSQL Modified
+// todo 获取PhysicalIndexReader计划中的参数类型
 func (p *PhysicalIndexReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -199,7 +199,7 @@ type PhysicalIndexLookUpReader struct {
 	PushedLimit *PushedDownLimit
 }
 
-// PGSQL Modified
+// todo 从PhysicalIndexLookUpReader计划中获取参数类型
 func (p *PhysicalIndexLookUpReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -218,7 +218,7 @@ type PhysicalIndexMergeReader struct {
 	tablePlan PhysicalPlan
 }
 
-//PGSQL Modified
+// todo 从PhysicalIndexMergeReader计划中获取参数类型
 func (p *PhysicalIndexMergeReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -263,7 +263,7 @@ type PhysicalIndexScan struct {
 	DoubleRead bool
 }
 
-// PGSQL Modified
+// todo 从PhysicalIndexScan计划中获取参数类型
 func (p *PhysicalIndexScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -279,9 +279,8 @@ type PhysicalMemTable struct {
 	QueryTimeRange QueryTimeRange
 }
 
-// PGSQL Modified
-// SetParamType 设置参数类型
-func (men *PhysicalMemTable) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+// SetParamType todo 从PhysicalMemTable计划中获取参数类型
+func (p *PhysicalMemTable) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -389,7 +388,7 @@ type PhysicalProjection struct {
 	AvoidColumnEvaluator bool
 }
 
-// SetParamType 为PhysicalProjection计划设置参数类型
+// SetParamType 从PhysicalProjection计划中获取参数类型
 func (p *PhysicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := p.children; childPlans != nil {
 		for _,childPlan := range childPlans {
@@ -411,7 +410,7 @@ type PhysicalTopN struct {
 	Count   uint64
 }
 
-// PGSQL Modified
+// todo 从PhysicalTopN中获取参数类型
 func (lt *PhysicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -423,7 +422,7 @@ type PhysicalApply struct {
 	OuterSchema []*expression.CorrelatedColumn
 }
 
-// PGSQL Modified
+// todo 从PhysicalApply计划中获取参数类型
 func (la *PhysicalApply) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -456,7 +455,7 @@ type PhysicalHashJoin struct {
 	UseOuterToBuild bool
 }
 
-// SetParamType 为PhysicalHashJoin计划设置参数
+// SetParamType 从PhysicalHashJoin计划中获取参数类型
 func (p *PhysicalHashJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := p.children; childPlans != nil {
 		for _, childPlan := range childPlans {
@@ -518,8 +517,8 @@ type PhysicalIndexJoin struct {
 	InnerHashKeys []*expression.Column
 }
 
-// PGSQL Modified
-func (indexJoin *PhysicalIndexJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+// todo 从PhysicalIndexJoin计划中获取参数类型
+func (p *PhysicalIndexJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -557,7 +556,7 @@ type PhysicalMergeJoin struct {
 	Desc bool
 }
 
-//PGSQL Modified
+// todo 从PhysicalMergeJoin中获取参数类型
 func (join *PhysicalMergeJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -568,7 +567,7 @@ type PhysicalBroadCastJoin struct {
 	globalChildIndex int
 }
 
-// PGSQL Modified
+// todo 从PhysicalBroadCastJoin计划中获取参数类型
 func (lock *PhysicalBroadCastJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -583,7 +582,7 @@ type PhysicalLock struct {
 	PartitionedTable []table.PartitionedTable
 }
 
-// PGSQL Modified
+// todo 从PhysicalLock计划中获取参数类型
 func (lock *PhysicalLock) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -596,7 +595,7 @@ type PhysicalLimit struct {
 	Count  uint64
 }
 
-// PGSQL Modified
+// todo 从PhysicalLimit计划中获取参数类型
 func (p *PhysicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -606,7 +605,7 @@ type PhysicalUnionAll struct {
 	physicalSchemaProducer
 }
 
-// PGSQL Modified
+// todo 从PhysicalUnionAll计划中获取参数类型
 func (unionAll *PhysicalUnionAll) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -618,7 +617,7 @@ type basePhysicalAgg struct {
 	GroupByItems []expression.Expression
 }
 
-// PGSQL Modified
+// todo 从basePhysicalAgg计划中获取参数类型
 func (agg *basePhysicalAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -652,7 +651,7 @@ type PhysicalHashAgg struct {
 	basePhysicalAgg
 }
 
-// PGSQL Modified
+// todo 从PhysicalHashAgg中获取参数类型
 func (agg *PhysicalHashAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -671,8 +670,7 @@ type PhysicalStreamAgg struct {
 	basePhysicalAgg
 }
 
-// SetParamType
-// PGSQL Modified
+// SetParamType todo 从PhysicalStreamAgg孔家中获取参数类型
 func (agg *PhysicalStreamAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -684,7 +682,7 @@ type PhysicalSort struct {
 	ByItems []*util.ByItems
 }
 
-// PGSQL Modified
+// todo 从PhysicalSort计划中获取参数类型
 func (ls *PhysicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -701,7 +699,7 @@ type NominalSort struct {
 	OnlyColumn bool
 }
 
-//PGSQL Modified
+//todo 从NominalSort计划中获取参数类型
 func (sort *NominalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -715,7 +713,7 @@ type PhysicalUnionScan struct {
 	HandleCol *expression.Column
 }
 
-// PGSQL Modified
+// todo 从PhysicalUnionScan获取参数类型
 func (p *PhysicalUnionScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -740,8 +738,7 @@ type PhysicalSelection struct {
 	Conditions []expression.Expression
 }
 
-// PGSQL Modified
-// SetParamType 设置paramExprs参数类型，需要考虑具体计划内部参数的分布
+// SetParamType 从PhysicalSelection计划中获取参数类型
 func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := p.children; childPlans != nil {
 		for _,childPlan := range childPlans {
@@ -757,70 +754,13 @@ func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err
 	return err
 }
 
-// DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
-// 其分为两种情况，一种是 condition1 and condition2 and condition 3，其参数放在select子计划中的Condition成员中，是一个数组
-// 另一种情况是 condition1 or condition2 and condition3 。其参数构造成了一个树，需要深度优先遍历
-// exprs：select子计划的参数，可能是个数组，也可能是个树
-// paramExprs：prepared.Param，我们需要往里面设置参数类型。
-// cols：select计划查询的字段信息
-// PGSQL Modified
-func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
-	if len(exprs) > 1 {
-		// sql where condition like this : x = aaa and y > bbb and z < ccc
-		for i := range exprs {
-			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
-				SetParamTypes(scalar.Function.Args(), paramExprs, cols)
-			}
-		}
-	} else if len(exprs) == 1 {
-		// sql where condition like this : x = aaa or y < bbb and z = zzz
-		// the struct is a tree , not even array, we should use deep-first traversal to resolve
-		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
-			DoDeepFirstTraverSal(scalar.Function.Args(), paramExprs, cols)
-		}
-	}
-}
-
-// DoDeepFirstTraverSal 深度优先遍历树形结构的参数，设置到paramExprs中去
-// PGSQL Modified
-func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
-	//left不是终结点，还可以往下遍历
-	if left, ok := args[0].(*expression.ScalarFunction); ok {
-		DoDeepFirstTraverSal(left.Function.Args(), paramExprs, cols)
-	}
-	// 右子树不是终结点，还可以往下遍历
-	if right, ok := args[1].(*expression.ScalarFunction); ok {
-		DoDeepFirstTraverSal(right.Function.Args(), paramExprs, cols)
-	}
-	//深度优先遍历，先往下一直遍历，知道叶子节点在做具体的处理逻辑，也就是判断节点参数类型。
-	SetParamTypes(args, paramExprs, cols)
-}
-
-// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
-func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
-	if constant, ok := args[1].(*expression.Constant); ok {
-		if column, ok := args[0].(*expression.Column); ok {
-		cycle:
-			for _, col := range *cols {
-				for _,expr := range *paramExprs {
-					if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == column.OrigName &&
-						paramMarker.Offset == constant.Offset {
-						paramMarker.TexprNode.Type = *col.RetType
-						break cycle
-					}
-				}
-			}
-		}
-	}
-}
-
 // PhysicalMaxOneRow is the physical operator of maxOneRow.
 type PhysicalMaxOneRow struct {
 	basePhysicalPlan
 }
 
-// PGSQL Modified
-func (maxOneRow *PhysicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+// todo 从PhysicalMaxOneRow计划中获取参数类型
+func (p *PhysicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -835,7 +775,7 @@ type PhysicalTableDual struct {
 	names []*types.FieldName
 }
 
-//PGSQL Modified
+// todo 从PhysicalTableDual计划中获取参数类型
 func (p *PhysicalTableDual) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -860,7 +800,7 @@ type PhysicalWindow struct {
 	Frame           *WindowFrame
 }
 
-// PGSQL Modified
+// todo 从PhysicalWindow获取参数类型
 func (p *PhysicalWindow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -884,7 +824,7 @@ type PhysicalShuffle struct {
 	HashByItems  []expression.Expression
 }
 
-// PGSQL Modified
+// todo 从PhysicalShuffle计划中获取参数类型
 func (shuffle *PhysicalShuffle) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -906,7 +846,7 @@ type PhysicalShuffleDataSourceStub struct {
 	Worker unsafe.Pointer
 }
 
-// PGSQL Modified
+// todo 从PhysicalShuffleDataSourceStub计划中获取参数类型
 func (p *PhysicalShuffleDataSourceStub) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -941,7 +881,7 @@ type PhysicalShow struct {
 	ShowContents
 }
 
-// PGSQL Modified
+// todo 从PhysicalShow计划中获取参数类型
 func (show *PhysicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -953,7 +893,7 @@ type PhysicalShowDDLJobs struct {
 	JobNumber int64
 }
 
-//PGSQL Modified
+// todo 从PhysicalShowDDLJobs中获取参数类型
 func (ddl *PhysicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -967,4 +907,80 @@ func BuildMergeJoinPlan(ctx sessionctx.Context, joinType JoinType, leftKeys, rig
 		RightJoinKeys: rightKeys,
 	}
 	return PhysicalMergeJoin{basePhysicalJoin: baseJoin}.Init(ctx, nil, 0)
+}
+
+// DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
+// 其分为两种情况，一种是 condition1 and condition2 and condition 3，其参数放在select子计划中的Condition成员中，是一个数组
+// 另一种情况是 condition1 or condition2 and condition3 。其参数构造成了一个树，需要深度优先遍历
+// exprs：select子计划的参数，可能是个数组，也可能是个树
+// paramExprs：prepared.Param，我们需要往里面设置参数类型。
+// cols：select计划查询的字段信息
+func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
+	if len(exprs) > 1 {
+		// sql where condition like this : x = aaa and y > bbb and z < ccc
+		for i := range exprs {
+			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
+				SetParamTypes(scalar.Function.GetArgs(), paramExprs, cols)
+			}
+		}
+	} else if len(exprs) == 1 {
+		// sql where condition like this : x = aaa or y < bbb and z = zzz
+		// the struct is a tree , not even array, we should use deep-first traversal to resolve
+		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
+			DoDeepFirstTraverSal(scalar.Function.GetArgs(), paramExprs, cols)
+		}
+	}
+}
+
+// DoDeepFirstTraverSal 深度优先遍历树形结构的参数，设置到paramExprs中去
+// 这个递归方法返回值的情况是当遇到 cast 这样的一个参数的函数时，将其参数返回但递归的上一层处理。
+// 这是一种特殊情况，我们在前面构造计划 p 之前，设置prepared.Param参数类型为interface以保证无论子查询条件中是否包含主键字段，都能够在计划中找到条件字段。
+// 这样做的代价就是生成的 condition 在条件左侧的字段类型如果与默认类型不同，那么条件左右两侧的column和constant都要再包上一层cast方法。
+// 当遇到这种情况，我们就在递归过程中直接将参数（这里可能是column或者是constant）返回上层。在上层的逻辑中再调用SetParamTypes设置参数进去。
+func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
+	//left不是终结点，还可以往下遍历
+	var lRet,rRet []expression.Expression
+	if len(args) == 2 {
+		if left, ok := args[0].(*expression.ScalarFunction); ok {
+			lRet = DoDeepFirstTraverSal(left.Function.GetArgs(), paramExprs, cols)
+		}
+		// 右子树不是终结点，还可以往下遍历
+		if right, ok := args[1].(*expression.ScalarFunction); ok {
+			rRet = DoDeepFirstTraverSal(right.Function.GetArgs(), paramExprs, cols)
+		}
+	}
+	if lRet != nil && rRet != nil {
+		newArgs := append(lRet, rRet...)
+		SetParamTypes(newArgs, paramExprs, cols)
+	}
+	//深度优先遍历，先往下一直遍历，知道叶子节点在做具体的处理逻辑，也就是判断节点参数类型。
+	return SetParamTypes(args, paramExprs, cols)
+}
+
+// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
+// 只考虑了参数一个方法参数数量为1,或者是2的情况，比如 cast一个参数。eq 参数数量是2.
+func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
+	if len(args) == 1 {
+		// 当前考虑的是cast方法，只有一个参数的情况。直接返回上层处理。
+		return args
+	} else if len(args) == 2 {
+		if constant, ok := args[1].(*expression.Constant); ok {
+			if column, ok := args[0].(*expression.Column); ok {
+			cycle:
+				for _, col := range *cols {
+					for _,expr := range *paramExprs {
+						if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == column.OrigName &&
+							paramMarker.Offset == constant.Offset {
+							paramMarker.TexprNode.Type = *col.RetType
+							break cycle
+						}
+					}
+				}
+			}
+		}
+		return nil
+	}else {
+		// todo 完善多参数的处理逻辑
+		return nil
+	}
 }

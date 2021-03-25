@@ -283,8 +283,8 @@ func (b *baseBuiltinFunc) getArgs() []Expression {
 	return b.args
 }
 
-// Args 获取方法参数
-func (b *baseBuiltinFunc) Args() []Expression {
+// Args 获取方法参数，是一个public方法
+func (b *baseBuiltinFunc) GetArgs() []Expression {
 	return b.args
 }
 
@@ -544,7 +544,8 @@ type builtinFunc interface {
 	// Clone returns a copy of itself.
 	Clone() builtinFunc
 
-	Args() []Expression
+	// GetArgs 获取参数列表
+	GetArgs() []Expression
 
 	CollationInfo
 }

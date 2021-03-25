@@ -70,7 +70,7 @@ type PointGetPlan struct {
 	Path *util.AccessPath
 }
 
-// PGSQL Modified
+// todo PointGetPlan计划中获取参数类型
 func (pointGet *PointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
 	return nil
 }
@@ -251,7 +251,7 @@ type BatchPointGetPlan struct {
 	Path *util.AccessPath
 }
 
-// PGSQL Modified
+// todo 从BatchPointGetPlan计划中获取参数类型
 func (p *BatchPointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
 	return nil
 }

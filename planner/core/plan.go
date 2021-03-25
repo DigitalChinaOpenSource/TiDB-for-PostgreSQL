@@ -202,7 +202,7 @@ type LogicalPlan interface {
 	SetChild(i int, child LogicalPlan)
 
 	// SetParamType 逻辑计划设置参数类型的方法
-	SetParamType(paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column, paramMarkerIndex int) (currParamMarkerIndex int, err error)
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 // PhysicalPlan is a tree of the physical operators.
@@ -241,13 +241,9 @@ type PhysicalPlan interface {
 	// ExplainNormalizedInfo returns operator normalized information for generating digest.
 	ExplainNormalizedInfo() string
 
-	// SetParamType 设置参数类型
+	// SetParamType 从计划中获取参数信息，设置参数类型
 	// paramExprs:参数设置的目标，其中的Type成员就是具体设置的地方
-	// cols：表字段的参照，通过当前计划中的expression.Column成员与cols中的成员对比，获取到各参数的类型。
-	// paramMarkerIndex 设置参数的索引起点，由于不断的调用子计划的SetParamType方法，当前计划不能从头开始设置这些参数类型。
-	// currParamMarkerIndex：通过 paramMarkerIndex 以及该方法内部设置的参数类型树，将下一次调用这个方法该从数组哪个位置开始设置
 	// err：过程中的异常报错
-	// PGSQL Modified
 	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
