@@ -70,8 +70,11 @@ type Constant struct {
 
 	collationInfo
 
-	// 保存参数偏移量的变量，用于在树的遍历过程中，通过这个偏移量和prepared.Params结构中的变量比较从而获取其类型
+	// 用于保存参数偏移量的变量
 	Offset int
+
+	// 参数顺序 即$1这样的形式后面的数字
+	Order int
 }
 
 // ParamMarker indicates param provided by COM_STMT_EXECUTE.
