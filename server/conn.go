@@ -1093,12 +1093,12 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	}
 
 	cc.lastCode = m.Code
-
+	// todo 完成MySQL错误与PgSQL错误的转换和返回
 	// https://www.postgresql.org/docs/13/errcodes-appendix.html
 	errorResponse := pgproto3.ErrorResponse{
 		Severity:            "ERROR",
 		SeverityUnlocalized: "",
-		Code:                "XX000",
+		Code:                "28P01",
 		Message:             m.Message,
 		Detail:              "",
 		Hint:                "",
@@ -1111,6 +1111,10 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 		return err
 	}
 
+	// 发送错误后需要发送 ReadyForQuery 通知客户端可以继续执行命令
+	// 所以这里需要获取到事务状态是否处于空闲阶段
+	// todo 获取事务状态
+	cc.writeReadForQuery(ctx, 'I')
 	return cc.flush(ctx)
 }
 
