@@ -1267,6 +1267,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 				RetType:      &targetFieldType,
 				DeferredExpr: con.DeferredExpr,
 				ParamMarker:  con.ParamMarker,
+				Offset: con.Offset,
+				Order: con.Order,
 			}, true
 		}
 		return con, false
@@ -1281,6 +1283,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 			RetType:      &targetFieldType,
 			DeferredExpr: con.DeferredExpr,
 			ParamMarker:  con.ParamMarker,
+			Offset: con.Offset,
+			Order: con.Order,
 		}, false
 	}
 	switch op {
@@ -1323,6 +1327,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 				RetType:      &targetFieldType,
 				DeferredExpr: con.DeferredExpr,
 				ParamMarker:  con.ParamMarker,
+				Offset: con.Offset,
+				Order: con.Order,
 			}, false
 		}
 	}

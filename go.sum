@@ -915,8 +915,7 @@ newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210318090948-625049667500 h1
 newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210318090948-625049667500/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
 newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210319072222-9a19d5845aa5 h1:8wxd7oVBvLz2BMdbII681GPNVUq9BVgdr1RvGJeZze4=
 newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210319072222-9a19d5845aa5/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
-newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210325092335-62928cd57829 h1:4NRwtTlRarMgor1hhvrrT4pcf2KyOKAQ3u+KbIztarY=
-newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210325092335-62928cd57829/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
+
 newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210326013917-f7fed7f2ae9d h1:25g1CiVAmtfAEMSfhppNJY04Eeyva4yb1ljN0C57sxE=
 newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210326013917-f7fed7f2ae9d/go.mod h1:GbEr2PgY72/4XqPZzmzstlOU/+il/wrjeTNFs6ihsSE=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=

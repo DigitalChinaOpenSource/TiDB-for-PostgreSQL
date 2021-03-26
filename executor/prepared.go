@@ -16,7 +16,6 @@ package executor
 import (
 	"context"
 	"math"
-	"sort"
 	"strings"
 	"time"
 
@@ -161,6 +160,9 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return ErrPsManyParam
 	}
 
+	//根据parammaker自带的的order成员排序
+	ParamMakerSortor(extractor.markers)
+
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
 	if err != nil {
 		return err
@@ -169,16 +171,17 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// The parameter markers are appended in visiting order, which may not
 	// be the same as the position order in the query string. We need to
 	// sort it by position.
-	sorter := &paramMarkerSorter{markers: extractor.markers}
-	sort.Sort(sorter)
-	e.ParamCount = len(sorter.markers)
-	for i := 0; i < e.ParamCount; i++ {
-		sorter.markers[i].SetOrder(i)
-	}
+	//sorter := &paramMarkerSorter{markers: extractor.markers}
+	//sort.Sort(sorter)
+	//e.ParamCount = len(sorter.markers)
+	e.ParamCount = len(extractor.markers)
+	//for i := 0; i < e.ParamCount; i++ {
+	//	sorter.markers[i].SetOrder(i)
+	//}
 	prepared := &ast.Prepared{
 		Stmt:          stmt,
 		StmtType:      GetStmtLabel(stmt),
-		Params:        sorter.markers,
+		Params:        extractor.markers,
 		SchemaVersion: e.is.SchemaMetaVersion(),
 	}
 
@@ -236,6 +239,16 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return vars.AddPreparedStmt(e.ID, preparedObj)
 }
 
+func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
+	for i := 0; i< len(markers); i++ {
+		for j := i + 1; j < len(markers); j++ {
+			if markers[j].(*driver.ParamMarkerExpr).Order < markers[i].(*driver.ParamMarkerExpr).Order {
+				markers[i], markers[j] = markers[j], markers[i]
+			}
+		}
+	}
+}
+
 // SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
 //	insertPlan：计划结构体
 //	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
@@ -248,21 +261,29 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 		cols := insertPlan.GetTableSchema().Columns
 		// 这里有参数传进来的顺序。
 		orderedColumns := insertPlan.Columns
+
 		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
 		for _, list := range insertPlan.Lists {
 			for j := range list {
-				if cst := list[j].(*expression.Constant); cst.Offset != 0 {
-					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
-						for _, col := range cols {
-							nameSplit := strings.Split(col.OrigName,".")
-							shortName := nameSplit[len(nameSplit) - 1]
-							if shortName == orderedColumns[j].Name.O {
-								paramMakerExpr.TexprNode.Type = *col.RetType
-								paramIndex++
+				if orderedColumns != nil {
+					if cst := list[j].(*expression.Constant); cst.Offset != 0 {
+						if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
+							for _, col := range cols {
+								nameSplit := strings.Split(col.OrigName,".")
+								shortName := nameSplit[len(nameSplit) - 1]
+								if shortName == orderedColumns[cst.Order - 1].Name.O {
+									paramMakerExpr.TexprNode.Type = *col.RetType
+									paramIndex++
+								}
 							}
 						}
 					}
+				} else {
+					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
+						paramMakerExpr.TexprNode.Type = *cols[j].RetType
+					}
 				}
+
 			}
 		}
 	}
