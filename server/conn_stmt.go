@@ -191,7 +191,8 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 }
 
 // handleStmtDescription 处理 Execute 请求
-func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Execute) (err error) {
+// PGSQL Modified
+func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Execute) error {
 	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
 	vars := cc.ctx.GetSessionVars()
 
@@ -227,7 +228,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 }
 
 // handleStmtClose 处理 Close 请求
-func (cc *clientConn) handleStmtClose(ctx context.Context, close pgproto3.Close) (err error) {
+func (cc *clientConn) handleStmtClose(ctx context.Context, close pgproto3.Close) error {
 	vars := cc.ctx.GetSessionVars()
 	stmtID, ok := vars.PreparedStmtNameToID[close.Name]
 	if !ok {
@@ -237,6 +238,9 @@ func (cc *clientConn) handleStmtClose(ctx context.Context, close pgproto3.Close)
 	stmt := cc.ctx.GetStatement(int(stmtID))
 	if stmt != nil {
 		return stmt.Close()
+	}
+	if err := cc.writeCloseComplete(); err != nil {
+		return err
 	}
 	return cc.flush(ctx)
 }
