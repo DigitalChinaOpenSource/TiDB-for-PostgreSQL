@@ -57,7 +57,7 @@ import (
 // PgSQL Modified
 func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Parse) error {
 	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
-	stmt, _, _, err := cc.ctx.Prepare(parser.Query)
+	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
 	vars := cc.ctx.GetSessionVars()
 
@@ -216,6 +216,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
+
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}

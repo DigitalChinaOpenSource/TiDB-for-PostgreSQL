@@ -2269,6 +2269,7 @@ func (cc *clientConn) writeBinaryRowData(columns []*ColumnInfo, row chunk.Row) (
 	data := make([][]byte, len(columns))
 	for i := range columns {
 		if row.IsNull(i) {
+			data[i] = []byte("null")
 			continue
 		}
 		switch columns[i].Type {
@@ -2326,7 +2327,7 @@ func (cc *clientConn) writeTextRowData(columns []*ColumnInfo, row chunk.Row) err
 	tmp := make([]byte, 0, 20)
 	for i, col := range columns {
 		if row.IsNull(i) {
-			data = append(data, []byte("null"))
+			data[i] = []byte("null")
 			continue
 		}
 		switch col.Type {

@@ -5215,10 +5215,10 @@ func (s *testSuiteP2) TestPointGetPreparedPlan(c *C) {
 	tk1.MustExec("insert into t values (2, 2, 2)")
 	tk1.MustExec("insert into t values (3, 3, 3)")
 
-	pspk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where a = ?")
+	pspk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where a = ?", "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[pspk1Id].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
-	pspk2Id, _, _, err := tk1.Se.PrepareStmt("select * from t where ? = a ")
+	pspk2Id, _, _, err := tk1.Se.PrepareStmt("select * from t where ? = a ", "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[pspk2Id].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 
@@ -5258,7 +5258,7 @@ func (s *testSuiteP2) TestPointGetPreparedPlan(c *C) {
 	tk1.ResultSetToResult(rs, Commentf("%v", rs)).Check(testkit.Rows("3 3 3"))
 
 	// unique index
-	psuk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where b = ? ")
+	psuk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where b = ? ", "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[psuk1Id].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 
@@ -5372,7 +5372,7 @@ func (s *testSuiteP2) TestPointGetPreparedPlanWithCommitMode(c *C) {
 	tk1.MustExec("insert into t values (2, 2, 2)")
 	tk1.MustExec("insert into t values (3, 3, 3)")
 
-	pspk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where a = ?")
+	pspk1Id, _, _, err := tk1.Se.PrepareStmt("select * from t where a = ?", "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[pspk1Id].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 
@@ -5436,11 +5436,11 @@ func (s *testSuiteP2) TestPointUpdatePreparedPlan(c *C) {
 	tk1.MustExec("insert into t values (2, 2, 2)")
 	tk1.MustExec("insert into t values (3, 3, 3)")
 
-	updateID1, pc, _, err := tk1.Se.PrepareStmt(`update t set c = c + 1 where a = ?`)
+	updateID1, pc, _, err := tk1.Se.PrepareStmt(`update t set c = c + 1 where a = ?`, "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[updateID1].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 	c.Assert(pc, Equals, 1)
-	updateID2, pc, _, err := tk1.Se.PrepareStmt(`update t set c = c + 2 where ? = a`)
+	updateID2, pc, _, err := tk1.Se.PrepareStmt(`update t set c = c + 2 where ? = a`, "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[updateID2].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 	c.Assert(pc, Equals, 1)
@@ -5475,7 +5475,7 @@ func (s *testSuiteP2) TestPointUpdatePreparedPlan(c *C) {
 	tk1.MustQuery("select * from t where a = 3").Check(testkit.Rows("3 3 10"))
 
 	// unique index
-	updUkID1, _, _, err := tk1.Se.PrepareStmt(`update t set c = c + 10 where b = ?`)
+	updUkID1, _, _, err := tk1.Se.PrepareStmt(`update t set c = c + 10 where b = ?`, "")
 	c.Assert(err, IsNil)
 	tk1.Se.GetSessionVars().PreparedStmts[updUkID1].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 	rs, err = tk1.Se.ExecutePreparedStmt(ctx, updUkID1, []types.Datum{types.NewDatum(3)})
@@ -5541,7 +5541,7 @@ func (s *testSuiteP2) TestPointUpdatePreparedPlanWithCommitMode(c *C) {
 	tk1.MustExec("insert into t values (3, 3, 3)")
 
 	ctx := context.Background()
-	updateID1, _, _, err := tk1.Se.PrepareStmt(`update t set c = c + 1 where a = ?`)
+	updateID1, _, _, err := tk1.Se.PrepareStmt(`update t set c = c + 1 where a = ?`, "")
 	tk1.Se.GetSessionVars().PreparedStmts[updateID1].(*plannercore.CachedPrepareStmt).PreparedAst.UseCache = false
 	c.Assert(err, IsNil)
 

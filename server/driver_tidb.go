@@ -351,8 +351,9 @@ func (tc *TiDBContext) GetStatement(stmtID int) PreparedStatement {
 }
 
 // Prepare implements QueryCtx Prepare method.
-func (tc *TiDBContext) Prepare(sql string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
-	stmtID, paramCount, fields, err := tc.session.PrepareStmt(sql)
+// PgSQL Modified
+func (tc *TiDBContext) Prepare(sql string, name string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
+	stmtID, paramCount, fields, err := tc.session.PrepareStmt(sql, name)
 	if err != nil {
 		return
 	}

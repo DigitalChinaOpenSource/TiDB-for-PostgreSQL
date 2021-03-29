@@ -84,7 +84,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 
 		// Call Session PrepareStmt directly to get stmtID.
 		query := "select c1, c2 from prepare_test where c1 = ?"
-		stmtID, _, _, err := tk.Se.PrepareStmt(query)
+		stmtID, _, _, err := tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 		rs, err := tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(1)})
 		c.Assert(err, IsNil)
@@ -92,7 +92,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 
 		tk.MustExec("delete from prepare_test")
 		query = "select c1 from prepare_test where c1 = (select c1 from prepare_test where c1 = ?)"
-		stmtID, _, _, err = tk.Se.PrepareStmt(query)
+		stmtID, _, _, err = tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 
 		tk1 := testkit.NewTestKit(c, s.store)
@@ -109,7 +109,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 
 		tk.MustExec("delete from prepare_test")
 		query = "select c1 from prepare_test where c1 = (select c1 from prepare_test where c1 = ?)"
-		stmtID, _, _, err = tk.Se.PrepareStmt(query)
+		stmtID, _, _, err = tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 		rs, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(3)})
 		c.Assert(err, IsNil)
@@ -121,7 +121,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 
 		tk.MustExec("delete from prepare_test")
 		query = "select c1 from prepare_test where c1 in (select c1 from prepare_test where c1 = ?)"
-		stmtID, _, _, err = tk.Se.PrepareStmt(query)
+		stmtID, _, _, err = tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 		rs, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(3)})
 		c.Assert(err, IsNil)
@@ -135,7 +135,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 		tk.MustExec("begin")
 		tk.MustExec("insert prepare_test (c1) values (4)")
 		query = "select c1, c2 from prepare_test where c1 = ?"
-		stmtID, _, _, err = tk.Se.PrepareStmt(query)
+		stmtID, _, _, err = tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 		tk.MustExec("rollback")
 		rs, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(4)})
@@ -168,7 +168,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 
 		// Drop a column so the prepared statement become invalid.
 		query = "select c1, c2 from prepare_test where c1 = ?"
-		stmtID, _, _, err = tk.Se.PrepareStmt(query)
+		stmtID, _, _, err = tk.Se.PrepareStmt(query, "")
 		c.Assert(err, IsNil)
 		tk.MustExec("alter table prepare_test drop column c2")
 
@@ -186,32 +186,32 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 		_, err = tk.Exec("execute stmt")
 		c.Assert(err, NotNil)
 
-		_, _, fields, err := tk.Se.PrepareStmt("select a from prepare3")
+		_, _, fields, err := tk.Se.PrepareStmt("select a from prepare3", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "test")
 		c.Assert(fields[0].TableAsName.L, Equals, "prepare3")
 		c.Assert(fields[0].ColumnAsName.L, Equals, "a")
 
-		_, _, fields, err = tk.Se.PrepareStmt("select a from prepare3 where ?")
+		_, _, fields, err = tk.Se.PrepareStmt("select a from prepare3 where ?", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "test")
 		c.Assert(fields[0].TableAsName.L, Equals, "prepare3")
 		c.Assert(fields[0].ColumnAsName.L, Equals, "a")
 
-		_, _, fields, err = tk.Se.PrepareStmt("select (1,1) in (select 1,1)")
+		_, _, fields, err = tk.Se.PrepareStmt("select (1,1) in (select 1,1)", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "")
 		c.Assert(fields[0].TableAsName.L, Equals, "")
 		c.Assert(fields[0].ColumnAsName.L, Equals, "(1,1) in (select 1,1)")
 
 		_, _, fields, err = tk.Se.PrepareStmt("select a from prepare3 where a = (" +
-			"select a from prepare2 where a = ?)")
+			"select a from prepare2 where a = ?)", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "test")
 		c.Assert(fields[0].TableAsName.L, Equals, "prepare3")
 		c.Assert(fields[0].ColumnAsName.L, Equals, "a")
 
-		_, _, fields, err = tk.Se.PrepareStmt("select * from prepare3 as t1 join prepare3 as t2")
+		_, _, fields, err = tk.Se.PrepareStmt("select * from prepare3 as t1 join prepare3 as t2", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "test")
 		c.Assert(fields[0].TableAsName.L, Equals, "t1")
@@ -220,7 +220,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 		c.Assert(fields[1].TableAsName.L, Equals, "t2")
 		c.Assert(fields[1].ColumnAsName.L, Equals, "a")
 
-		_, _, fields, err = tk.Se.PrepareStmt("update prepare3 set a = ?")
+		_, _, fields, err = tk.Se.PrepareStmt("update prepare3 set a = ?", "")
 		c.Assert(err, IsNil)
 		c.Assert(len(fields), Equals, 0)
 
@@ -257,11 +257,11 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 		exec.Close()
 
 		// issue 8065
-		stmtID, _, _, err = tk.Se.PrepareStmt("select ? from dual")
+		stmtID, _, _, err = tk.Se.PrepareStmt("select ? from dual", "")
 		c.Assert(err, IsNil)
 		_, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(1)})
 		c.Assert(err, IsNil)
-		stmtID, _, _, err = tk.Se.PrepareStmt("update prepare1 set a = ? where a = ?")
+		stmtID, _, _, err = tk.Se.PrepareStmt("update prepare1 set a = ? where a = ?", "")
 		c.Assert(err, IsNil)
 		_, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(1), types.NewDatum(1)})
 		c.Assert(err, IsNil)
@@ -301,7 +301,7 @@ func (s *seqTestSuite) TestPreparedLimitOffset(c *C) {
 		_, err = tk.Exec("execute stmt_test_1 using @c, @c")
 		c.Assert(plannercore.ErrWrongArguments.Equal(err), IsTrue)
 
-		stmtID, _, _, err := tk.Se.PrepareStmt("select id from prepare_test limit ?")
+		stmtID, _, _, err := tk.Se.PrepareStmt("select id from prepare_test limit ?", "")
 		c.Assert(err, IsNil)
 		_, err = tk.Se.ExecutePreparedStmt(ctx, stmtID, []types.Datum{types.NewDatum(1)})
 		c.Assert(err, IsNil)
@@ -815,7 +815,7 @@ func (s *seqTestSuite) TestPreparedIssue17419(c *C) {
 	tk1.GetConnectionID()
 
 	query := "select * from test.t"
-	stmtID, _, _, err := tk1.Se.PrepareStmt(query)
+	stmtID, _, _, err := tk1.Se.PrepareStmt(query, "")
 	c.Assert(err, IsNil)
 
 	sm := &mockSessionManager1{
