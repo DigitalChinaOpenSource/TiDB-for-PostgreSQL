@@ -97,7 +97,7 @@ func (tk *CTestKit) Exec(ctx context.Context, sql string, args ...interface{}) (
 		}
 		return nil, err
 	}
-	stmtID, _, _, err := getSession(ctx).PrepareStmt(sql)
+	stmtID, _, _, err := getSession(ctx).PrepareStmt(sql, "")
 	if err != nil {
 		return nil, err
 	}
