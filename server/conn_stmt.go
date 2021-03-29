@@ -56,23 +56,10 @@ import (
 // handleStmtPrepare 预处理语句
 // PgSQL Modified
 func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Parse) error {
-	vars := cc.ctx.GetSessionVars()
-
-	if parser.ParameterOIDs != nil {
-		// 数据类型可以直接从报文中去，后面的从计划树中获取的代码就可以跳过
-		vars.ParamTypeStatus = true
-	}
 	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
 	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
-	//直接从报文读取类型并设置到prepard.Params中
-	if parser.ParameterOIDs != nil {
-		if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
-			for i, oId := range parser.ParameterOIDs {
-				cachedStmt.PreparedAst.Params[i].SetType(types.NewFieldType(convertPgSQLDataTypeToMySQLDataType(oId)))
-			}
-		}
-	}
+	vars := cc.ctx.GetSessionVars()
 
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
 	var	paramTypes []byte
