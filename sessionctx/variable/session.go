@@ -319,7 +319,6 @@ const (
 )
 
 // SessionVars is to handle user-defined or global variables in the current session.
-// PGSQL Modified
 type SessionVars struct {
 	Concurrency
 	MemQuota

@@ -60,6 +60,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
 	vars := cc.ctx.GetSessionVars()
+
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
 	var	paramTypes []byte
 	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
