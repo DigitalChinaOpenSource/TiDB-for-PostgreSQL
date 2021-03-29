@@ -2596,3 +2596,32 @@ func loadSSLCertificates()(tlsConfig *tls.Config,err error){
 	}
 	return tlsConfig,nil
 }
+// convertPgSQLDataTypeToMySQLDataType pg转换mysql类型
+func convertPgSQLDataTypeToMySQLDataType (pgsqlType uint32) uint8 {
+	switch pgsqlType {
+	case pgtype.Int2OID:
+		return mysql.TypeShort
+	case pgtype.Int4OID:
+		return mysql.TypeLong
+	case pgtype.Float4OID:
+		return mysql.TypeFloat
+	case pgtype.Float8OID:
+		return mysql.TypeDouble
+	case pgtype.TimestampOID:
+		return mysql.TypeTimestamp
+	case pgtype.Int8OID:
+		return mysql.TypeLonglong
+	case pgtype.DateOID:
+		return mysql.TypeNewDate
+	case pgtype.VarcharOID:
+		return mysql.TypeVarchar
+	case pgtype.BitOID:
+		return mysql.TypeBit
+	case pgtype.JSONOID:
+		return mysql.TypeJSON
+	case pgtype.TextOID:
+		return mysql.TypeVarString
+	default:
+		return mysql.TypeNull
+	}
+}
