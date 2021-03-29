@@ -216,6 +216,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
+
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}
