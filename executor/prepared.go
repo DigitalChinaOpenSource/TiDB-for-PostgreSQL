@@ -205,19 +205,15 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return err
 	}
 
-	//如果报文中没有传参数数据类型（不同的客户端可能有不同的策略，有的会传参数类型而有的不会）
-	//如果报文自带了参数类型，则不用从计划树中寻找参数类型，节省性能。
-	if !vars.ParamTypeStatus {
-		switch p.(type) {
-		case *plannercore.Insert:
-			SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
-		case *plannercore.LogicalProjection:
-			SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
-		case *plannercore.Delete:
-			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
-		case *plannercore.Update:
-			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
-		}
+	switch p.(type) {
+	case *plannercore.Insert:
+		SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
+	case *plannercore.LogicalProjection:
+		SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
+	case *plannercore.Delete:
+		SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
+	case *plannercore.Update:
+		SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	}
 
 	if _, ok := stmt.(*ast.SelectStmt); ok {

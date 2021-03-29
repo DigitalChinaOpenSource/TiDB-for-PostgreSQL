@@ -665,9 +665,6 @@ type SessionVars struct {
 
 	// EnabledRateLimitAction indicates whether enabled ratelimit action during coprocessor
 	EnabledRateLimitAction bool
-
-	// 参数类型可能从报文中直接传来，这是就不需要从计划树中找了。
-	ParamTypeStatus bool
 }
 
 // PreparedParams contains the parameters of the current prepared statement when executing it.
