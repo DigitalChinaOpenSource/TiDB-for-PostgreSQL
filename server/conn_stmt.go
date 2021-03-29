@@ -122,13 +122,22 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		}
 
 		stmt.SetArgs(args)
+	}
 
-		// todo 对返回数据的格式进行设置
+	// Bind 完成后创建 Portal，Portal Name 由客户端传送过来
+	// 果如 Portal Name 为空则表示为临时门户，用"0"作为默认 Name
+	// 这个位置没有进行真正的 Portal 生成，只是绑定 StmtID 在后面的阶段可以通过 Portal Name 找到 Statement ID
+	if bind.DestinationPortal != ""{
+		vars.Portal[bind.DestinationPortal] = stmtID
+	}else {
+		vars.Portal["0"] = stmtID
+	}
 
-		err = cc.writeBindComplete()
-		if err != nil {
-			return err
-		}
+	// todo 对返回数据的格式进行设置
+
+	err = cc.writeBindComplete()
+	if err != nil {
+		return err
 	}
 
 	return cc.flush(ctx)
@@ -137,18 +146,24 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 // handleStmtDescription 处理 Description 请求，通过 stmtName 找到相应的预处理语句
 // 返回参数的类型信息和返回值的表结构信息，如果没有返回值，则返回 NoData
 func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.Describe) error {
-	if desc.ObjectType == 'P' {
-		// todo 当类型为 portal 需要做其他的处理
-		return nil
-	}
+	vars := cc.ctx.GetSessionVars()
 
+	// 无论是 Stmt Name 还是 Portal Name 当为临时语句的时候，默认 Name 为 "0"
 	if desc.Name == ""{
 		desc.Name = "0"
 	}
 
-	vars := cc.ctx.GetSessionVars()
-	// 获取stmtID 通过ID获取到预处理语句
-	stmtID, ok := vars.PreparedStmtNameToID[desc.Name]
+	var stmtID uint32
+	var ok bool
+
+	// 如果通过 Portal 来指定运行语句，则直接通过 Portal 找到对应 StmtID 来运行即可
+	if desc.ObjectType == 'P' {
+		stmtID, ok = vars.Portal[desc.Name]
+	} else {
+		// 获取stmtID 通过ID获取到预处理语句
+		stmtID, ok = vars.PreparedStmtNameToID[desc.Name]
+	}
+
 	if !ok {
 		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
 			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")
@@ -190,19 +205,19 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	return cc.flush(ctx)
 }
 
-// handleStmtDescription 处理 Execute 请求
+// handleStmtExecute 处理 Execute 请求
 // PGSQL Modified
 func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Execute) error {
 	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
-	vars := cc.ctx.GetSessionVars()
 
 	// 当为临时预处理查询，默认设置 Name 为 0
 	if execute.Portal == "" {
 		execute.Portal = "0"
 	}
 
-	// 获取stmtID 通过ID获取到预处理语句
-	stmtID, ok := vars.PreparedStmtNameToID[execute.Portal]
+	vars := cc.ctx.GetSessionVars()
+
+	stmtID, ok := vars.Portal[execute.Portal]
 	if !ok {
 		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
 			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")

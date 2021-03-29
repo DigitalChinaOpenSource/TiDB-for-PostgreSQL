@@ -319,6 +319,7 @@ const (
 )
 
 // SessionVars is to handle user-defined or global variables in the current session.
+// PgSQL Modified
 type SessionVars struct {
 	Concurrency
 	MemQuota
@@ -341,6 +342,9 @@ type SessionVars struct {
 	// PreparedStmts stores prepared statement.
 	PreparedStmts        map[uint32]interface{}
 	PreparedStmtNameToID map[string]uint32
+	// Portal pgsql will create portal after bind cmd in extended query
+	// portal will save the name and its corresponding statement ID
+	Portal map[string]uint32
 	// preparedStmtID is id of prepared statement.
 	preparedStmtID uint32
 	// PreparedParams params for prepared statements
@@ -704,6 +708,7 @@ func NewSessionVars() *SessionVars {
 		systems:                     make(map[string]string),
 		PreparedStmts:               make(map[uint32]interface{}),
 		PreparedStmtNameToID:        make(map[string]uint32),
+		Portal: 					 make(map[string]uint32),
 		PreparedParams:              make([]types.Datum, 0, 10),
 		TxnCtx:                      &TransactionContext{},
 		RetryInfo:                   &RetryInfo{},
