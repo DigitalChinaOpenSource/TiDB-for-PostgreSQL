@@ -108,7 +108,8 @@ type Session interface {
 	CommitTxn(context.Context) error
 	RollbackTxn(context.Context)
 	// PrepareStmt executes prepare statement in binary protocol.
-	PrepareStmt(sql string) (stmtID uint32, paramCount int, fields []*ast.ResultField, err error)
+	// PgSQL Modified
+	PrepareStmt(sql string, name string) (stmtID uint32, paramCount int, fields []*ast.ResultField, err error)
 	// ExecutePreparedStmt executes a prepared statement.
 	ExecutePreparedStmt(ctx context.Context, stmtID uint32, param []types.Datum) (sqlexec.RecordSet, error)
 	DropPreparedStmt(stmtID uint32) error
@@ -1269,7 +1270,8 @@ func (s *session) rollbackOnError(ctx context.Context) {
 }
 
 // PrepareStmt is used for executing prepare statement in binary protocol
-func (s *session) PrepareStmt(sql string) (stmtID uint32, paramCount int, fields []*ast.ResultField, err error) {
+// PgSQL Modified
+func (s *session) PrepareStmt(sql string, name string) (stmtID uint32, paramCount int, fields []*ast.ResultField, err error) {
 	if s.sessionVars.TxnCtx.InfoSchema == nil {
 		// We don't need to create a transaction for prepare statement, just get information schema will do.
 		s.sessionVars.TxnCtx.InfoSchema = domain.GetDomain(s).InfoSchema()
@@ -1285,7 +1287,7 @@ func (s *session) PrepareStmt(sql string) (stmtID uint32, paramCount int, fields
 	// So we have to call PrepareTxnCtx here.
 	s.PrepareTxnCtx(ctx)
 	s.PrepareTSFuture(ctx)
-	prepareExec := executor.NewPrepareExec(s, infoschema.GetInfoSchema(s), sql)
+	prepareExec := executor.NewPrepareExec(s, infoschema.GetInfoSchema(s), sql, name)
 	err = prepareExec.Next(ctx, nil)
 	if err != nil {
 		return

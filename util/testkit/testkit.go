@@ -171,7 +171,7 @@ func (tk *TestKit) Exec(sql string, args ...interface{}) (sqlexec.RecordSet, err
 		}
 		return rs0, nil
 	}
-	stmtID, _, _, err := tk.Se.PrepareStmt(sql)
+	stmtID, _, _, err := tk.Se.PrepareStmt(sql, "")
 	if err != nil {
 		return nil, errors.Trace(err)
 	}

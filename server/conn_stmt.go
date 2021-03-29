@@ -63,7 +63,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 		vars.ParamTypeStatus = true
 	}
 	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
-	stmt, _, _, err := cc.ctx.Prepare(parser.Query)
+	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
 	//直接从报文读取类型并设置到prepard.Params中
 	if parser.ParameterOIDs != nil {
@@ -229,6 +229,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
+
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}
