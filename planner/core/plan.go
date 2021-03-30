@@ -15,6 +15,7 @@ package core
 
 import (
 	"fmt"
+	"github.com/pingcap/parser/ast"
 	"math"
 	"strconv"
 
@@ -136,6 +137,7 @@ func optimizeByShuffle4Window(pp *PhysicalWindow, ctx sessionctx.Context) *Physi
 
 // LogicalPlan is a tree of logical operators.
 // We can do a lot of logical optimizations to it, like predicate pushdown and column pruning.
+// PGSQL Modified
 type LogicalPlan interface {
 	Plan
 
@@ -198,9 +200,13 @@ type LogicalPlan interface {
 
 	// SetChild sets the ith child for the plan.
 	SetChild(i int, child LogicalPlan)
+
+	// SetParamType 逻辑计划设置参数类型的方法
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 // PhysicalPlan is a tree of the physical operators.
+// PGSQL Modified
 type PhysicalPlan interface {
 	Plan
 
@@ -234,6 +240,11 @@ type PhysicalPlan interface {
 
 	// ExplainNormalizedInfo returns operator normalized information for generating digest.
 	ExplainNormalizedInfo() string
+
+	// SetParamType 从计划中获取参数信息，设置参数类型
+	// paramExprs:参数设置的目标，其中的Type成员就是具体设置的地方
+	// err：过程中的异常报错
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 type baseLogicalPlan struct {

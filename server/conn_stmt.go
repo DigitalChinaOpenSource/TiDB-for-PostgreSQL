@@ -38,6 +38,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/jackc/pgproto3/v2"
+	"github.com/pingcap/tidb/util/execdetails"
 	"math"
 	"runtime/trace"
 	"strconv"
@@ -45,176 +47,218 @@ import (
 
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/parser/terror"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
-	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/hack"
 )
 
-func (cc *clientConn) handleStmtPrepare(ctx context.Context, sql string) error {
-	stmt, columns, params, err := cc.ctx.Prepare(sql)
+// handleStmtPrepare 预处理语句
+// PgSQL Modified
+func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Parse) error {
+	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
+	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
+
+	vars := cc.ctx.GetSessionVars()
+
+	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
+	var	paramTypes []byte
+	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
+		cachedParams := cachedStmt.PreparedAst.Params
+		for i := range cachedParams {
+			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+		}
+	}
+
+	stmt.SetParamsType(paramTypes)
+
 	if err != nil {
 		return err
 	}
-	data := make([]byte, 4, 128)
 
-	//status ok
-	data = append(data, 0)
-	//stmt id
-	data = dumpUint32(data, uint32(stmt.ID()))
-	//number columns
-	data = dumpUint16(data, uint16(len(columns)))
-	//number params
-	data = dumpUint16(data, uint16(len(params)))
-	//filter [00]
-	data = append(data, 0)
-	//warning count
-	data = append(data, 0, 0) //TODO support warning count
-
-	if err := cc.writePacket(data); err != nil {
+	err = cc.writeParseComplete()
+	if err != nil {
 		return err
-	}
-
-	if len(params) > 0 {
-		for i := 0; i < len(params); i++ {
-			data = data[0:4]
-			data = params[i].Dump(data)
-
-			if err := cc.writePacket(data); err != nil {
-				return err
-			}
-		}
-
-		if err := cc.writeEOF(0); err != nil {
-			return err
-		}
-	}
-
-	if len(columns) > 0 {
-		for i := 0; i < len(columns); i++ {
-			data = data[0:4]
-			data = columns[i].Dump(data)
-
-			if err := cc.writePacket(data); err != nil {
-				return err
-			}
-		}
-
-		if err := cc.writeEOF(0); err != nil {
-			return err
-		}
-
 	}
 	return cc.flush(ctx)
 }
 
-func (cc *clientConn) handleStmtExecute(ctx context.Context, data []byte) (err error) {
-	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
-	if len(data) < 9 {
-		return mysql.ErrMalformPacket
+// handleStmtBind 处理pgsql拓展查询协议过程中的bind过程
+// PGSQL Modified
+func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (err error) {
+	vars := cc.ctx.GetSessionVars()
+
+	// 当为临时预处理查询，默认设置 Name 为 0
+	if bind.PreparedStatement == ""{
+		bind.PreparedStatement = "0"
 	}
-	pos := 0
-	stmtID := binary.LittleEndian.Uint32(data[0:4])
-	pos += 4
+
+	// 获取stmtID 通过ID获取到预处理语句
+	stmtID, ok := vars.PreparedStmtNameToID[bind.PreparedStatement]
+	if !ok {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_bind")
+	}
 
 	stmt := cc.ctx.GetStatement(int(stmtID))
 	if stmt == nil {
 		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_execute")
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_bind")
 	}
 
-	flag := data[pos]
-	pos++
-	// Please refer to https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
-	// The client indicates that it wants to use cursor by setting this flag.
-	// 0x00 CURSOR_TYPE_NO_CURSOR
-	// 0x01 CURSOR_TYPE_READ_ONLY
-	// 0x02 CURSOR_TYPE_FOR_UPDATE
-	// 0x04 CURSOR_TYPE_SCROLLABLE
-	// Now we only support forward-only, read-only cursor.
-	var useCursor bool
-	switch flag {
-	case 0:
-		useCursor = false
-	case 1:
-		useCursor = true
-	default:
-		return mysql.NewErrf(mysql.ErrUnknown, "unsupported flag %d", nil, flag)
-	}
-
-	// skip iteration-count, always 1
-	pos += 4
-
-	var (
-		nullBitmaps []byte
-		paramTypes  []byte
-		paramValues []byte
-	)
 	numParams := stmt.NumParams()
-	args := make([]types.Datum, numParams)
-	if numParams > 0 {
-		nullBitmapLen := (numParams + 7) >> 3
-		if len(data) < (pos + nullBitmapLen + 1) {
-			return mysql.ErrMalformPacket
-		}
-		nullBitmaps = data[pos : pos+nullBitmapLen]
-		pos += nullBitmapLen
+	if numParams != len(bind.Parameters){
+		return mysql.ErrMalformPacket
+	}
 
-		// new param bound flag
-		if data[pos] == 1 {
-			pos++
-			if len(data) < (pos + (numParams << 1)) {
-				return mysql.ErrMalformPacket
-			}
+	if numParams > 0{
+		paramTypes := stmt.GetParamsType()
 
-			paramTypes = data[pos : pos+(numParams<<1)]
-			pos += numParams << 1
-			paramValues = data[pos:]
-			// Just the first StmtExecute packet contain parameters type,
-			// we need save it for further use.
-			stmt.SetParamsType(paramTypes)
-		} else {
-			paramValues = data[pos+1:]
-		}
-
-		err = parseExecArgs(cc.ctx.GetSessionVars().StmtCtx, args, stmt.BoundParams(), nullBitmaps, stmt.GetParamsType(), paramValues)
+		args := make([]types.Datum, numParams)
+		err = parseBindArgs(cc.ctx.GetSessionVars().StmtCtx, args, paramTypes, bind)
 		stmt.Reset()
 		if err != nil {
 			return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 		}
+
+		stmt.SetArgs(args)
 	}
+
+	// Bind 完成后创建 Portal，Portal Name 由客户端传送过来
+	// 果如 Portal Name 为空则表示为临时门户，用"0"作为默认 Name
+	// 这个位置没有进行真正的 Portal 生成，只是绑定 StmtID 在后面的阶段可以通过 Portal Name 找到 Statement ID
+	if bind.DestinationPortal != ""{
+		vars.Portal[bind.DestinationPortal] = stmtID
+	}else {
+		vars.Portal["0"] = stmtID
+	}
+
+	// todo 对返回数据的格式进行设置
+
+	err = cc.writeBindComplete()
+	if err != nil {
+		return err
+	}
+
+	return cc.flush(ctx)
+}
+
+// handleStmtDescription 处理 Description 请求，通过 stmtName 找到相应的预处理语句
+// 返回参数的类型信息和返回值的表结构信息，如果没有返回值，则返回 NoData
+func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.Describe) error {
+	vars := cc.ctx.GetSessionVars()
+
+	// 无论是 Stmt Name 还是 Portal Name 当为临时语句的时候，默认 Name 为 "0"
+	if desc.Name == ""{
+		desc.Name = "0"
+	}
+
+	var stmtID uint32
+	var ok bool
+
+	// 如果通过 Portal 来指定运行语句，则直接通过 Portal 找到对应 StmtID 来运行即可
+	if desc.ObjectType == 'P' {
+		stmtID, ok = vars.Portal[desc.Name]
+	} else {
+		// 获取stmtID 通过ID获取到预处理语句
+		stmtID, ok = vars.PreparedStmtNameToID[desc.Name]
+	}
+
+	if !ok {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")
+	}
+
+	stmt := cc.ctx.GetStatement(int(stmtID))
+	if stmt == nil {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")
+	}
+	numParams := stmt.NumParams()
+
+	// 将解析阶段解析出的参数类型获取到，并转换为PgSQL数据类型传回到客户端
+	paramsType := stmt.GetParamsType()
+	pgType := make([]uint32, numParams)
+	for i,_ := range paramsType{
+		pgType[i] = convertMySQLDataTypeToPgSQLDataType(paramsType[i])
+	}
+
+	if err := cc.writeParameterDescription(pgType); err != nil{
+		return err
+	}
+
+	// columnInfo 有数据则返回 WriteRowDescription 没有数据则需要返回 NoData
+	columnInfo := stmt.GetColumnInfo()
+	if columnInfo == nil || len(columnInfo) > 0 {
+		if err := cc.WriteRowDescription(columnInfo); err != nil {
+			return err
+		}
+
+		// 如果在这个位子已经输出的行描述信息，则在后面输出结果时不再输出行描述信息
+
+	} else {
+		if err := cc.writeNoData(); err != nil {
+			return err
+		}
+	}
+
+	return cc.flush(ctx)
+}
+
+// handleStmtExecute 处理 Execute 请求
+// PGSQL Modified
+func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Execute) error {
+	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
+
+	// 当为临时预处理查询，默认设置 Name 为 0
+	if execute.Portal == "" {
+		execute.Portal = "0"
+	}
+
+	vars := cc.ctx.GetSessionVars()
+
+	stmtID, ok := vars.Portal[execute.Portal]
+	if !ok {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")
+	}
+
+	stmt := cc.ctx.GetStatement(int(stmtID))
+	args := stmt.GetArgs()
+
 	ctx = context.WithValue(ctx, execdetails.StmtExecDetailKey, &execdetails.StmtExecDetails{})
 	rs, err := stmt.Execute(ctx, args)
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
+
 	if rs == nil {
-		return cc.writeOK(ctx)
+		return cc.writeCommandComplete()
 	}
 
-	// if the client wants to use cursor
-	// we should hold the ResultSet in PreparedStatement for next stmt_fetch, and only send back ColumnInfo.
-	// Tell the client cursor exists in server by setting proper serverStatus.
-	if useCursor {
-		stmt.StoreResultSet(rs)
-		err = cc.writeColumnInfo(rs.Columns(), mysql.ServerStatusCursorExists)
-		if err != nil {
-			return err
-		}
-		if cl, ok := rs.(fetchNotifier); ok {
-			cl.OnFetchReturned()
-		}
-		// explicitly flush columnInfo to client.
-		return cc.flush(ctx)
-	}
-	defer terror.Call(rs.Close)
 	err = cc.writeResultset(ctx, rs, true, 0, 0)
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
 	return nil
+}
+
+// handleStmtClose 处理 Close 请求
+func (cc *clientConn) handleStmtClose(ctx context.Context, close pgproto3.Close) error {
+	vars := cc.ctx.GetSessionVars()
+	stmtID, ok := vars.PreparedStmtNameToID[close.Name]
+	if !ok {
+		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+			strconv.FormatUint(uint64(stmtID), 10), "stmt_close")
+	}
+	stmt := cc.ctx.GetStatement(int(stmtID))
+	if stmt != nil {
+		return stmt.Close()
+	}
+	if err := cc.writeCloseComplete(); err != nil {
+		return err
+	}
+	return cc.flush(ctx)
 }
 
 // maxFetchSize constants
@@ -264,6 +308,25 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 		fetchSize = maxFetchSize
 	}
 	return stmtID, fetchSize, nil
+}
+
+// parseBindArgs 将客户端传来的参数值解析为 Datum 结构
+func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind) error {
+	// todo 传参为文本 text 格式时候的处理
+
+	for i := 0; i < len(args); i++ {
+		if bind.Parameters[i] == nil {
+			var nilDatum types.Datum
+			nilDatum.SetNull()
+			args[i] = nilDatum
+			continue
+		}
+
+		args[i] = types.NewBytesDatum(bind.Parameters[i])
+		continue
+	}
+
+	return nil
 }
 
 func parseExecArgs(sc *stmtctx.StatementContext, args []types.Datum, boundParams [][]byte, nullBitmap, paramTypes, paramValues []byte) (err error) {
@@ -563,19 +626,6 @@ func parseBinaryDurationWithMS(pos int, paramValues []byte,
 	microSecond := binary.LittleEndian.Uint32(paramValues[pos : pos+4])
 	pos += 4
 	return pos, fmt.Sprintf("%s.%06d", dur, microSecond)
-}
-
-func (cc *clientConn) handleStmtClose(data []byte) (err error) {
-	if len(data) < 4 {
-		return
-	}
-
-	stmtID := int(binary.LittleEndian.Uint32(data[0:4]))
-	stmt := cc.ctx.GetStatement(stmtID)
-	if stmt != nil {
-		return stmt.Close()
-	}
-	return
 }
 
 func (cc *clientConn) handleStmtSendLongData(data []byte) (err error) {

@@ -2336,3 +2336,8 @@ func EstimatedMemUsage(array []Datum, numOfRows int) int64 {
 	bytesConsumed += len(array) * sizeOfEmptyDatum
 	return int64(bytesConsumed * numOfRows)
 }
+
+// SetInterfaceType 只设置datum的成员k，不要管x
+func (d * Datum) SetInterfaceType() {
+	d.k = KindInterface
+}

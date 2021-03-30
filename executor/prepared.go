@@ -15,9 +15,7 @@ package executor
 
 import (
 	"context"
-	"github.com/pingcap/parser/model"
 	"math"
-	"sort"
 	"strings"
 	"time"
 
@@ -91,13 +89,14 @@ type PrepareExec struct {
 }
 
 // NewPrepareExec creates a new PrepareExec.
-func NewPrepareExec(ctx sessionctx.Context, is infoschema.InfoSchema, sqlTxt string) *PrepareExec {
+func NewPrepareExec(ctx sessionctx.Context, is infoschema.InfoSchema, sqlTxt string, name string) *PrepareExec {
 	base := newBaseExecutor(ctx, nil, 0)
 	base.initCap = chunk.ZeroCapacity
 	return &PrepareExec{
 		baseExecutor: base,
 		is:           is,
 		sqlText:      sqlTxt,
+		name:         name,
 	}
 }
 
@@ -162,6 +161,9 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return ErrPsManyParam
 	}
 
+	//根据parammaker自带的的order成员排序
+	ParamMakerSortor(extractor.markers)
+
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
 	if err != nil {
 		return err
@@ -170,16 +172,17 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// The parameter markers are appended in visiting order, which may not
 	// be the same as the position order in the query string. We need to
 	// sort it by position.
-	sorter := &paramMarkerSorter{markers: extractor.markers}
-	sort.Sort(sorter)
-	e.ParamCount = len(sorter.markers)
-	for i := 0; i < e.ParamCount; i++ {
-		sorter.markers[i].SetOrder(i)
-	}
+	//sorter := &paramMarkerSorter{markers: extractor.markers}
+	//sort.Sort(sorter)
+	//e.ParamCount = len(sorter.markers)
+	e.ParamCount = len(extractor.markers)
+	//for i := 0; i < e.ParamCount; i++ {
+	//	sorter.markers[i].SetOrder(i)
+	//}
 	prepared := &ast.Prepared{
 		Stmt:          stmt,
 		StmtType:      GetStmtLabel(stmt),
-		Params:        sorter.markers,
+		Params:        extractor.markers,
 		SchemaVersion: e.is.SchemaMetaVersion(),
 	}
 
@@ -188,7 +191,9 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// We try to build the real statement of preparedStmt.
 	for i := range prepared.Params {
 		param := prepared.Params[i].(*driver.ParamMarkerExpr)
-		param.Datum.SetNull()
+		//param.Datum.SetNull()
+		//每个datum设置类型为interface，保证计划中的条件都会存在不会被优化掉。
+		param.Datum.SetInterfaceType()
 		param.InExecute = false
 	}
 	var p plannercore.Plan
@@ -207,6 +212,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 			SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
 		case *plannercore.Delete:
 			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
+		case *plannercore.Update:
+			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	}
 
 	if _, ok := stmt.(*ast.SelectStmt); ok {
@@ -217,6 +224,10 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	}
 	if e.name != "" {
 		vars.PreparedStmtNameToID[e.name] = e.ID
+	} else {
+		// 当没有 Stmt 没有Name时，则表示该预处理语句为临时语句，我们会分配 0 作为其 Name
+		// 后面在获取临时预处理语句 ID 的时候，通过 0 获取
+		vars.PreparedStmtNameToID["0"] = e.ID
 	}
 
 	normalized, digest := parser.NormalizeDigest(prepared.Stmt.Text())
@@ -229,133 +240,89 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return vars.AddPreparedStmt(e.ID, preparedObj)
 }
 
+func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
+	for i := 0; i< len(markers); i++ {
+		for j := i + 1; j < len(markers); j++ {
+			if markers[j].(*driver.ParamMarkerExpr).Order < markers[i].(*driver.ParamMarkerExpr).Order {
+				markers[i], markers[j] = markers[j], markers[i]
+			}
+		}
+	}
+}
+
 // SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
 //	insertPlan：计划结构体
 //	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
-// PGSQL Modified
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
-	//if insertPlan, ok := insertPlan.(*plannercore.Insert); ok {
 	if insertPlan.SelectPlan != nil {
-		if selectPlan, ok := insertPlan.SelectPlan.(*plannercore.PhysicalTableReader); ok {
-			//获取子查询中各字段类型的map，给下文获取参数类型提供参照。
-			if tableScan, ok := selectPlan.TablePlans[0].(*plannercore.PhysicalTableScan); ok {
-				cols := tableScan.Columns
-				//从condition中获取参数类型
-				if selection, ok := selectPlan.TablePlans[1].(*plannercore.PhysicalSelection); ok {
-					conditions := selection.Conditions
-					//调用递归方法，获取参数类型，填充到paramType数组
-					DeepFirstTravsalTree(conditions, paramExprs, &cols)
-				}
-			}
-		}
+		insertPlan.SelectPlan.SetParamType(paramExprs)
 	} else {
-		//当前计划的tableSchema，也就是表结构。
 		paramIndex := 0
+		//当前计划的tableSchema，也就是表结构。
 		cols := insertPlan.GetTableSchema().Columns
+		// 这里有参数传进来的顺序。
+		orderedColumns := insertPlan.Columns
+
 		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
-		lists := insertPlan.Lists
-		//遍历lists，将参数类型都
-		for i := range lists {
-			list := lists[i]
+		for _, list := range insertPlan.Lists {
 			for j := range list {
-				cst := list[j].(*expression.Constant)
-				//Kind()将返回Datum对象的k成员，我们通过这个标志知道这个参数是传进来值了，还是暂时用？占位。
-				if cst.Value.Kind() == 0 {
-					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok{
-						paramMakerExpr.TexprNode.Type = *(cols[j].RetType)
-						paramIndex++
+				if orderedColumns != nil {
+					if cst := list[j].(*expression.Constant); cst.Offset != 0 {
+						if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
+							for _, col := range cols {
+								nameSplit := strings.Split(col.OrigName,".")
+								shortName := nameSplit[len(nameSplit) - 1]
+								if shortName == orderedColumns[cst.Order - 1].Name.O {
+									paramMakerExpr.TexprNode.Type = *col.RetType
+									paramIndex++
+								}
+							}
+						}
+					}
+				} else {
+					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
+						paramMakerExpr.TexprNode.Type = *cols[j].RetType
 					}
 				}
+
 			}
 		}
 	}
 }
 
-// DeepFirstTravsalTree 当insert计划嵌套select子查询时，将select子查询的参数类型设置到prepared.Param中去。
-// 其分为两种情况，一种是 condition1 and condition2 and condition 3，其参数放在select子计划中的Condition成员中，是一个数组
-// 另一种情况是 condition1 or condition2 and condition3 。其参数构造成了一个树，需要深度优先遍历
-// exprs：select子计划的参数，可能是个数组，也可能是个树
-// paramExprs：prepared.Param，我们需要往里面设置参数类型。
-// cols：select计划查询的字段信息
-// PGSQL Modified
-// todo 完善多层select嵌套的情况。
-func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo){
-	paramIndex := 0
-	if len(exprs) > 1 {
-		// sql where condition like this : x = aaa and y > bbb and z < ccc
-		for i := range exprs {
-			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
-				if setOk := SetParamTypes(scalar.Function.Args(), paramExprs, cols, paramIndex); setOk{
-					paramIndex++
-				}
-			}
-		}
-	} else if len(exprs) == 1 {
-		// sql where condition like this : x = aaa or y < bbb and z = zzz
-		// the struct is a tree , not even array, we should use deep-first traversal to resolve
-		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
-			DoDeepFirstTraverSal(scalar.Function.Args(), paramExprs, cols, paramIndex)
-		}
-	}
-}
-
-// DoDeepFirstTraverSal 深度优先遍历树形结构的参数，设置到paramExprs中去
-// PGSQL Modified
-func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo, paramIndex int) int {
-	//left不是终结点，还可以往下遍历
-	if left, ok := args[0].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(left.Function.Args(), paramExprs, cols, paramIndex)
-	}
-	// 右子树不是终结点，还可以往下遍历
-	if right, ok := args[1].(*expression.ScalarFunction); ok {
-		paramIndex = DoDeepFirstTraverSal(right.Function.Args(), paramExprs, cols, paramIndex)
-	}
-	//深度优先遍历，先往下一直遍历，知道叶子节点在做具体的处理逻辑，也就是判断节点参数类型。
-	//程序到达这里，args左右子树就是column和constant了。
-	if setOk := SetParamTypes(args, paramExprs, cols, paramIndex); setOk {
-		paramIndex++
-	}
-	return paramIndex
-}
-
-// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
-// PGSQL Modified
-func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*model.ColumnInfo, paramIndex int) bool {
-	if constant, ok := args[1].(*expression.Constant); ok && constant.Value.Kind() == 0 {
-		if column, ok := args[0].(*expression.Column); ok {
-			nameSplit := strings.Split(column.OrigName,".")
-			shortName := nameSplit[len(nameSplit) - 1]
-			for i := range *cols {
-				if paramMarker, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); (*cols)[i].Name.O == shortName && ok {
-					paramMarker.TexprNode.Type = (*cols)[i].FieldType
-					break
-				}
-			}
-		}
-		return true
-	} else {
-		return false
-	}
-}
-
-// SetSelectParamType 当语句为select，获取其参数类型并设置到prepared.Param中去
+// SetSelectParamType 从select计划中获取参数类型
 func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
-	schemaProducer := projection.GetLogicalSchemaProducer()
-	childPlan := schemaProducer.GetBaseLogicalPlan().Children()
-	if selection, ok := childPlan[0].(*plannercore.LogicalSelection); ok {
-		if ds, ok := (selection.GetBaseLogicalPlan()).Children()[0].(*plannercore.DataSource); ok {
-			DeepFirstTravsalTree(selection.Conditions,params,&ds.Columns)
-		}
+	projection.SetParamType(params)
+}
+
+// SetDeleteParamType 从delete计划中获取参数类型
+func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
+	if delete.SelectPlan != nil {
+		delete.SelectPlan.SetParamType(params)
 	}
 }
 
-// SetDeleteParamType 为delete语句设置参数类型
-func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
-	if tableReader, ok := delete.SelectPlan.(*plannercore.PhysicalTableReader); ok {
-		plans := tableReader.TablePlans
-		if scan, ok := plans[0].(*plannercore.PhysicalTableScan); ok {
-			if selection, ok := plans[1].(*plannercore.PhysicalSelection); ok {
-				DeepFirstTravsalTree(selection.Conditions,params,&scan.Columns)
+// SetUpdateParamType 从update计划获取参数类型
+func SetUpdateParamType(update *plannercore.Update, params *[]ast.ParamMarkerExpr) {
+	if list := update.OrderedList; list != nil {
+		for _,l := range list {
+			SetUpdateParamTypes(l,params,&update.SelectPlan.Schema().Columns)
+		}
+	}
+	update.SelectPlan.SetParamType(params)
+}
+
+// SetUpdateParamTypes 这里是处理 update table set name = ?, age = ?这样的位置的参数的
+func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
+	if constant, ok := assignmnet.Expr.(*expression.Constant); ok {
+	cycle:
+		for _, col := range *cols {
+			for _,expr := range *paramExprs {
+				if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == assignmnet.Col.OrigName &&
+					paramMarker.Offset == constant.Offset {
+					paramMarker.TexprNode.Type = *col.RetType
+					break cycle
+				}
 			}
 		}
 	}

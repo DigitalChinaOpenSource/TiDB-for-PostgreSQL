@@ -66,8 +66,8 @@ type TiDBStatement struct {
 	ctx         *TiDBContext
 	rs          ResultSet
 	sql         string
-	// columnsExists 作为拓展查询是否有行数据的标志
-	columnsExists bool
+	columnInfo []*ColumnInfo
+	args       []types.Datum
 }
 
 // ID implements PreparedStatement ID method.
@@ -184,18 +184,28 @@ func (ts *TiDBStatement) Close() error {
 	return nil
 }
 
-// SetColumnExistStatus 设置 TiDBStatement 中是否有行数据返回的标志
+// SetColumnInfo 设置 TiDBStatement 中返回行数据信息
+// 如果有返回数据的语句，则存储返回数据的结构，如果没有则为空
 // PGSQL Modified
-func (ts *TiDBStatement) SetColumnExistStatus(exist bool) {
-	ts.columnsExists = exist
+func (ts *TiDBStatement) SetColumnInfo(columns []*ColumnInfo) {
+	ts.columnInfo = columns
 }
 
-// GetColumnExistStatus 获取 TiDBStatement 中是否有行数据返回的标志
+// GetColumnInfo 获取 TiDBStatement 中返回行数据信息
 // PGSQL Modified
-func (ts *TiDBStatement) GetColumnExistStatus() bool {
-	return ts.columnsExists
+func (ts *TiDBStatement) GetColumnInfo() []*ColumnInfo {
+	return ts.columnInfo
 }
 
+// GetArgs 获取绑定后的参数值
+func (ts *TiDBStatement) GetArgs() []types.Datum {
+	return ts.args
+}
+
+// SetArgs 进行参数绑定值
+func (ts *TiDBStatement) SetArgs(args []types.Datum) {
+	ts.args = args
+}
 
 // OpenCtx implements IDriver.
 func (qd *TiDBDriver) OpenCtx(connID uint64, capability uint32, collation uint8, dbname string, tlsState *tls.ConnectionState) (QueryCtx, error) {
@@ -341,19 +351,13 @@ func (tc *TiDBContext) GetStatement(stmtID int) PreparedStatement {
 }
 
 // Prepare implements QueryCtx Prepare method.
-func (tc *TiDBContext) Prepare(sql string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
-	stmtID, paramCount, fields, err := tc.session.PrepareStmt(sql)
+// PgSQL Modified
+func (tc *TiDBContext) Prepare(sql string, name string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
+	stmtID, paramCount, fields, err := tc.session.PrepareStmt(sql, name)
 	if err != nil {
 		return
 	}
-	stmt := &TiDBStatement{
-		sql:         sql,
-		id:          stmtID,
-		numParams:   paramCount,
-		boundParams: make([][]byte, paramCount),
-		ctx:         tc,
-	}
-	statement = stmt
+
 	columns = make([]*ColumnInfo, len(fields))
 	for i := range fields {
 		columns[i] = convertColumnInfo(fields[i])
@@ -364,6 +368,16 @@ func (tc *TiDBContext) Prepare(sql string) (statement PreparedStatement, columns
 			Type: mysql.TypeBlob,
 		}
 	}
+	stmt := &TiDBStatement{
+		sql:         sql,
+		id:          stmtID,
+		numParams:   paramCount,
+		boundParams: make([][]byte, paramCount),
+		ctx:         tc,
+		columnInfo:  columns,
+	}
+
+	statement = stmt
 	tc.stmts[int(stmtID)] = stmt
 	return
 }
@@ -389,6 +403,14 @@ type tidbResultSet struct {
 	rows         []chunk.Row
 	closed       int32
 	preparedStmt *core.CachedPrepareStmt
+}
+
+// IsPrepareStmt 判断是否为预处理查询
+func (trs *tidbResultSet) IsPrepareStmt() bool {
+	if trs.preparedStmt != nil {
+		return true
+	}
+	return false
 }
 
 func (trs *tidbResultSet) NewChunk() *chunk.Chunk {

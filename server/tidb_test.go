@@ -1035,7 +1035,7 @@ func (ts *tidbTestSerialSuite) TestPrepareCount(c *C) {
 	c.Assert(err, IsNil)
 	_, err = Execute(ctx, qctx, "create table t1 (id int)")
 	c.Assert(err, IsNil)
-	stmt, _, _, err := qctx.Prepare("insert into t1 values (?)")
+	stmt, _, _, err := qctx.Prepare("insert into t1 values (?)", "")
 	c.Assert(err, IsNil)
 	c.Assert(atomic.LoadInt64(&variable.PreparedStmtCount), Equals, prepareCnt+1)
 	c.Assert(err, IsNil)

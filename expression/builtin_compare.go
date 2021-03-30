@@ -1246,6 +1246,8 @@ func tryToConvertConstantInt(ctx sessionctx.Context, targetFieldType *types.Fiel
 // ExceptionalVal : It is used to get more information to check whether 'int column [cmp] const' is true/false
 // 					If the op == LT,LE,GT,GE and it gets an Overflow when converting, return inf/-inf.
 // 					If the op == EQ,NullEQ and the constant can never be equal to the int column, return ‘con’(the input, a non-int constant).
+// PGSQL Modified
+// 要保存参数offset，不仅需要在遍历语法树时保存到Constant结构体中，还要在这里重新定义比较常量方法里将offset继续传递下去
 func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldType, con *Constant, op opcode.Op) (_ *Constant, isExceptional bool) {
 	dt, err := con.Eval(chunk.Row{})
 	if err != nil {
@@ -1265,6 +1267,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 				RetType:      &targetFieldType,
 				DeferredExpr: con.DeferredExpr,
 				ParamMarker:  con.ParamMarker,
+				Offset: con.Offset,
+				Order: con.Order,
 			}, true
 		}
 		return con, false
@@ -1279,6 +1283,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 			RetType:      &targetFieldType,
 			DeferredExpr: con.DeferredExpr,
 			ParamMarker:  con.ParamMarker,
+			Offset: con.Offset,
+			Order: con.Order,
 		}, false
 	}
 	switch op {
@@ -1321,6 +1327,8 @@ func RefineComparedConstant(ctx sessionctx.Context, targetFieldType types.FieldT
 				RetType:      &targetFieldType,
 				DeferredExpr: con.DeferredExpr,
 				ParamMarker:  con.ParamMarker,
+				Offset: con.Offset,
+				Order: con.Order,
 			}, false
 		}
 	}

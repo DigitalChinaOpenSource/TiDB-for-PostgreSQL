@@ -143,7 +143,7 @@ func exec(se Session, sql string, args ...interface{}) (sqlexec.RecordSet, error
 		}
 		return nil, err
 	}
-	stmtID, _, _, err := se.PrepareStmt(sql)
+	stmtID, _, _, err := se.PrepareStmt(sql, "")
 	if err != nil {
 		return nil, err
 	}

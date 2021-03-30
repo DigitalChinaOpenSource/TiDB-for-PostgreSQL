@@ -320,7 +320,7 @@ func (s *testSessionSuite) TestQueryString(c *C) {
 	c.Assert(err, IsNil)
 	_, err = tk.Se.Execute(context.Background(), "show create table t")
 	c.Assert(err, IsNil)
-	id, _, _, err := tk.Se.PrepareStmt("CREATE TABLE t2(id bigint PRIMARY KEY, age int)")
+	id, _, _, err := tk.Se.PrepareStmt("CREATE TABLE t2(id bigint PRIMARY KEY, age int)", "")
 	c.Assert(err, IsNil)
 	params := []types.Datum{}
 	_, err = tk.Se.ExecutePreparedStmt(context.Background(), id, params)
@@ -1242,9 +1242,9 @@ func (s *testSessionSuite) TestAutoIncrementWithRetry(c *C) {
 func (s *testSessionSuite) TestBinaryReadOnly(c *C) {
 	tk := testkit.NewTestKitWithInit(c, s.store)
 	tk.MustExec("create table t (i int key)")
-	id, _, _, err := tk.Se.PrepareStmt("select i from t where i = ?")
+	id, _, _, err := tk.Se.PrepareStmt("select i from t where i = ?", "")
 	c.Assert(err, IsNil)
-	id2, _, _, err := tk.Se.PrepareStmt("insert into t values (?)")
+	id2, _, _, err := tk.Se.PrepareStmt("insert into t values (?)", "")
 	c.Assert(err, IsNil)
 	tk.MustExec("set autocommit = 0")
 	tk.MustExec("set tidb_disable_txn_auto_retry = 0")
@@ -1263,7 +1263,7 @@ func (s *testSessionSuite) TestPrepare(c *C) {
 	tk := testkit.NewTestKitWithInit(c, s.store)
 	tk.MustExec("create table t(id TEXT)")
 	tk.MustExec(`INSERT INTO t VALUES ("id");`)
-	id, ps, _, err := tk.Se.PrepareStmt("select id+? from t")
+	id, ps, _, err := tk.Se.PrepareStmt("select id+? from t", "")
 	ctx := context.Background()
 	c.Assert(err, IsNil)
 	c.Assert(id, Equals, uint32(1))
@@ -1288,7 +1288,7 @@ func (s *testSessionSuite) TestPrepare(c *C) {
 	// Execute prepared statements for more than one time.
 	tk.MustExec("create table multiexec (a int, b int)")
 	tk.MustExec("insert multiexec values (1, 1), (2, 2)")
-	id, _, _, err = tk.Se.PrepareStmt("select a from multiexec where b = ? order by b")
+	id, _, _, err = tk.Se.PrepareStmt("select a from multiexec where b = ? order by b", "")
 	c.Assert(err, IsNil)
 	rs, err := tk.Se.ExecutePreparedStmt(ctx, id, []types.Datum{types.NewDatum(1)})
 	c.Assert(err, IsNil)
