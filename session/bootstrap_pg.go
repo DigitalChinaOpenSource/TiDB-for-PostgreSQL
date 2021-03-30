@@ -891,6 +891,13 @@ VALUES
 (3375,3373,10,0),
 (3377,3373,10,0);`
 
+	DataForTablePgDatabase = `INSERT INTO
+postgres.pg_database
+VALUES
+(1,'template1',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',1,1,-1,13441,479,1,1663,'{=c/postgres,postgres=CTc/postgres}'),
+(13441,'template0',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',1,0,-1,13441,479,1,1663,'{=c/postgres,postgres=CTc/postgres}'),
+(13442,'postgres',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',0,1,-1,13441,479,1,1663,NULL);`
+
 	DataForTablePgClass = ``
 
 	DataForTablePgType = `INSERT INTO
@@ -898,18 +905,24 @@ postgres.pg_type VALUES
 (25,'text',11,10,-1,0,'b','S',1,1,',',0,0,1009,'textin','textout','textrecv','textsend','-','-','-','i','x',0,0,-1,0,100,NULL,NULL,NULL),
 (1043,'varchar',11,10,-1,0,'b','S',0,1,',',0,0,1015,'varcharin','varcharout','varcharrecv','varcharsend','varchartypmodin','varchartypmodout','-','i','x',0,0,-1,0,100,NULL,NULL,NULL);
 `
+	DataForTablePgTablespace =`INSERT INTO
+postgres.pg_tablespace VALUES
+(1663,'pg_default',10,NULL,NULL),
+(1664,'pg_global',10,NULL,NULL);`
+
+	DataForTablePgNamespace = `INSERT INTO
+postgres.pg_namespace VALUES
+(99,'ph_toast',10,NULL),
+(11,'pg_catalog',10,'{postgres=UC/postgres,=U/postgres}'),
+(2200,'public',10,'{postgres=UC/postgres,=U/postgres}'),
+(13158,'information_schema',10,'{postgres=UC/postgres,=U/postgres}');`
+
 )
 
 //todo list 暂且考虑连接到PgAdmin需要的系统数据表、系统数据视图，因而，中间会牵扯到一些系统变量以及系统函数
 //
-//系统表
-//pg_database、pg_class、pg_namespace、pg_tablespace
-//
 //系统视图
 //pg_settings
-//
-//系统变量
-//client_encoding、client_min_messages、DateStyle
 //
 //系统函数
 //pg_show_all_settings、set_config、pg_encoding_to_char、has_database_privilege、current_database、pg_is_in_recovery

@@ -543,6 +543,13 @@ const (
 	DefTiDBEnableRateLimitAction       = true
 )
 
+// Default Pg system variable values.
+const (
+	DefPgClientEncoding 			= "UTF8"
+	DefPgDateStyle					="ISO"
+	DefPgClientMinMessage			="notice"
+)
+
 // Process global variables.
 var (
 	ProcessGeneralLog      uint32
