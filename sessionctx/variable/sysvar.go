@@ -745,6 +745,7 @@ var defaultSysVars = []*SysVar{
 	{ScopeGlobal | ScopeSession,PgDateStyle,DefPgClientEncoding},
 	{ScopeGlobal | ScopeSession,PgClientEncoding,DefPgDateStyle},
 	{ScopeGlobal | ScopeSession,PgClientMinMessage,DefPgClientMinMessage},
+	{ScopeGlobal | ScopeSession,PgByteaOutput,DefPgByteaOutput},
 }
 
 // SynonymsSysVariables is synonyms of system variables.

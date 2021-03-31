@@ -925,5 +925,5 @@ postgres.pg_namespace VALUES
 //pg_settings
 //
 //系统函数
-//pg_show_all_settings、set_config、pg_encoding_to_char、has_database_privilege、current_database、pg_is_in_recovery
+//pg_show_all_settings、set_config、pg_encoding_to_char、has_database_privilege、pg_is_in_recovery
 //pg_is_wal_replay_paused、has_table_privilege、has_schema_privilege、has_database_privilege
