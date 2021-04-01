@@ -2118,6 +2118,7 @@ var builtinGlobalVariable = []string{
 	variable.PgClientMinMessage,
 	variable.PgDateStyle,
 	variable.PgClientEncoding,
+	variable.PgByteaOutput,
 }
 
 var (

@@ -1494,6 +1494,12 @@ func doDMLWorks(s Session) {
 
 	mustExecute(s, DataForTablePgType)
 
+	mustExecute(s, DataForTablePgDatabase)
+
+	mustExecute(s, DataForTablePgTablespace)
+
+	mustExecute(s, DataForTablePgNamespace)
+
 	_, err := s.Execute(context.Background(), "COMMIT")
 	if err != nil {
 		sleepTime := 1 * time.Second
