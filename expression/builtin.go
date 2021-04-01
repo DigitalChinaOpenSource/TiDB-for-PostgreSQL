@@ -901,6 +901,7 @@ var funcs = map[string]functionClass{
 	ast.PgFuncCurrentDatabase: &currentDatabaseFunctionClass{baseFunctionClass{ast.PgFuncCurrentDatabase,0,0}},
 	ast.PgFuncSetConfig: &pgSettingsDatabaseFunctionClass{baseFunctionClass{ast.PgFuncSetConfig,2,3}},
 	ast.PgFuncEncodingToChar: &pgEncodingToCharFunctionClass{baseFunctionClass{ast.PgFuncEncodingToChar,1,1}},
+	ast.PgFuncHasDatabasePrivilege: &pgHasDatabasePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasDatabasePrivilege,2,3}},
 }
 
 // IsFunctionSupported check if given function name is a builtin sql function.

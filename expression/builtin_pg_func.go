@@ -166,17 +166,19 @@ func (p *pgHasDatabasePrivilegeFunctionClass) getFunction(ctx sessionctx.Context
 		return nil,err
 	}
 	argTps := make([]types.EvalType, 0, 3)
-	argTps = append(argTps, types.ETString, types.ETString)
+	argTps = append(argTps, types.ETInt, types.ETString)
 	if len(args) > 2 {
-		argTps = append(argTps, types.ETString)
+		idArgTp := make([]types.EvalType,0,1)
+		idArgTp = append(idArgTp, types.ETInt)
+		argTps = append(idArgTp, argTps...)
 	}
-	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETInt, argTps...)
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argTps...)
 	if err!=nil {
 		return nil, err
 	}
 	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
 	bf.tp.Flen = 64
-	sig := &builtinPgSettingsSig{bf}
+	sig := &builtinPgHasDatabasePrivilegeSig{bf}
 	return sig, nil
 }
 
@@ -191,12 +193,8 @@ func (b *builtinPgHasDatabasePrivilegeSig) Clone() builtinFunc {
 }
 
 func (b *builtinPgHasDatabasePrivilegeSig) evalString(row chunk.Row)(string, bool, error){
-	id, isNull, err := b.args[0].EvalInt(b.ctx,row)
-	if isNull || err != nil {
-		return "", isNull, err
-	}
-	charset :=  encodingToChar[id].name
-	return charset,  false, nil
+
+	return "true", false, nil
 }
 
 
