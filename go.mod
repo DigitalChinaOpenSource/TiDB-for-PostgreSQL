@@ -27,6 +27,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0
 	github.com/grpc-ecosystem/grpc-gateway v1.14.3 // indirect
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
+	github.com/jackc/pgio v1.0.0
 	github.com/jackc/pgproto3/v2 v2.0.7
 	github.com/jackc/pgtype v1.6.2
 	github.com/klauspost/cpuid v1.2.1
