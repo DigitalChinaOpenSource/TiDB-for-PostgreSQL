@@ -957,7 +957,7 @@ func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamM
 	return SetParamTypes(args, paramExprs, cols)
 }
 
-// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
+// SetParamTypes 设置参数类型.
 // 只考虑了参数一个方法参数数量为1,或者是2的情况，比如 cast一个参数。eq 参数数量是2.
 func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
 	if len(args) == 1 {
