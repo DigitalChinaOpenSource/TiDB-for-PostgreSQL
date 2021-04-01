@@ -47,6 +47,9 @@ const (
 	//PgClientEncoding is the pg database system_variable
 	PgClientEncoding = "client_encoding"
 
+	//PgByteaOutput is the pg database system_variable
+	PgByteaOutput 	= "bytea_output"
+
 	TiDBDDLSlowOprThreshold = "ddl_slow_threshold"
 
 	// tidb_snapshot is used for reading history data, the default value is empty string.
@@ -541,6 +544,14 @@ const (
 	DefTiDBEnableTelemetry             = true
 	DefTiDBEnableAmendPessimisticTxn   = false
 	DefTiDBEnableRateLimitAction       = true
+)
+
+// Default Pg system variable values.
+const (
+	DefPgClientEncoding 			= "UTF8"
+	DefPgDateStyle					="ISO"
+	DefPgClientMinMessage			="notice"
+	DefPgByteaOutput				="hex"
 )
 
 // Process global variables.

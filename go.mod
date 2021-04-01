@@ -27,6 +27,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0
 	github.com/grpc-ecosystem/grpc-gateway v1.14.3 // indirect
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
+	github.com/jackc/pgio v1.0.0
 	github.com/jackc/pgproto3/v2 v2.0.7
 	github.com/jackc/pgtype v1.6.2
 	github.com/klauspost/cpuid v1.2.1
@@ -90,6 +91,6 @@ require (
 	sourcegraph.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
 )
 
-replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210326013917-f7fed7f2ae9d
+replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210331094253-fef9c0a032fa
 
 go 1.13

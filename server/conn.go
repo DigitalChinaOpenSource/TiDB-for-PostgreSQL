@@ -43,12 +43,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/jackc/pgio"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
-	"github.com/pingcap/tidb/types"
 	"io"
 	"io/ioutil"
-	"math"
 	"math/rand"
 	"net"
 	"runtime"
@@ -1570,6 +1569,7 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 // serverStatus, a flag bit represents server information
 // PostgreSQL Modified
 func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
+	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
 	gotColumnInfo := false
@@ -1608,16 +1608,28 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		}
 		start := time.Now()
 		reg := trace.StartRegion(ctx, "WriteClientConn")
-		for i := 0; i < rowCount; i++ {
+
+		// rowdata : 'D' + len(msg) + len(columns) + for(len(val) + val)
+		data = append(data, 'D')
+		data = pgio.AppendInt32(data, -1)
+ 		for i := 0; i < rowCount; i++ {
+			data = data[0:5]
 			if binary {
-				err = cc.writeBinaryRowData(rs.Columns(), req.GetRow(i))
+				data, err = dumpBinaryRowData(data, rs.Columns(), req.GetRow(i))
 			} else {
-				err = cc.writeTextRowData(rs.Columns(), req.GetRow(i))
+				data, err = dumpTextRowData(data, rs.Columns(), req.GetRow(i))
 			}
 			if err != nil {
 				return err
 			}
+
+			pgio.SetInt32(data[1:], int32(len(data[1:])))
+
+			if _, err = cc.pkt.bufWriter.Write(data); err != nil {
+				return err
+			}
 		}
+
 		if stmtDetail != nil {
 			stmtDetail.WriteSQLRespDuration += time.Since(start)
 		}
@@ -2256,137 +2268,6 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 	rowDescription := convertColumnInfoToRowDescription(columns)
 
 	if _, err := cc.pkt.bufWriter.Write(rowDescription.Encode(nil)); err != nil{
-		return err
-	}
-	return nil
-}
-
-// writeBinaryRowData 向客户端以 Binary 格式写回 RowData
-// MySQL 报文协议为小端序，在 PgSQL 中报文为大端序
-// 每次只写入一行数据
-// 这里只写向缓存，并不发送
-func (cc *clientConn) writeBinaryRowData(columns []*ColumnInfo, row chunk.Row) (err error) {
-	data := make([][]byte, len(columns))
-	for i := range columns {
-		if row.IsNull(i) {
-			data[i] = []byte("null")
-			continue
-		}
-		switch columns[i].Type {
-		case mysql.TypeTiny:
-			data[i] = make([]byte, 1)
-			data[i][0] = byte(row.GetInt64(i))
-		case mysql.TypeShort, mysql.TypeYear:
-			data[i] = make([]byte, 2)
-			binary.BigEndian.PutUint16(data[i], uint16(row.GetInt64(i)))
-		case mysql.TypeInt24, mysql.TypeLong:
-			data[i] = make([]byte, 4)
-			binary.BigEndian.PutUint32(data[i], uint32(row.GetInt64(i)))
-		case mysql.TypeLonglong:
-			data[i] = make([]byte, 8)
-			binary.BigEndian.PutUint64(data[i], row.GetUint64(i))
-		case mysql.TypeFloat:
-			data[i] = make([]byte, 4)
-			binary.BigEndian.PutUint32(data[i], math.Float32bits(row.GetFloat32(i)))
-		case mysql.TypeDouble:
-			data[i] = make([]byte, 8)
-			binary.BigEndian.PutUint64(data[i], math.Float64bits(row.GetFloat64(i)))
-		case mysql.TypeNewDecimal:
-			data[i] = hack.Slice(row.GetMyDecimal(i).String())
-		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
-			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-			data[i] = row.GetBytes(i)
-		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
-			data[i] = make([]byte, 0)
-			data[i] = dumpBinaryDateTimeByBigEndian(data[i], row.GetTime(i))
-		case mysql.TypeDuration:
-			data[i] = dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
-		case mysql.TypeEnum:
-			data[i] = hack.Slice(row.GetEnum(i).String())
-		case mysql.TypeSet:
-			data[i] = hack.Slice(row.GetSet(i).String())
-		case mysql.TypeJSON:
-			data[i] = hack.Slice(row.GetJSON(i).String())
-		default:
-			return errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
-		}
-	}
-	dataRow := pgproto3.DataRow{Values: data }
-
-	if _, err := cc.pkt.bufWriter.Write(dataRow.Encode(nil)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// writeTextRowData 向客户端以 Text 格式写回 RowData
-// 每次只写入一行数据
-// 这里只写向缓存，并不发送
-func (cc *clientConn) writeTextRowData(columns []*ColumnInfo, row chunk.Row) error {
-	data := make([][]byte, len(columns))
-	tmp := make([]byte, 0, 20)
-	for i, col := range columns {
-		if row.IsNull(i) {
-			data[i] = []byte("null")
-			continue
-		}
-		switch col.Type {
-		case mysql.TypeTiny, mysql.TypeShort, mysql.TypeInt24, mysql.TypeLong:
-			tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
-			data[i] = tmp
-		case mysql.TypeYear:
-			year := row.GetInt64(i)
-			tmp = nil
-			if year == 0 {
-				tmp = append(tmp, '0', '0', '0', '0')
-			} else {
-				tmp = strconv.AppendInt(tmp, year, 10)
-			}
-			data[i] = tmp
-		case mysql.TypeLonglong:
-			if mysql.HasUnsignedFlag(uint(columns[i].Flag)) {
-				tmp = strconv.AppendUint(nil, row.GetUint64(i), 10)
-			} else {
-				tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
-			}
-			data[i] = tmp
-		case mysql.TypeFloat:
-			prec := -1
-			if columns[i].Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
-				prec = int(col.Decimal)
-			}
-			tmp = appendFormatFloat(nil, float64(row.GetFloat32(i)), prec, 32)
-			data[i] = tmp
-		case mysql.TypeDouble:
-			prec := types.UnspecifiedLength
-			if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
-				prec = int(col.Decimal)
-			}
-			tmp = appendFormatFloat(nil, row.GetFloat64(i), prec, 64)
-			data[i] = tmp
-		case mysql.TypeNewDecimal:
-			data[i] = hack.Slice(row.GetMyDecimal(i).String())
-		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
-			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-			data[i] = row.GetBytes(i)
-		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
-			data[i] = hack.Slice(row.GetTime(i).String())
-		case mysql.TypeDuration:
-			dur := row.GetDuration(i, int(col.Decimal))
-			data[i] = hack.Slice(dur.String())
-		case mysql.TypeEnum:
-			data[i] = hack.Slice(row.GetEnum(i).String())
-		case mysql.TypeSet:
-			data[i] = hack.Slice(row.GetSet(i).String())
-		case mysql.TypeJSON:
-			data[i] = hack.Slice(row.GetJSON(i).String())
-		default:
-			return errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
-		}
-	}
-	dataRow := pgproto3.DataRow{Values: data }
-
-	if _, err := cc.pkt.bufWriter.Write(dataRow.Encode(nil)); err != nil {
 		return err
 	}
 	return nil
