@@ -916,17 +916,22 @@ func BuildMergeJoinPlan(ctx sessionctx.Context, joinType JoinType, leftKeys, rig
 // paramExprs：prepared.Param，我们需要往里面设置参数类型。
 // cols：select计划查询的字段信息
 func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) {
-	if len(exprs) > 1 {
-		// sql where condition like this : x = aaa and y > bbb and z < ccc
-		for i := range exprs {
-			if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
-				SetParamTypes(scalar.Function.GetArgs(), paramExprs, cols)
-			}
-		}
-	} else if len(exprs) == 1 {
-		// sql where condition like this : x = aaa or y < bbb and z = zzz
-		// the struct is a tree , not even array, we should use deep-first traversal to resolve
-		if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
+	//if len(exprs) > 1 {
+	//	// sql where condition like this : x = aaa and y > bbb and z < ccc
+	//	for i := range exprs {
+	//		if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
+	//			SetParamTypes(scalar.Function.GetArgs(), paramExprs, cols)
+	//		}
+	//	}
+	//} else if len(exprs) == 1 {
+	//	// sql where condition like this : x = aaa or y < bbb and z = zzz
+	//	// the struct is a tree , not even array, we should use deep-first traversal to resolve
+	//	if scalar, ok := exprs[0].(*expression.ScalarFunction); ok {
+	//		DoDeepFirstTraverSal(scalar.Function.GetArgs(), paramExprs, cols)
+	//	}
+	//}
+	for i := range exprs {
+		if scalar, ok := exprs[i].(*expression.ScalarFunction); ok {
 			DoDeepFirstTraverSal(scalar.Function.GetArgs(), paramExprs, cols)
 		}
 	}
@@ -960,6 +965,10 @@ func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamM
 // SetParamTypes 设置参数类型.
 // 只考虑了参数一个方法参数数量为1,或者是2的情况，比如 cast一个参数。eq 参数数量是2.
 func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
+	//如果参数类型已经完全设置完毕，则退出
+	if CheckParamFullySeted(paramExprs) {
+		return nil
+	}
 	if len(args) == 1 {
 		// 当前考虑的是cast方法，只有一个参数的情况。直接返回上层处理。
 		return args
@@ -983,4 +992,14 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 		// todo 完善多参数的处理逻辑
 		return nil
 	}
+}
+
+// CheckParamFullySeted 检查params是否完全设置完毕
+func CheckParamFullySeted(paramExprs *[]ast.ParamMarkerExpr) bool {
+	for _,p := range *paramExprs {
+		if p.(*driver.ParamMarkerExpr).Type.Tp == 0 {
+			return false
+		}
+	}
+	return true
 }
