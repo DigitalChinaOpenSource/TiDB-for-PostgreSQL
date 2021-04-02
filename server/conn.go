@@ -1016,8 +1016,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return cc.handleStmtDescription(ctx, desc)
 	case 'H':            /* flush */
 	case 'S':            /* sync */
-		// todo 获取事务状态再返回
-		return cc.writeReadForQuery(ctx,'I')
+		return cc.writeReadForQuery(ctx,cc.ctx.Status())
 	case 'X':
 		return nil
 	case 'd':            /* copy data */
@@ -1106,14 +1105,14 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 		Line:                0,
 	}
 
-	if _, err := cc.pkt.bufWriter.Write(errorResponse.Encode(nil)); err != nil {
+	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
 		return err
 	}
 
 	// 发送错误后需要发送 ReadyForQuery 通知客户端可以继续执行命令
 	// 所以这里需要获取到事务状态是否处于空闲阶段
 	// todo 获取事务状态
-	cc.writeReadForQuery(ctx, 'I')
+	cc.writeReadForQuery(ctx, cc.ctx.Status())
 	return cc.flush(ctx)
 }
 
@@ -1572,13 +1571,10 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
-	gotColumnInfo := false
 	isPrepareStmt := rs.IsPrepareStmt()
 
 	// 当为预处理查询执行时，在执行完成后不需要返回 RowDescription
-	if isPrepareStmt {
-		gotColumnInfo = true
-	}
+	gotColumnInfo := isPrepareStmt
 
 	var stmtDetail *execdetails.StmtExecDetails
 	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
@@ -1625,7 +1621,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 
 			pgio.SetInt32(data[1:], int32(len(data[1:])))
 
-			if _, err = cc.pkt.bufWriter.Write(data); err != nil {
+			if err = cc.WriteData(data); err != nil {
 				return err
 			}
 		}
@@ -2085,26 +2081,32 @@ func (cc *clientConn) PgOpenSessionAndDoAuth(ctx context.Context) error {
 		return err
 	}
 
-	//hasPassword := "YES"
-	//if len(authData) == 0 {
-	//	hasPassword = "NO"
-	//}
+	// todo 增加密码验证
+	// 测试环境不做密码设置
+	authData := make([]byte, 0)
 
-	// 直接不带密码 也没有认证信息
-	hasPassword := "NO"
+	hasPassword := "YES"
+	if len(authData) == 0 {
+		hasPassword = "NO"
+	}
 
 	host, err := cc.PeerHost(hasPassword)
 	if err != nil {
 		return err
 	}
 
-	if err := cc.DoAuth(ctx); err != nil {
+	// 测试环境不做密码认证
+	//if err := cc.DoAuth(ctx); err != nil {
+	//	return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
+	//}
+
+	if !cc.ctx.Auth(&auth.UserIdentity{Username: cc.user, Hostname: host}, authData, cc.salt) {
 		return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
 	}
 
-	//if !cc.ctx.Auth(&auth.UserIdentity{Username: cc.user, Hostname: host}, authData, cc.salt) {
-	//	return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
-	//}
+	if err = cc.writeAuthenticationOK(ctx); err != nil {
+		return err
+	}
 
 	if cc.dbname != "" {
 		err = cc.useDB(context.Background(), cc.dbname)
@@ -2134,8 +2136,7 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 	rand.Read(a)
 	salt := [4]byte{a[0], a[1], a[2], a[3]}
 	authRequest := pgproto3.AuthenticationMD5Password{Salt: salt}
-	_, err := cc.pkt.bufWriter.Write(authRequest.Encode(nil))
-	if err != nil {
+	if err := cc.WriteData(authRequest.Encode(nil)); err != nil {
 		return errors.New("write AuthenticationMD5Password to client failed: " + err.Error())
 	}
 
@@ -2200,7 +2201,7 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 		InternalPosition:    0,
 		Line:                0,
 	}
-	if _, err := cc.pkt.bufWriter.Write(errorResponse.Encode(nil)); err != nil {
+	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
 		return errors.New("write ErrorResponse to client failed：" + err.Error())
 	}
 
@@ -2210,7 +2211,7 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 		return err
 	}
 
-	err = errors.New("access denied: invalid password")
+	err := errors.New("access denied: invalid password")
 
 	return err
 }
@@ -2219,7 +2220,7 @@ func (cc *clientConn) DoAuth(ctx context.Context) error {
 // 服务端回复 'S'，表示同意SSL握手
 // 服务端回复 'N'，表示不使用SSL握手
 func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) error {
-	if _,err := cc.pkt.bufWriter.Write([]byte{pgRequestSSL}); err != nil{
+	if err := cc.WriteData([]byte{pgRequestSSL}); err != nil{
 		return err
 	}
 
@@ -2241,7 +2242,7 @@ func (cc *clientConn) writeParameterStatus() error {
 
 	for k ,v := range parameters{
 		parameterStatus := &pgproto3.ParameterStatus{Name: k, Value: v}
-		if _, err := cc.pkt.bufWriter.Write(parameterStatus.Encode(nil)); err != nil{
+		if err :=  cc.WriteData(parameterStatus.Encode(nil)); err != nil{
 			return errors.New("write ParameterStatus to client failed: " + err.Error())
 		}
 	}
@@ -2251,7 +2252,7 @@ func (cc *clientConn) writeParameterStatus() error {
 // writeAuthenticationOK 向客户端写回 AuthenticationOK
 func (cc *clientConn) writeAuthenticationOK(ctx context.Context) error {
 	authOK := &pgproto3.AuthenticationOk{}
-	if _, err := cc.pkt.bufWriter.Write(authOK.Encode(nil)); err != nil{
+	if err := cc.WriteData(authOK.Encode(nil)); err != nil{
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2267,10 +2268,7 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 	}
 	rowDescription := convertColumnInfoToRowDescription(columns)
 
-	if _, err := cc.pkt.bufWriter.Write(rowDescription.Encode(nil)); err != nil{
-		return err
-	}
-	return nil
+	return cc.WriteData(rowDescription.Encode(nil))
 }
 
 // writeCommandComplete 向客户端写回 CommandComplete 表示一次查询已经完成
@@ -2290,17 +2288,13 @@ func (cc *clientConn) writeCommandComplete() error {
 		msg = stmtType + " " + affectedRows
 	}
 	commandComplete := pgproto3.CommandComplete{CommandTag: []byte(msg)}
-	if _, err := cc.pkt.bufWriter.Write(commandComplete.Encode(nil)); err != nil {
-		return err
-	}
-	return nil
+	return cc.WriteData(commandComplete.Encode(nil))
 }
 
 // writeParseComplete 向客户端写回 ParseComplete 表示解析命令完成
 func (cc *clientConn) writeParseComplete() error {
 	parseComplete := pgproto3.ParseComplete{}
-	_, err := cc.pkt.bufWriter.Write(parseComplete.Encode(nil))
-	return err
+	return cc.WriteData(parseComplete.Encode(nil))
 }
 
 // writeParameterDescription 向客户端写回 ParameterDescription
@@ -2308,29 +2302,25 @@ func (cc *clientConn) writeParameterDescription(paramOid []uint32) error {
 	parameterDescription := pgproto3.ParameterDescription{
 		ParameterOIDs: paramOid,
 	}
-	_, err := cc.pkt.bufWriter.Write(parameterDescription.Encode(nil))
-	return err
+	return cc.WriteData(parameterDescription.Encode(nil))
 }
 
 // writeNoData 向客户端写回 NoData 表示语句无数据返回
 func (cc *clientConn) writeNoData() error {
 	noData := pgproto3.NoData{}
-	_, err := cc.pkt.bufWriter.Write(noData.Encode(nil))
-	return err
+	return cc.WriteData(noData.Encode(nil))
 }
 
 // writeBindComplete 向客户端写回 BindComplete 表示绑定命令完成
 func (cc *clientConn) writeBindComplete() error {
 	bindComplete := pgproto3.BindComplete{}
-	_, err := cc.pkt.bufWriter.Write(bindComplete.Encode(nil))
-	return err
+	return cc.WriteData(bindComplete.Encode(nil))
 }
 
 // writeCloseComplete 向客户端写回 BindComplete 表示绑定命令完成
 func (cc *clientConn) writeCloseComplete() error {
 	closeComplete  := pgproto3.CloseComplete{}
-	_, err := cc.pkt.bufWriter.Write(closeComplete.Encode(nil))
-	return err
+	return cc.WriteData(closeComplete.Encode(nil))
 }
 
 // writeReadForQuery 向客户端写回 ReadyForQuery
@@ -2343,11 +2333,22 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	}
 
 	readForReady := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
-	if _, err := cc.pkt.bufWriter.Write(readForReady.Encode(nil)); err != nil{
+	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
 		return err
 	}
 
 	return cc.flush(ctx)
+}
+
+func (cc *clientConn) WriteData(data []byte) error {
+	if n, err := cc.pkt.bufWriter.Write(data); err != nil {
+		terror.Log(errors.Trace(err))
+		return errors.Trace(mysql.ErrBadConn)
+	} else if n != len(data) {
+		return errors.Trace(mysql.ErrBadConn)
+	} else {
+		return nil
+	}
 }
 
 // convertColumnInfoToRowDescription 将 MySQL 的字段结构信息 转换为 PgSQL 的字段结构信息
