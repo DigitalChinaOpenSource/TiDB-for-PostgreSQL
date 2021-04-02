@@ -1964,9 +1964,6 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 // 用户认证时，客服端可能会断开连接，等待用户输入密码后再重新建立连接，需要注意
 // 最后发送 AuthenticationOK 或 ErrorResponse 来表式认证成功或失败
 func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *pgproto3.StartupMessage) error {
-	// 获取用户名和数据库名称
-	cc.user = startupMessage.Parameters["user"]
-	cc.dbname = startupMessage.Parameters["database"]
 
 	// 这里获取到的启动包后会发现只有部分参数
 	// 而MySQL协议会需求更多的参数
@@ -1988,6 +1985,7 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 	}
 
 	cc.capability = resp.Capability & cc.server.capability
+	// 获取用户名和数据库名称
 	cc.user = resp.User
 	cc.dbname = resp.DBName
 	cc.collation = resp.Collation
