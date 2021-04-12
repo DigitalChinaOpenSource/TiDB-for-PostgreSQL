@@ -346,6 +346,11 @@ type LogicalAggregation struct {
 
 // SetParamType todo 设置参数类型
 func (p *LogicalAggregation) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := p.children; childs != nil {
+		for _, child := range childs {
+			child.SetParamType(paramExprs)
+		}
+	}
 	return err
 }
 
@@ -1017,6 +1022,11 @@ type LogicalSort struct {
 
 // SetParamType todo 设置参数类型
 func (p *LogicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := p.children; childs != nil {
+		for _, child := range childs {
+			child.SetParamType(paramExprs)
+		}
+	}
 	return err
 }
 

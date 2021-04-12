@@ -1603,6 +1603,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			gotColumnInfo = true
 		}
 		rowCount := req.NumRows()
+		logutil.Logger(ctx).Info("['E-rowCount']",zap.String("count",strconv.Itoa(rowCount)))
 		if rowCount == 0 {
 			break
 		}

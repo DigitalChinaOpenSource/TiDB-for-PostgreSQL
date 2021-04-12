@@ -209,6 +209,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
 		case *plannercore.Update:
 			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
+		case *plannercore.LogicalSort:
+			SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
 	}
 	if _, ok := stmt.(*ast.SelectStmt); ok {
 		e.Fields = colNames2ResultFields(p.Schema(), p.OutputNames(), vars.CurrentDB)
@@ -320,6 +322,11 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 			}
 		}
 	}
+}
+
+// SetSortType
+func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) {
+	sort.SetParamType(i)
 }
 
 
