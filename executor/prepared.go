@@ -208,6 +208,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
 	case *plannercore.Update:
 		SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
+	case *plannercore.LogicalSort:
+		SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
 	}
 
 	if _, ok := stmt.(*ast.SelectStmt); ok {
@@ -336,6 +338,11 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 			}
 		}
 	}
+}
+
+// SetSortType 从根节点计划是logicalSort的计划中获取参数类型
+func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) {
+	sort.SetParamType(i)
 }
 
 
