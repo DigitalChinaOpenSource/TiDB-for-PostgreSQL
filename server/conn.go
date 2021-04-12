@@ -1581,9 +1581,13 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 	if stmtDetailRaw != nil {
 		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
 	}
+	var addedNext time.Duration
+	st := time.Now()
 	for {
 		// Here server.tidbResultSet implements Next method.
+		st5 := time.Now()
 		err := rs.Next(ctx, req)
+		addedNext += time.Since(st5)
 		if err != nil {
 			return err
 		}
@@ -1608,6 +1612,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		// rowdata : 'D' + len(msg) + len(columns) + for(len(val) + val)
 		data = append(data, 'D')
 		data = pgio.AppendInt32(data, -1)
+		st1 := time.Now()
  		for i := 0; i < rowCount; i++ {
 			data = data[0:5]
 			if binary {
@@ -1620,17 +1625,18 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			}
 
 			pgio.SetInt32(data[1:], int32(len(data[1:])))
-
 			if err = cc.WriteData(data); err != nil {
 				return err
 			}
 		}
-
+		logutil.Logger(ctx).Info("['E-RS-subLoop']",zap.String("Cost",time.Since(st1).String()))
 		if stmtDetail != nil {
 			stmtDetail.WriteSQLRespDuration += time.Since(start)
 		}
 		reg.End()
 	}
+	logutil.Logger(ctx).Info("['E-next']",zap.String("Cost",addedNext.String()))
+	logutil.Logger(ctx).Info("['E-RS-loop']",zap.String("Cost",time.Since(st).String()))
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
@@ -2325,6 +2331,7 @@ func (cc *clientConn) writeCloseComplete() error {
 // status 为当前后端事务状态码。"I"表示空闲(没有在事务中)、"T"表示在事务中；"E"表示在失败的事务中(事务块结束前查询都回被驳回)
 // 调用该方法后会清空缓存，发送缓存中的所有报文
 func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) error {
+	start := time.Now()
 	pgStatus, err := convertMySQLServerStatusToPgSQLServerStatus(status)
 	if err != nil {
 		return err
@@ -2334,7 +2341,7 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
 		return err
 	}
-
+	logutil.Logger(ctx).Info("['S']",zap.String("Cost",time.Since(start).String()))
 	return cc.flush(ctx)
 }
 

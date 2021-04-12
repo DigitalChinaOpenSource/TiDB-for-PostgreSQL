@@ -15,12 +15,7 @@ package executor
 
 import (
 	"context"
-	"math"
-	"strings"
-	"time"
-
 	"github.com/pingcap/errors"
-	"github.com/pingcap/log"
 	"github.com/pingcap/parser"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/mysql"
@@ -35,7 +30,9 @@ import (
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/hint"
 	"github.com/pingcap/tidb/util/sqlexec"
-	"go.uber.org/zap"
+	"math"
+	"strings"
+	"time"
 )
 
 var (
@@ -185,7 +182,6 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		Params:        extractor.markers,
 		SchemaVersion: e.is.SchemaMetaVersion(),
 	}
-
 	prepared.UseCache = plannercore.PreparedPlanCacheEnabled() && plannercore.Cacheable(stmt, e.is)
 
 	// We try to build the real statement of preparedStmt.
@@ -204,7 +200,6 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	if err != nil {
 		return err
 	}
-
 	switch p.(type) {
 		case *plannercore.Insert:
 			SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
@@ -215,7 +210,6 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		case *plannercore.Update:
 			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	}
-
 	if _, ok := stmt.(*ast.SelectStmt); ok {
 		e.Fields = colNames2ResultFields(p.Schema(), p.OutputNames(), vars.CurrentDB)
 	}
@@ -372,7 +366,7 @@ func (e *ExecuteExec) Build(b *executorBuilder) error {
 	}
 	stmtExec := b.build(e.plan)
 	if b.err != nil {
-		log.Warn("rebuild plan in EXECUTE statement failed", zap.String("labelName of PREPARE statement", e.name))
+		//log.Warn("rebuild plan in EXECUTE statement failed", zap.String("labelName of PREPARE statement", e.name))
 		return errors.Trace(b.err)
 	}
 	e.stmtExec = stmtExec

@@ -260,7 +260,6 @@ func Next(ctx context.Context, e Executor, req *chunk.Chunk) error {
 		defer trace.StartRegion(ctx, fmt.Sprintf("%T.Next", e)).End()
 	}
 	err := e.Next(ctx, req)
-
 	if err != nil {
 		return err
 	}
