@@ -236,15 +236,32 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return vars.AddPreparedStmt(e.ID, preparedObj)
 }
 
+// ParamMakerSortor sort by order.
+// in the query, most situations are in order.so bubble sort and insert sort are Preferred
+// we choose insert sort here.
+// todo: According to different parameters situations, choose the most suitable sorting method
 func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
-	for i := 0; i< len(markers); i++ {
-		for j := i + 1; j < len(markers); j++ {
-			if markers[j].(*driver.ParamMarkerExpr).Order < markers[i].(*driver.ParamMarkerExpr).Order {
-				markers[i], markers[j] = markers[j], markers[i]
+	if len(markers) > 1 {
+		var val ast.ParamMarkerExpr
+		var index int
+		for i := 1; i < len(markers); i++ {
+			val, index = markers[i], i -1
+			for {
+				if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order {
+					markers[index + 1] = markers[index]
+				} else {
+					break
+				}
+				index--
+				if index < 0 {
+					break
+				}
 			}
+			markers[index + 1] = val
 		}
 	}
 }
+
 
 // SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
 //	insertPlan：计划结构体

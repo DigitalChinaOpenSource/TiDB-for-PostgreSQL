@@ -1581,13 +1581,9 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 	if stmtDetailRaw != nil {
 		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
 	}
-	var addedNext time.Duration
-	st := time.Now()
 	for {
 		// Here server.tidbResultSet implements Next method.
-		st5 := time.Now()
 		err := rs.Next(ctx, req)
-		addedNext += time.Since(st5)
 		if err != nil {
 			return err
 		}
@@ -1603,7 +1599,6 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			gotColumnInfo = true
 		}
 		rowCount := req.NumRows()
-		logutil.Logger(ctx).Info("['E-rowCount']",zap.String("count",strconv.Itoa(rowCount)))
 		if rowCount == 0 {
 			break
 		}
@@ -1613,7 +1608,6 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		// rowdata : 'D' + len(msg) + len(columns) + for(len(val) + val)
 		data = append(data, 'D')
 		data = pgio.AppendInt32(data, -1)
-		st1 := time.Now()
  		for i := 0; i < rowCount; i++ {
 			data = data[0:5]
 			if binary {
@@ -1630,14 +1624,11 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 				return err
 			}
 		}
-		logutil.Logger(ctx).Info("['E-RS-subLoop']",zap.String("Cost",time.Since(st1).String()))
 		if stmtDetail != nil {
 			stmtDetail.WriteSQLRespDuration += time.Since(start)
 		}
 		reg.End()
 	}
-	logutil.Logger(ctx).Info("['E-next']",zap.String("Cost",addedNext.String()))
-	logutil.Logger(ctx).Info("['E-RS-loop']",zap.String("Cost",time.Since(st).String()))
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}

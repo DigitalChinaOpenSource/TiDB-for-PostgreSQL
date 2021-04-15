@@ -40,8 +40,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/pingcap/tidb/util/execdetails"
-	"github.com/pingcap/tidb/util/logutil"
-	"go.uber.org/zap"
 	"math"
 	"runtime/trace"
 	"strconv"
@@ -87,7 +85,6 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 // handleStmtBind 处理pgsql拓展查询协议过程中的bind过程
 // PGSQL Modified
 func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (err error) {
-	start := time.Now()
 	vars := cc.ctx.GetSessionVars()
 
 	// 当为临时预处理查询，默认设置 Name 为 0
@@ -141,14 +138,12 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	if err != nil {
 		return err
 	}
-	logutil.Logger(ctx).Info("['B']",zap.String("Cost",time.Since(start).String()))
 	return cc.flush(ctx)
 }
 
 // handleStmtDescription 处理 Description 请求，通过 stmtName 找到相应的预处理语句
 // 返回参数的类型信息和返回值的表结构信息，如果没有返回值，则返回 NoData
 func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.Describe) error {
-	start := time.Now()
 	vars := cc.ctx.GetSessionVars()
 
 	// 无论是 Stmt Name 还是 Portal Name 当为临时语句的时候，默认 Name 为 "0"
@@ -204,14 +199,12 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 			return err
 		}
 	}
-	logutil.Logger(ctx).Info("['D']",zap.String("Cost",time.Since(start).String()))
 	return cc.flush(ctx)
 }
 
 // handleStmtExecute 处理 Execute 请求
 // PGSQL Modified
 func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Execute) error {
-	start := time.Now()
 	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
 
 	// 当为临时预处理查询，默认设置 Name 为 0
@@ -239,13 +232,10 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}
-	start2 := time.Now()
 	err = cc.writeResultset(ctx, rs, true, 0, 0)
-	logutil.Logger(ctx).Info("['E-writeResult']",zap.String("Cost",time.Since(start2).String()))
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
-	logutil.Logger(ctx).Info("['E']",zap.String("Cost",time.Since(start).String()))
 	return nil
 }
 
