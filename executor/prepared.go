@@ -158,7 +158,7 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return ErrPsManyParam
 	}
 
-	//根据parammaker自带的的order成员排序
+	//sort according to its own order
 	ParamMakerSortor(extractor.markers)
 
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
@@ -166,16 +166,10 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return err
 	}
 
-	// The parameter markers are appended in visiting order, which may not
-	// be the same as the position order in the query string. We need to
-	// sort it by position.
-	//sorter := &paramMarkerSorter{markers: extractor.markers}
-	//sort.Sort(sorter)
-	//e.ParamCount = len(sorter.markers)
+	// set paramCount to PrepareExec.It was used in step 'handleDescription'
 	e.ParamCount = len(extractor.markers)
-	//for i := 0; i < e.ParamCount; i++ {
-	//	sorter.markers[i].SetOrder(i)
-	//}
+
+	// set Params use extractor's member 'markers'
 	prepared := &ast.Prepared{
 		Stmt:          stmt,
 		StmtType:      GetStmtLabel(stmt),
@@ -187,8 +181,7 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// We try to build the real statement of preparedStmt.
 	for i := range prepared.Params {
 		param := prepared.Params[i].(*driver.ParamMarkerExpr)
-		//param.Datum.SetNull()
-		//每个datum设置类型为interface，保证计划中的条件都会存在不会被优化掉。
+		//set every paramType to interface. It keeps every param in the plan tree whatever the param is Primary key index
 		param.Datum.SetInterfaceType()
 		param.InExecute = false
 	}
@@ -200,17 +193,18 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	if err != nil {
 		return err
 	}
+	// according to plan type. Get param type from the plan tree.
 	switch p.(type) {
-		case *plannercore.Insert:
-			SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
-		case *plannercore.LogicalProjection:
-			SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
-		case *plannercore.Delete:
-			SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
-		case *plannercore.Update:
-			SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
-		case *plannercore.LogicalSort:
-			SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
+	case *plannercore.Insert:
+		SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
+	case *plannercore.LogicalProjection:
+		SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
+	case *plannercore.Delete:
+		SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
+	case *plannercore.Update:
+		SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
+	case *plannercore.LogicalSort:
+		SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
 	}
 	if _, ok := stmt.(*ast.SelectStmt); ok {
 		e.Fields = colNames2ResultFields(p.Schema(), p.OutputNames(), vars.CurrentDB)
@@ -221,8 +215,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	if e.name != "" {
 		vars.PreparedStmtNameToID[e.name] = e.ID
 	} else {
-		// 当没有 Stmt 没有Name时，则表示该预处理语句为临时语句，我们会分配 0 作为其 Name
-		// 后面在获取临时预处理语句 ID 的时候，通过 0 获取
+		// When Stmt does not have a Name, it means that the prepared statement is a temporary statement, and we will assign 0 as its Name
+		// When obtaining the temporary prepared statement ID later, pass 0 to obtain
 		vars.PreparedStmtNameToID["0"] = e.ID
 	}
 
@@ -341,7 +335,7 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 	}
 }
 
-// SetSortType
+// SetSortType 从根节点计划是logicalSort的计划中获取参数类型
 func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) {
 	sort.SetParamType(i)
 }
