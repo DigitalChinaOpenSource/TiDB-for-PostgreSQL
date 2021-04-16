@@ -1370,7 +1370,6 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 		metrics.ExecuteErrorCounter.WithLabelValues(metrics.ExecuteErrorToLabel(err)).Inc()
 		return err
 	}
-
 	if len(stmts) == 0 {
 		return cc.writeOK(ctx)
 	}
@@ -2323,7 +2322,6 @@ func (cc *clientConn) writeCloseComplete() error {
 // status 为当前后端事务状态码。"I"表示空闲(没有在事务中)、"T"表示在事务中；"E"表示在失败的事务中(事务块结束前查询都回被驳回)
 // 调用该方法后会清空缓存，发送缓存中的所有报文
 func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) error {
-	start := time.Now()
 	pgStatus, err := convertMySQLServerStatusToPgSQLServerStatus(status)
 	if err != nil {
 		return err
@@ -2333,7 +2331,6 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
 		return err
 	}
-	logutil.Logger(ctx).Info("['S']",zap.String("Cost",time.Since(start).String()))
 	return cc.flush(ctx)
 }
 
