@@ -1090,19 +1090,35 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 		}
 	}
 
+	// todo 处理某些情况下从lastPacket获取不到sl的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
+	//读包获取sql，去除第一位的类型
+	sql := string(cc.lastPacket)[1 : ]
+
+	//Get the file location and line number where the error occurred
+	var filePath string
+	var line int
+	if te != nil {
+		filePath, line = te.Location()
+	}
+	code, pgMsg, position, err := convertMysqlErrorToPgError(m, sql)
+	if err != nil {
+		return err
+	}
 	cc.lastCode = m.Code
 	// todo 完成MySQL错误与PgSQL错误的转换和返回
 	// https://www.postgresql.org/docs/13/errcodes-appendix.html
 	errorResponse := pgproto3.ErrorResponse{
 		Severity:            "ERROR",
 		SeverityUnlocalized: "",
-		Code:                "28P01",
-		Message:             m.Message,
+		Code:                code,
+		Message:             pgMsg,
 		Detail:              "",
 		Hint:                "",
-		Position:            0,
-		InternalPosition:    0,
-		Line:                0,
+		Position:            position,
+		// the file name of the source-code location where the error was reported.
+		Line:                int32(line),
+		// the line number of the source-code location where the error was reported.
+		File:				filePath,
 	}
 
 	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
@@ -2471,4 +2487,157 @@ func loadSSLCertificates()(tlsConfig *tls.Config,err error){
 		Certificates: []tls.Certificate{tlsCert},
 	}
 	return tlsConfig,nil
+}
+// convertMysqlErrorToPgError 从mysql消息体中获取信息转换出pgsql所需要的信息
+func convertMysqlErrorToPgError(m *mysql.SQLError, sql string) (code, pgMsg string, position int32, err error) {
+	defaultCode,defaultMsg := "XX000","unknown error"
+	switch m.Code {
+	case 1054:
+		return handleUnknownColumn(m,sql)
+	case 1062:
+		return handleDuplicateKey(m)
+	case 1064:
+		return handleParseError(m, sql)
+		//type error
+	case 1105:
+		return handleTypeError(m, sql)
+	case 1136:
+		return handeleColumnMisMatch(m,sql)
+	case 1146:
+		return handleRelationNotExists(m, sql)
+	default:
+		return defaultCode, defaultMsg, position, err
+	}
+}
+
+//handeleColumnMisMatch
+func handeleColumnMisMatch(m *mysql.SQLError, sql string) (string, string, int32, error) {
+	values := "values"
+
+	valueStart := strings.Index(sql, values) + len(values)
+	//这里的游标只能指到values后面的括号，mysql的错误信息里拿不到哪些 value 是多出来的。
+	position := valueStart + 3
+
+	pgMsg := fmt.Sprintf("INSERT has more expressions than target columns")
+
+	return "", pgMsg, int32(position), nil
+}
+
+//handleUnknownColumn
+func handleUnknownColumn(m *mysql.SQLError, sql string) (string, string, int32, error) {
+	msg, column, into, apostrophe, bracket,empty := m.Message, "column ", "into ","'", "(", " "
+
+	sel, del, insert, update := "SELECT","DELETE","INSERT","UPDATE"
+
+	columnNameStart := strings.Index(msg, column) + len(column)
+	columnNameLen := strings.Index(msg[columnNameStart : ], empty) + 1
+	columnName := strings.Trim(strings.Trim(msg[columnNameStart : columnNameStart + columnNameLen], empty), apostrophe)
+
+	var relation,pgMsg string
+	if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), insert) {
+		relationStart := strings.Index(sql, into) + len(into)
+		relationLen := strings.Index(sql[relationStart : ], empty)
+		leftBracketLen := strings.Index(sql[relationStart : ], bracket)
+
+		if leftBracketLen != -1 && leftBracketLen < relationLen {
+			relation = sql[relationStart : relationStart + leftBracketLen]
+		} else {
+			relation = sql[relationStart : relationStart + relationLen]
+		}
+		pgMsg = fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist", columnName, relation)
+	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), del) {
+		pgMsg = fmt.Sprintf("column \"%s\" does not exist", columnName)
+	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), sel) {
+
+	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), update) {
+
+	}
+
+	position := strings.Index(sql, columnName) + 3
+
+	return "tobe", pgMsg, int32(position), nil
+}
+
+// handleDuplicateKey
+func handleDuplicateKey(m *mysql.SQLError) (string, string, int32, error) {
+	msg, entry, key, apostrophe, empty := m.Message,"entry ", "key ", "'", " "
+
+	keyStart := strings.Index(msg, key) + len(key) + 1
+	keyName := strings.Trim(msg[keyStart : ], apostrophe)
+
+	valueStart := strings.Index(msg, entry) + len(entry)
+	valueLen := strings.Index(msg[valueStart : ], empty)
+	value := msg[valueStart : valueStart + valueLen]
+
+	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"\nDescription:  Key value %v already exists.", keyName, value)
+
+	return "tobe",pgMsg,-1,nil
+}
+
+// handleRelationNotExists
+func handleRelationNotExists(m *mysql.SQLError, sql string) (string, string, int32, error) {
+	msg, point, apostrophe := m.Message, ".", "'"
+
+	tableNameStart := strings.Index(msg,point) + 1
+	nameLen := strings.Index(msg[tableNameStart : ], apostrophe)
+	tableName := msg[tableNameStart : tableNameStart + nameLen]
+
+	pgMsg := fmt.Sprintf("relation \"%s\" does not exist", tableName)
+
+	position := strings.Index(sql, tableName) + 3
+
+	return "tobe", pgMsg, int32(position),nil
+}
+// handleTypeError
+func handleTypeError(m *mysql.SQLError, sql string) (string, string, int32, error) {
+	msg, quotes, beforeInput := m.Message, "\"", "parsing "
+
+	inputStart := strings.Index(msg, beforeInput) + len(beforeInput)
+	inputLen := strings.Index(msg[inputStart + 1 : ], quotes) + 1
+	input := msg[inputStart : inputStart + inputLen]
+	if !strings.HasSuffix(input, quotes) {
+		input += quotes
+	}
+	pgMsg := fmt.Sprintf("invalid input syntax for : %s", input)
+
+	position := strings.Index(sql, input)
+
+	return "tobe",pgMsg,int32(position),nil
+}
+
+// handleParseError
+func handleParseError(m *mysql.SQLError, sql string) (string, string, int32, error) {
+	msg, nearDelimiter, positionDelimiter, wrap, quotes, emptyStr := m.Message, "near ", "column ", "\n","\""," "
+	// eg. You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 5 near "creat table student(id int);"
+	nearStart := strings.Index(msg, nearDelimiter) + len(nearDelimiter)
+	nearlen := strings.Index(strings.Trim(msg[nearStart : ], emptyStr), emptyStr)
+	lineEnd := strings.Index(strings.Trim(msg[nearStart : ], emptyStr), wrap)
+
+	var finalLen int
+	var behindNear string
+	if nearlen == -1 && lineEnd == -1 {
+		behindNear = strings.Trim(msg[nearStart : ], emptyStr)
+	} else if nearlen == -1 && lineEnd != -1 {
+		behindNear = strings.Trim(msg[nearStart : nearStart + lineEnd], emptyStr)
+	} else {
+		if lineEnd < nearlen && lineEnd != -1 {
+			finalLen = nearStart + lineEnd
+		} else {
+			finalLen = nearStart + nearlen
+		}
+		behindNear = strings.Trim(msg[nearStart : finalLen], emptyStr)
+	}
+
+	if !strings.HasSuffix(behindNear, quotes) {
+		behindNear += quotes
+	}
+
+	positionStart := strings.Index(msg, positionDelimiter) + len(positionDelimiter)
+	positionLen := strings.Index(strings.Trim(msg[positionStart : ], emptyStr), emptyStr)
+	pos, err := strconv.Atoi(msg[positionStart : positionStart + positionLen])
+
+	// 为什么加3? 在提示信息第二行开头回提示是第几行sql的错误，他也会占偏移量，所以要将其加上。
+	pos = strings.Index(sql,strings.Trim(behindNear, quotes)) + 3
+
+	return "42601", fmt.Sprintf("syntax error at or near %s",behindNear), int32(pos), err
 }

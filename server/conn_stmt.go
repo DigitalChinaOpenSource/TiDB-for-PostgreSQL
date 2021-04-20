@@ -59,6 +59,9 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
 	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
+	if err != nil {
+		return err
+	}
 	vars := cc.ctx.GetSessionVars()
 
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
@@ -72,9 +75,6 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 
 	stmt.SetParamsType(paramTypes)
 
-	if err != nil {
-		return err
-	}
 	err = cc.writeParseComplete()
 	if err != nil {
 		return err
