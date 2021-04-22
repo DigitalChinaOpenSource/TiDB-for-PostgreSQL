@@ -548,7 +548,7 @@ const (
 
 // Default Pg system variable values.
 const (
-	DefPgClientEncoding 			= "UTF8"
+	DefPgClientEncoding 			="UTF8"
 	DefPgDateStyle					="ISO"
 	DefPgClientMinMessage			="notice"
 	DefPgByteaOutput				="hex"

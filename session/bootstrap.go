@@ -1444,6 +1444,11 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateViewPgGroup)
 
 	mustExecute(s, CreateViewPgSettings)
+
+	// Create postgres Database
+	mustExecute(s,"CREATE DATABASE IF NOT EXISTS pg_catalog;")
+
+	mustExecute(s , CreatePgCalogViewPgRoles)
 }
 
 func doCreatePgViewsWorks(s Session){

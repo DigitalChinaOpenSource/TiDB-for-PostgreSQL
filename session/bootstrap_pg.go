@@ -19,54 +19,59 @@ const(
     aggmfinalextra 		TINYINT NOT NULL,
     aggfinalmodify 		CHAR(1) NOT NULL,
     aggmfinalmodify 	CHAR(1) NOT NULL,
-    aggsortop 			OID  UNSIGNED NOT NULL,
-    aggtranstype 		OID  UNSIGNED  NOT NULL,
+    aggsortop 			INTEGER(32)  UNSIGNED NOT NULL,
+    aggtranstype 		INTEGER(32)  UNSIGNED  NOT NULL,
     aggtransspace 		INTEGER(32) NOT NULL,
-    aggmtranstype 		OID  UNSIGNED  NOT NULL,
+    aggmtranstype 		INTEGER(32)  UNSIGNED  NOT NULL,
     aggmtransspace 		INTEGER(32) NOT NULL,
     agginitval 			longtext,
     aggminitval 		longtext
 );`
 
-	CreateTablePgAm = "CREATE TABLE IF NOT EXISTS postgres.pg_am"+
-		"( `oid` INTEGER(32) NOT NULL,"+
-		"amname VARCHAR(32) NOT NULL,"+
-		"amhandler VARCHAR(64) NOT NULL,"+
-		"amtype CHAR(1) NOT NULL"+
-		");"
+	CreateTablePgAm = `CREATE TABLE IF NOT EXISTS postgres.pg_am
+(
+	oid INTEGER(32) NOT NULL,
+	amname VARCHAR(32) NOT NULL,
+	amhandler VARCHAR(64) NOT NULL,
+	amtype CHAR(1) NOT NULL
+);`
 
-	CreateTablePgAmop = "CREATE TABLE IF NOT EXISTS postgres.pg_amop("+
-	"`oid` OID UNSIGNED NOT NULL,"+ `
-    amopfamily OID UNSIGNED NOT NULL,
-    amoplefttype OID UNSIGNED NOT NULL,
-    amoprighttype OID UNSIGNED NOT NULL,
+	CreateTablePgAmop = `CREATE TABLE IF NOT EXISTS postgres.pg_amop
+(
+	oid INTEGER(32) UNSIGNED NOT NULL,
+    amopfamily INTEGER(32) UNSIGNED NOT NULL,
+    amoplefttype INTEGER(32) UNSIGNED NOT NULL,
+    amoprighttype INTEGER(32) UNSIGNED NOT NULL,
     amopstrategy SMALLINT NOT NULL,
     amoppurpose CHAR(1) NOT NULL,
-    amopopr OID UNSIGNED NOT NULL,
-    amopmethod OID UNSIGNED NOT NULL,
-    amopsortfamily OID UNSIGNED NOT NULL);`
+    amopopr INTEGER(32) UNSIGNED NOT NULL,
+    amopmethod INTEGER(32) UNSIGNED NOT NULL,
+    amopsortfamily INTEGER(32) UNSIGNED NOT NULL
+);`
 
-	CreateTablePgAmproc = "CREATE TABLE IF NOT EXISTS postgres.pg_amproc("+
-    "`oid` OID UNSIGNED NOT NULL,"+
-		`amprocfamily OID UNSIGNED NOT NULL,
-    amproclefttype OID UNSIGNED NOT NULL,
-    amprocrighttype OID UNSIGNED NOT NULL,
+	CreateTablePgAmproc = `CREATE TABLE IF NOT EXISTS postgres.pg_amproc
+(
+    oid INTEGER(32) UNSIGNED NOT NULL,
+	amprocfamily INTEGER(32) UNSIGNED NOT NULL,
+    amproclefttype INTEGER(32) UNSIGNED NOT NULL,
+    amprocrighttype INTEGER(32) UNSIGNED NOT NULL,
     amprocnum SMALLINT NOT NULL,
     amproc VARCHAR(64) NOT NULL
 );`
 
-	CreateTablePgAttrdef = "CREATE TABLE IF NOT EXISTS postgres.pg_attrdef("+
-    "`oid` OID UNSIGNED NOT NULL,"+
-    `adrelid OID UNSIGNED NOT NULL,
+	CreateTablePgAttrdef = `CREATE TABLE IF NOT EXISTS postgres.pg_attrdef
+(
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    adrelid INTEGER(32) UNSIGNED NOT NULL,
     adnum SMALLINT NOT NULL,
     adbin VARCHAR(64) NOT NULL
 );`
 
 	CreateTablePgAttribute = `CREATE TABLE IF NOT EXISTS postgres.pg_attribute
 (
-    attrelid OID UNSIGNED NOT NULL,
+    attrelid INTEGER(32) UNSIGNED NOT NULL,
     attname VARCHAR(32) NOT NULL,
-    atttypid OID UNSIGNED NOT NULL,
+    atttypid INTEGER(32) UNSIGNED NOT NULL,
     attstattarget INTEGER(32) NOT NULL,
     attlen SMALLINT NOT NULL,
     attnum SMALLINT NOT NULL,
@@ -84,7 +89,7 @@ const(
     attisdropped TINYINT(1) NOT NULL,
     attislocal TINYINT(1) NOT NULL,
     attinhcount INTEGER(32) NOT NULL,
-    attcollation OID UNSIGNED NOT NULL,
+    attcollation INTEGER(32) UNSIGNED NOT NULL,
     attacl VARCHAR(64),
     attoptions VARCHAR(64),
     attfdwoptions VARCHAR(64),
@@ -93,15 +98,16 @@ const(
 
 	CreateTablePgAuthMembers = `CREATE TABLE IF NOT EXISTS postgres.pg_auth_members
 (
-    roleid OID UNSIGNED NOT NULL,
-    member OID UNSIGNED NOT NULL,
-    grantor OID UNSIGNED NOT NULL,
+    roleid INTEGER(32) UNSIGNED NOT NULL,
+    member INTEGER(32) UNSIGNED NOT NULL,
+    grantor INTEGER(32) UNSIGNED NOT NULL,
     admin_option TINYINT(1) NOT NULL
 );`
 
-	CreateTablePgAuthId = "CREATE TABLE IF NOT EXISTS postgres.pg_authid("+
-    "`oid` OID UNSIGNED NOT NULL,"+
-    `rolname VARCHAR(32) NOT NULL,
+	CreateTablePgAuthId = `CREATE TABLE IF NOT EXISTS postgres.pg_authid
+(
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    rolname VARCHAR(32) NOT NULL,
     rolsuper TINYINT(1) NOT NULL,
     rolinherit TINYINT(1) NOT NULL,
     rolcreaterole TINYINT(1) NOT NULL,
@@ -114,29 +120,31 @@ const(
     rolvaliduntil timestamp
 );`
 
-	CreateTablePgCast = "CREATE TABLE IF NOT EXISTS postgres.pg_cast("+
-    "`oid` OID UNSIGNED NOT NULL,"+
-    `castsource OID UNSIGNED NOT NULL,
-    casttarget OID UNSIGNED NOT NULL,
-    castfunc OID UNSIGNED NOT NULL,
+	CreateTablePgCast = `CREATE TABLE IF NOT EXISTS postgres.pg_cast
+(
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    castsource INTEGER(32) UNSIGNED NOT NULL,
+    casttarget INTEGER(32) UNSIGNED NOT NULL,
+    castfunc INTEGER(32) UNSIGNED NOT NULL,
     castcontext CHAR(1) NOT NULL,
     castmethod CHAR(1) NOT NULL
 );`
 
-	CreateTablePgClass = `CREATE TABLE IF NOT EXISTS postgres.pg_class(`+
-    "`oid`"+`OID UNSIGNED NOT NULL,
+	CreateTablePgClass = `CREATE TABLE IF NOT EXISTS postgres.pg_class
+(
+    oid INTEGER(32) UNSIGNED NOT NULL,
     relname VARCHAR(64) NOT NULL,
-    relnamespace OID UNSIGNED NOT NULL,
-    reltype OID UNSIGNED NOT NULL,
-    reloftype OID UNSIGNED NOT NULL,
-    relowner OID UNSIGNED NOT NULL,
-    relam OID UNSIGNED NOT NULL,
-    relfilenode OID UNSIGNED NOT NULL,
-    reltablespace OID UNSIGNED NOT NULL,
+    relnamespace INTEGER(32) UNSIGNED NOT NULL,
+    reltype INTEGER(32) UNSIGNED NOT NULL,
+    reloftype INTEGER(32) UNSIGNED NOT NULL,
+    relowner INTEGER(32) UNSIGNED NOT NULL,
+    relam INTEGER(32) UNSIGNED NOT NULL,
+    relfilenode INTEGER(32) UNSIGNED NOT NULL,
+    reltablespace INTEGER(32) UNSIGNED NOT NULL,
     relpages INTEGER(32) NOT NULL,
     reltuples FLOAT NOT NULL,
     relallvisible INTEGER(32) NOT NULL,
-    reltoastrelid OID UNSIGNED NOT NULL,
+    reltoastrelid INTEGER(32) UNSIGNED NOT NULL,
     relhasindex TINYINT(1) NOT NULL,
     relisshared TINYINT(1) NOT NULL,
     relpersistence CHAR(1) NOT NULL,
@@ -151,19 +159,20 @@ const(
     relispopulated TINYINT(1) NOT NULL,
     relreplident CHAR(1) NOT NULL,
     relispartition TINYINT(1) NOT NULL,
-    relrewrite OID UNSIGNED NOT NULL,
-    relfrozenxid OID UNSIGNED NOT NULL,
-    relminmxid OID UNSIGNED NOT NULL,
+    relrewrite INTEGER(32) UNSIGNED NOT NULL,
+    relfrozenxid INTEGER(32) UNSIGNED NOT NULL,
+    relminmxid INTEGER(32) UNSIGNED NOT NULL,
     relacl VARCHAR(255),
     reloptions TEXT,
     relpartbound TEXT
 );`
 
 	CreateTablePgCollation = `CREATE TABLE IF NOT EXISTS postgres.pg_collation
-(`+"`oid`"+ ` OID UNSIGNED NOT NULL,
+(
+	oid INTEGER(32) UNSIGNED NOT NULL,
     collname VARCHAR(32) NOT NULL,
-    collnamespace OID UNSIGNED NOT NULL,
-    collowner OID UNSIGNED NOT NULL,
+    collnamespace INTEGER(32) UNSIGNED NOT NULL,
+    collowner INTEGER(32) UNSIGNED NOT NULL,
     collprovider CHAR(1) NOT NULL,
     collisdeterministic TINYINT(1) NOT NULL,
     collencoding INTEGER(32) NOT NULL,
@@ -174,18 +183,18 @@ const(
 
 	CreateTablePgConstraint = `CREATE TABLE IF NOT EXISTS postgres.pg_constraint
 (
-    `+"`oid`"+ `OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     conname VARCHAR(32) NOT NULL,
-    connamespace OID UNSIGNED NOT NULL,
+    connamespace INTEGER(32) UNSIGNED NOT NULL,
     contype CHAR(1) NOT NULL,
     condeferrable TINYINT(1) NOT NULL,
     condeferred TINYINT(1) NOT NULL,
     convalidated TINYINT(1) NOT NULL,
-    conrelid OID UNSIGNED NOT NULL,
-    contypid OID UNSIGNED NOT NULL,
-    conindid OID UNSIGNED NOT NULL,
-    conparentid OID UNSIGNED NOT NULL,
-    confrelid OID UNSIGNED NOT NULL,
+    conrelid INTEGER(32) UNSIGNED NOT NULL,
+    contypid INTEGER(32) UNSIGNED NOT NULL,
+    conindid INTEGER(32) UNSIGNED NOT NULL,
+    conparentid INTEGER(32) UNSIGNED NOT NULL,
+    confrelid INTEGER(32) UNSIGNED NOT NULL,
     confupdtype CHAR(1) NOT NULL,
     confdeltype CHAR(1) NOT NULL,
     confmatchtype CHAR(1) NOT NULL,
@@ -194,19 +203,19 @@ const(
     connoinherit TINYINT(1) NOT NULL,
     conkey SMALLINT,
     confkey SMALLINT,
-    conpfeqop OID UNSIGNED,
-    conppeqop OID UNSIGNED,
-    conffeqop OID UNSIGNED,
-    conexclop OID UNSIGNED,
+    conpfeqop INTEGER(32) UNSIGNED,
+    conppeqop INTEGER(32) UNSIGNED,
+    conffeqop INTEGER(32) UNSIGNED,
+    conexclop INTEGER(32) UNSIGNED,
     conbin TEXT
 );`
 
 	CreateTablePgConversion = `CREATE TABLE IF NOT EXISTS postgres.pg_conversion
 (
-    `+"`oid`"+ ` INTEGER(32) NOT NULL,
+    oid INTEGER(32) NOT NULL,
     conname VARCHAR(32) NOT NULL,
-    connamespace OID UNSIGNED NOT NULL,
-    conowner OID UNSIGNED NOT NULL,
+    connamespace INTEGER(32) UNSIGNED NOT NULL,
+    conowner INTEGER(32) UNSIGNED NOT NULL,
     conforencoding INTEGER(32) NOT NULL,
     contoencoding INTEGER(32) NOT NULL,
     conproc TEXT NOT NULL,
@@ -215,105 +224,105 @@ const(
 
 	CreateTablePgDatabase = `CREATE TABLE IF NOT EXISTS postgres.pg_database
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     datname VARCHAR(32) NOT NULL,
-    datdba OID UNSIGNED NOT NULL,
+    datdba INTEGER(32) UNSIGNED NOT NULL,
     encoding INTEGER(32) NOT NULL,
     datcollate VARCHAR(32) NOT NULL,
     datctype VARCHAR(32) NOT NULL,
     datistemplate TINYINT(1) NOT NULL,
     datallowconn TINYINT(1) NOT NULL,
     datconnlimit INTEGER(32) NOT NULL,
-    datlastsysoid OID UNSIGNED NOT NULL,
-    datfrozenxid OID UNSIGNED NOT NULL,
-    datminmxid OID UNSIGNED NOT NULL,
-    dattablespace OID UNSIGNED NOT NULL,
+    datlastsysoid INTEGER(32) UNSIGNED NOT NULL,
+    datfrozenxid INTEGER(32) UNSIGNED NOT NULL,
+    datminmxid INTEGER(32) UNSIGNED NOT NULL,
+    dattablespace INTEGER(32) UNSIGNED NOT NULL,
     datacl VARCHAR(255)
 );`
 
 	CreateTablePgDbRoleSetting = `CREATE TABLE IF NOT EXISTS postgres.pg_db_role_setting
 (
-    setdatabase OID UNSIGNED NOT NULL,
-    setrole OID UNSIGNED NOT NULL,
+    setdatabase INTEGER(32) UNSIGNED NOT NULL,
+    setrole INTEGER(32) UNSIGNED NOT NULL,
     setconfig TEXT
 );`
 
 	CreateTablePgDefaultAcl = `CREATE TABLE IF NOT EXISTS postgres.pg_default_acl
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    defaclrole OID UNSIGNED NOT NULL,
-    defaclnamespace OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    defaclrole INTEGER(32) UNSIGNED NOT NULL,
+    defaclnamespace INTEGER(32) UNSIGNED NOT NULL,
     defaclobjtype CHAR(1) NOT NULL,
     defaclacl VARCHAR(255) NOT NULL
 );`
 
 	CreateTablePgDepend = `CREATE TABLE IF NOT EXISTS postgres.pg_depend
 (
-    classid OID UNSIGNED NOT NULL,
-    objid OID UNSIGNED NOT NULL,
+    classid INTEGER(32) UNSIGNED NOT NULL,
+    objid INTEGER(32) UNSIGNED NOT NULL,
     objsubid INTEGER(32) NOT NULL,
-    refclassid OID UNSIGNED NOT NULL,
-    refobjid OID UNSIGNED NOT NULL,
+    refclassid INTEGER(32) UNSIGNED NOT NULL,
+    refobjid INTEGER(32) UNSIGNED NOT NULL,
     refobjsubid INTEGER(32) NOT NULL,
     deptype CHAR(1) NOT NULL
 );`
 
 	CreateTablePgDescription = `CREATE TABLE IF NOT EXISTS postgres.pg_description
 (
-    objoid OID UNSIGNED NOT NULL,
-    classoid OID UNSIGNED NOT NULL,
+    objoid INTEGER(32) UNSIGNED NOT NULL,
+    classoid INTEGER(32) UNSIGNED NOT NULL,
     objsubid INTEGER(32) NOT NULL,
     description TEXT NOT NULL
 );`
 
 	CreateTablePgEnum = `CREATE TABLE IF NOT EXISTS postgres.pg_enum
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    enumtypid OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    enumtypid INTEGER(32) UNSIGNED NOT NULL,
     enumsortorder FLOAT NOT NULL,
     enumlabel VARCHAR(32) NOT NULL
 );`
 
 	CreateTablePgEventTrigger = `CREATE TABLE IF NOT EXISTS postgres.pg_event_trigger
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     evtname VARCHAR(32)  NOT NULL,
     evtevent VARCHAR(32)  NOT NULL,
-    evtowner OID UNSIGNED NOT NULL,
-    evtfoid OID UNSIGNED NOT NULL,
+    evtowner INTEGER(32) UNSIGNED NOT NULL,
+    evtfoid INTEGER(32) UNSIGNED NOT NULL,
     evtenabled CHAR(1) NOT NULL,
     evttags TEXT
 );`
 
 	CreateTablePgExtension = `CREATE TABLE IF NOT EXISTS postgres.pg_extension
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     extname VARCHAR(32)  NOT NULL,
-    extowner OID UNSIGNED NOT NULL,
-    extnamespace OID UNSIGNED NOT NULL,
+    extowner INTEGER(32) UNSIGNED NOT NULL,
+    extnamespace INTEGER(32) UNSIGNED NOT NULL,
     extrelocatable TINYINT(1) NOT NULL,
     extversion TEXT NOT NULL,
-    extconfig OID UNSIGNED,
+    extconfig INTEGER(32) UNSIGNED,
     extcondition TEXT
 );`
 
 	CreateTablePgForeignDataWrapper = `CREATE TABLE IF NOT EXISTS postgres.pg_foreign_data_wrapper
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     fdwname VARCHAR(32) NOT NULL,
-    fdwowner OID UNSIGNED NOT NULL,
-    fdwhandler OID UNSIGNED NOT NULL,
-    fdwvalidator OID UNSIGNED NOT NULL,
+    fdwowner INTEGER(32) UNSIGNED NOT NULL,
+    fdwhandler INTEGER(32) UNSIGNED NOT NULL,
+    fdwvalidator INTEGER(32) UNSIGNED NOT NULL,
     fdwacl VARCHAR(255),
     fdwoptions TEXT
 );`
 
 	CreateTablePgForeignServer = `CREATE TABLE IF NOT EXISTS postgres.pg_foreign_server
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     srvname VARCHAR(32) NOT NULL,
-    srvowner OID UNSIGNED NOT NULL,
-    srvfdw OID UNSIGNED NOT NULL,
+    srvowner INTEGER(32) UNSIGNED NOT NULL,
+    srvfdw INTEGER(32) UNSIGNED NOT NULL,
     srvtype TEXT,
     srvversion TEXT,
     srvacl VARCHAR(255),
@@ -322,15 +331,15 @@ const(
 
 	CreateTablePgForeignTable = `CREATE TABLE IF NOT EXISTS postgres.pg_foreign_table
 (
-    ftrelid OID UNSIGNED NOT NULL,
-    ftserver OID UNSIGNED NOT NULL,
+    ftrelid INTEGER(32) UNSIGNED NOT NULL,
+    ftserver INTEGER(32) UNSIGNED NOT NULL,
     ftoptions TEXT
 );`
 
 	CreateTablePgIndex = `CREATE TABLE IF NOT EXISTS postgres.pg_index
 (
-    indexrelid OID UNSIGNED NOT NULL,
-    indrelid OID UNSIGNED NOT NULL,
+    indexrelid INTEGER(32) UNSIGNED NOT NULL,
+    indrelid INTEGER(32) UNSIGNED NOT NULL,
     indnatts SMALLINT NOT NULL,
     indnkeyatts SMALLINT NOT NULL,
     indisunique TINYINT(1) NOT NULL,
@@ -353,15 +362,15 @@ const(
 
 	CreateTablePgInherits = `CREATE TABLE IF NOT EXISTS postgres.pg_inherits
 (
-    inhrelid OID UNSIGNED NOT NULL,
-    inhparent OID UNSIGNED NOT NULL,
+    inhrelid INTEGER(32) UNSIGNED NOT NULL,
+    inhparent INTEGER(32) UNSIGNED NOT NULL,
     inhseqno INTEGER(32) NOT NULL
 );`
 
 	CreateTablePgInitPrivs = `CREATE TABLE IF NOT EXISTS postgres.pg_init_privs
 (
-    objoid OID UNSIGNED NOT NULL,
-    classoid OID UNSIGNED NOT NULL,
+    objoid INTEGER(32) UNSIGNED NOT NULL,
+    classoid INTEGER(32) UNSIGNED NOT NULL,
     objsubid INTEGER(32) NOT NULL,
     privtype CHAR(1) NOT NULL,
     initprivs VARCHAR(255) NOT NULL
@@ -369,66 +378,66 @@ const(
 
 	CreateTablePgLanguage = `CREATE TABLE IF NOT EXISTS postgres.pg_language
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     lanname VARCHAR(32),
-    lanowner OID UNSIGNED NOT NULL,
+    lanowner INTEGER(32) UNSIGNED NOT NULL,
     lanispl TINYINT(1) NOT NULL,
     lanpltrusted TINYINT(1) NOT NULL,
-    lanplcallfoid OID UNSIGNED NOT NULL,
-    laninline OID UNSIGNED NOT NULL,
-    lanvalidator OID UNSIGNED NOT NULL,
+    lanplcallfoid INTEGER(32) UNSIGNED NOT NULL,
+    laninline INTEGER(32) UNSIGNED NOT NULL,
+    lanvalidator INTEGER(32) UNSIGNED NOT NULL,
     lanacl VARCHAR(255)
 );`
 
 	CreateTablePgLargeObject = `CREATE TABLE IF NOT EXISTS postgres.pg_largeobject
 (
-    loid OID UNSIGNED NOT NULL,
+    loid INTEGER(32) UNSIGNED NOT NULL,
     pageno INTEGER(32) NOT NULL,
     data BINARY NOT NULL
 );`
 
 	CreateTablePgLargeObjectMetadata = `CREATE TABLE IF NOT EXISTS postgres.pg_largeobject_metadata
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    lomowner OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    lomowner INTEGER(32) UNSIGNED NOT NULL,
     lomacl VARCHAR(255)
 );`
 
 	CreateTablePgNamespace = `CREATE TABLE IF NOT EXISTS postgres.pg_namespace
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     nspname VARCHAR(32) NOT NULL,
-    nspowner OID UNSIGNED NOT NULL,
+    nspowner INTEGER(32) UNSIGNED NOT NULL,
     nspacl VARCHAR(255)
 );`
 
 	CreateTablePgOpclass = `CREATE TABLE IF NOT EXISTS postgres.pg_opclass
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    opcmethod OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    opcmethod INTEGER(32) UNSIGNED NOT NULL,
     opcname VARCHAR(32) NOT NULL,
-    opcnamespace OID UNSIGNED NOT NULL,
-    opcowner OID UNSIGNED NOT NULL,
-    opcfamily OID UNSIGNED NOT NULL,
-    opcintype OID UNSIGNED NOT NULL,
+    opcnamespace INTEGER(32) UNSIGNED NOT NULL,
+    opcowner INTEGER(32) UNSIGNED NOT NULL,
+    opcfamily INTEGER(32) UNSIGNED NOT NULL,
+    opcintype INTEGER(32) UNSIGNED NOT NULL,
     opcdefault TINYINT(1) NOT NULL,
-    opckeytype OID UNSIGNED NOT NULL
+    opckeytype INTEGER(32) UNSIGNED NOT NULL
 );`
 
 	CreateTablePgOperator = `CREATE TABLE IF NOT EXISTS postgres.pg_operator
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     oprname VARCHAR(32) NOT NULL,
-    oprnamespace OID UNSIGNED NOT NULL,
-    oprowner OID UNSIGNED NOT NULL,
+    oprnamespace INTEGER(32) UNSIGNED NOT NULL,
+    oprowner INTEGER(32) UNSIGNED NOT NULL,
     oprkind CHAR(1) NOT NULL,
     oprcanmerge TINYINT(1) NOT NULL,
     oprcanhash TINYINT(1) NOT NULL,
-    oprleft OID UNSIGNED NOT NULL,
-    oprright OID UNSIGNED NOT NULL,
-    oprresult OID UNSIGNED NOT NULL,
-    oprcom OID UNSIGNED NOT NULL,
-    oprnegate OID UNSIGNED NOT NULL,
+    oprleft INTEGER(32) UNSIGNED NOT NULL,
+    oprright INTEGER(32) UNSIGNED NOT NULL,
+    oprresult INTEGER(32) UNSIGNED NOT NULL,
+    oprcom INTEGER(32) UNSIGNED NOT NULL,
+    oprnegate INTEGER(32) UNSIGNED NOT NULL,
     oprcode TEXT NOT NULL,
     oprrest TEXT NOT NULL,
     oprjoin TEXT NOT NULL
@@ -436,19 +445,19 @@ const(
 
 	CreateTablePgOpFamily = `CREATE TABLE IF NOT EXISTS postgres.pg_opfamily
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    opfmethod OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    opfmethod INTEGER(32) UNSIGNED NOT NULL,
     opfname VARCHAR(32) NOT NULL,
-    opfnamespace OID UNSIGNED NOT NULL,
-    opfowner OID UNSIGNED NOT NULL
+    opfnamespace INTEGER(32) UNSIGNED NOT NULL,
+    opfowner INTEGER(32) UNSIGNED NOT NULL
 );`
 
 	CreateTablePgPartitionedTable = `CREATE TABLE IF NOT EXISTS postgres.pg_partitioned_table
 (
-    partrelid OID UNSIGNED NOT NULL,
+    partrelid INTEGER(32) UNSIGNED NOT NULL,
     partstrat CHAR(1) NOT NULL,
     partnatts SMALLINT NOT NULL,
-    partdefid OID UNSIGNED NOT NULL,
+    partdefid INTEGER(32) UNSIGNED NOT NULL,
     partattrs VARCHAR(64) NOT NULL,
     partclass VARCHAR(64) NOT NULL,
     partcollation VARCHAR(64) NOT NULL,
@@ -457,26 +466,26 @@ const(
 
 	CreateTablePgPolicy = `CREATE TABLE IF NOT EXISTS postgres.pg_policy
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     polname VARCHAR(32) NOT NULL,
-    polrelid OID UNSIGNED NOT NULL,
+    polrelid INTEGER(32) UNSIGNED NOT NULL,
     polcmd CHAR(1) NOT NULL,
     polpermissive TINYINT(1) NOT NULL,
-    polroles OID UNSIGNED NOT NULL,
+    polroles INTEGER(32) UNSIGNED NOT NULL,
     polqual TEXT,
     polwithcheck TEXT
 );`
 
 	CreateTablePgProc = `CREATE TABLE IF NOT EXISTS postgres.pg_proc
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     proname VARCHAR(64) NOT NULL,
-    pronamespace OID UNSIGNED NOT NULL,
-    proowner OID UNSIGNED NOT NULL,
-    prolang OID UNSIGNED NOT NULL,
+    pronamespace INTEGER(32) UNSIGNED NOT NULL,
+    proowner INTEGER(32) UNSIGNED NOT NULL,
+    prolang INTEGER(32) UNSIGNED NOT NULL,
     procost FLOAT NOT NULL,
     prorows FLOAT NOT NULL,
-    provariadic OID UNSIGNED NOT NULL,
+    provariadic INTEGER(32) UNSIGNED NOT NULL,
     prosupport TEXT NOT NULL,
     prokind CHAR(1) NOT NULL,
     prosecdef TINYINT(1) NOT NULL,
@@ -487,7 +496,7 @@ const(
     proparallel CHAR(1) NOT NULL,
     pronargs SMALLINT NOT NULL,
     pronargdefaults SMALLINT NOT NULL,
-    prorettype OID UNSIGNED NOT NULL,
+    prorettype INTEGER(32) UNSIGNED NOT NULL,
     proargtypes VARCHAR(64) NOT NULL,
     proallargtypes VARCHAR(255),
     proargmodes VARCHAR(64),
@@ -502,9 +511,9 @@ const(
 
 	CreateTablePgPublication = `CREATE TABLE IF NOT EXISTS postgres.pg_publication
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     pubname VARCHAR(32) NOT NULL,
-    pubowner OID UNSIGNED NOT NULL,
+    pubowner INTEGER(32) UNSIGNED NOT NULL,
     puballtables TINYINT(1) NOT NULL,
     pubinsert TINYINT(1) NOT NULL,
     pubupdate TINYINT(1) NOT NULL,
@@ -515,32 +524,32 @@ const(
 
 	CreateTablePgPublicationRel = `CREATE TABLE IF NOT EXISTS postgres.pg_publication_rel
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    prpubid OID UNSIGNED NOT NULL,
-    prrelid OID UNSIGNED NOT NULL
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    prpubid INTEGER(32) UNSIGNED NOT NULL,
+    prrelid INTEGER(32) UNSIGNED NOT NULL
 );`
 
 	CreateTablePgRange = `CREATE TABLE IF NOT EXISTS postgres.pg_range
 (
-    rngtypid OID UNSIGNED NOT NULL,
-    rngsubtype OID UNSIGNED NOT NULL,
-    rngcollation OID UNSIGNED NOT NULL,
-    rngsubopc OID UNSIGNED NOT NULL,
+    rngtypid INTEGER(32) UNSIGNED NOT NULL,
+    rngsubtype INTEGER(32) UNSIGNED NOT NULL,
+    rngcollation INTEGER(32) UNSIGNED NOT NULL,
+    rngsubopc INTEGER(32) UNSIGNED NOT NULL,
     rngcanonical TEXT NOT NULL,
     rngsubdiff TEXT NOT NULL
 );`
 
 	CreateTablePgReplicationOrigin = `CREATE TABLE IF NOT EXISTS postgres.pg_replication_origin
 (
-    roident OID UNSIGNED NOT NULL,
+    roident INTEGER(32) UNSIGNED NOT NULL,
     roname TEXT NOT NULL
 );`
 
 	CreateTablePgRewrite = `CREATE TABLE IF NOT EXISTS postgres.pg_rewrite
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     rulename VARCHAR(32) NOT NULL,
-    ev_class OID UNSIGNED NOT NULL,
+    ev_class INTEGER(32) UNSIGNED NOT NULL,
     ev_type CHAR(1) NOT NULL,
     ev_enabled CHAR(1) NOT NULL,
     is_instead TINYINT(1) NOT NULL,
@@ -550,8 +559,8 @@ const(
 
 	CreateTablePgSeclabel = `CREATE TABLE IF NOT EXISTS postgres.pg_seclabel
 (
-    objoid OID UNSIGNED NOT NULL,
-    classoid OID UNSIGNED NOT NULL,
+    objoid INTEGER(32) UNSIGNED NOT NULL,
+    classoid INTEGER(32) UNSIGNED NOT NULL,
     objsubid INTEGER(32) NOT NULL,
     provider TEXT NOT NULL,
     label TEXT NOT NULL
@@ -559,8 +568,8 @@ const(
 
 	CreateTablePgSequence = `CREATE TABLE IF NOT EXISTS postgres.pg_sequence
 (
-    seqrelid OID UNSIGNED NOT NULL,
-    seqtypid OID UNSIGNED NOT NULL,
+    seqrelid INTEGER(32) UNSIGNED NOT NULL,
+    seqtypid INTEGER(32) UNSIGNED NOT NULL,
     seqstart BIGINT NOT NULL,
     seqincrement BIGINT NOT NULL,
     seqmax BIGINT NOT NULL,
@@ -571,33 +580,33 @@ const(
 
 	CreateTablePgShdepend = `CREATE TABLE IF NOT EXISTS postgres.pg_shdepend
 (
-    dbid OID UNSIGNED NOT NULL,
-    classid OID UNSIGNED NOT NULL,
-    objid OID UNSIGNED NOT NULL,
+    dbid INTEGER(32) UNSIGNED NOT NULL,
+    classid INTEGER(32) UNSIGNED NOT NULL,
+    objid INTEGER(32) UNSIGNED NOT NULL,
     objsubid INTEGER(32) NOT NULL,
-    refclassid OID UNSIGNED NOT NULL,
-    refobjid OID UNSIGNED NOT NULL,
+    refclassid INTEGER(32) UNSIGNED NOT NULL,
+    refobjid INTEGER(32) UNSIGNED NOT NULL,
     deptype CHAR(1) NOT NULL
 );`
 
 	CreateTablePgShdescription = `CREATE TABLE IF NOT EXISTS postgres.pg_shdescription
 (
-    objoid OID UNSIGNED NOT NULL,
-    classoid OID UNSIGNED NOT NULL,
+    objoid INTEGER(32) UNSIGNED NOT NULL,
+    classoid INTEGER(32) UNSIGNED NOT NULL,
     description TEXT NOT NULL
 );`
 
 	CreateTablePgShseclabel = `CREATE TABLE IF NOT EXISTS postgres.pg_shseclabel
 (
-    objoid OID UNSIGNED NOT NULL,
-    classoid OID UNSIGNED NOT NULL,
+    objoid INTEGER(32) UNSIGNED NOT NULL,
+    classoid INTEGER(32) UNSIGNED NOT NULL,
     provider TEXT NOT NULL,
     label TEXT NOT NULL
 );`
 
 	CreateTablePgStatistic = `CREATE TABLE IF NOT EXISTS postgres.pg_statistic
 (
-    starelid OID UNSIGNED NOT NULL,
+    starelid INTEGER(32) UNSIGNED NOT NULL,
     staattnum SMALLINT NOT NULL,
     stainherit TINYINT(1) NOT NULL,
     stanullfrac FLOAT NOT NULL,
@@ -608,16 +617,16 @@ const(
     stakind3 SMALLINT NOT NULL,
     stakind4 SMALLINT NOT NULL,
     stakind5 SMALLINT NOT NULL,
-    staop1 OID UNSIGNED NOT NULL,
-    staop2 OID UNSIGNED NOT NULL,
-    staop3 OID UNSIGNED NOT NULL,
-    staop4 OID UNSIGNED NOT NULL,
-    staop5 OID UNSIGNED NOT NULL,
-    stacoll1 OID UNSIGNED NOT NULL,
-    stacoll2 OID UNSIGNED NOT NULL,
-    stacoll3 OID UNSIGNED NOT NULL,
-    stacoll4 OID UNSIGNED NOT NULL,
-    stacoll5 OID UNSIGNED NOT NULL,
+    staop1 INTEGER(32) UNSIGNED NOT NULL,
+    staop2 INTEGER(32) UNSIGNED NOT NULL,
+    staop3 INTEGER(32) UNSIGNED NOT NULL,
+    staop4 INTEGER(32) UNSIGNED NOT NULL,
+    staop5 INTEGER(32) UNSIGNED NOT NULL,
+    stacoll1 INTEGER(32) UNSIGNED NOT NULL,
+    stacoll2 INTEGER(32) UNSIGNED NOT NULL,
+    stacoll3 INTEGER(32) UNSIGNED NOT NULL,
+    stacoll4 INTEGER(32) UNSIGNED NOT NULL,
+    stacoll5 INTEGER(32) UNSIGNED NOT NULL,
     stanumbers1 FLOAT,
     stanumbers2 FLOAT,
     stanumbers3 FLOAT,
@@ -632,11 +641,11 @@ const(
 
 	CreateTablePgStatisticExt = `CREATE TABLE IF NOT EXISTS postgres.pg_statistic_ext
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    stxrelid OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    stxrelid INTEGER(32) UNSIGNED NOT NULL,
     stxname VARCHAR(32) NOT NULL,
-    stxnamespace OID UNSIGNED NOT NULL,
-    stxowner OID UNSIGNED NOT NULL,
+    stxnamespace INTEGER(32) UNSIGNED NOT NULL,
+    stxowner INTEGER(32) UNSIGNED NOT NULL,
     stxstattarget INTEGER(32) NOT NULL,
     stxkeys VARCHAR(64) NOT NULL,
     stxkind CHAR(1) NOT NULL
@@ -644,7 +653,7 @@ const(
 
 	CreateTablePgStatisticExtData = `CREATE TABLE IF NOT EXISTS postgres.pg_statistic_ext_data
 (
-    stxoid OID UNSIGNED NOT NULL,
+    stxoid INTEGER(32) UNSIGNED NOT NULL,
     stxdndistinct VARCHAR(64),
     stxddependencies VARCHAR(64),
     stxdmcv VARCHAR(64)
@@ -652,10 +661,10 @@ const(
 
 	CreateTablePgSubscription = `CREATE TABLE IF NOT EXISTS postgres.pg_subscription
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    subdbid OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    subdbid INTEGER(32) UNSIGNED NOT NULL,
     subname VARCHAR(32) NOT NULL,
-    subowner OID UNSIGNED NOT NULL,
+    subowner INTEGER(32) UNSIGNED NOT NULL,
     subenabled TINYINT(1) NOT NULL,
     subconninfo TEXT NOT NULL,
     subslotname VARCHAR(32),
@@ -665,43 +674,43 @@ const(
 
 	CreateTablePgSubscriptionRel = `CREATE TABLE IF NOT EXISTS postgres.pg_subscription_rel
 (
-    srsubid OID UNSIGNED NOT NULL,
-    srrelid OID UNSIGNED NOT NULL,
+    srsubid INTEGER(32) UNSIGNED NOT NULL,
+    srrelid INTEGER(32) UNSIGNED NOT NULL,
     srsubstate CHAR(1) NOT NULL,
     srsublsn VARCHAR(64)
 );`
 
 	CreateTablePgTablespace = `CREATE TABLE IF NOT EXISTS postgres.pg_tablespace
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     spcname VARCHAR(32)  NOT NULL,
-    spcowner OID UNSIGNED NOT NULL,
+    spcowner INTEGER(32) UNSIGNED NOT NULL,
     spcacl VARCHAR(255),
     spcoptions TEXT
 );`
 
 	CreateTablePgTransform = `CREATE TABLE IF NOT EXISTS postgres.pg_transform
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    trftype OID UNSIGNED NOT NULL,
-    trflang OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    trftype INTEGER(32) UNSIGNED NOT NULL,
+    trflang INTEGER(32) UNSIGNED NOT NULL,
     trffromsql TEXT NOT NULL,
     trftosql TEXT NOT NULL
 );`
 
 	CreateTablePgTrigger = `CREATE TABLE IF NOT EXISTS postgres.pg_trigger
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    tgrelid OID UNSIGNED NOT NULL,
-    tgparentid OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    tgrelid INTEGER(32) UNSIGNED NOT NULL,
+    tgparentid INTEGER(32) UNSIGNED NOT NULL,
     tgname VARCHAR(32) NOT NULL,
-    tgfoid OID UNSIGNED NOT NULL,
+    tgfoid INTEGER(32) UNSIGNED NOT NULL,
     tgtype SMALLINT NOT NULL,
     tgenabled CHAR(1) NOT NULL,
     tgisinternal TINYINT(1) NOT NULL,
-    tgconstrrelid OID UNSIGNED NOT NULL,
-    tgconstrindid OID UNSIGNED NOT NULL,
-    tgconstraint OID UNSIGNED NOT NULL,
+    tgconstrrelid INTEGER(32) UNSIGNED NOT NULL,
+    tgconstrindid INTEGER(32) UNSIGNED NOT NULL,
+    tgconstraint INTEGER(32) UNSIGNED NOT NULL,
     tgdeferrable TINYINT(1) NOT NULL,
     tginitdeferred TINYINT(1) NOT NULL,
     tgnargs SMALLINT NOT NULL,
@@ -714,36 +723,36 @@ const(
 
 	CreateTablePgTsConfig = `CREATE TABLE IF NOT EXISTS postgres.pg_ts_config
 (
-    `+"`oid`"+` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     cfgname VARCHAR(32),
-    cfgnamespace OID UNSIGNED NOT NULL,
-    cfgowner OID UNSIGNED NOT NULL,
-    cfgparser OID UNSIGNED NOT NULL
+    cfgnamespace INTEGER(32) UNSIGNED NOT NULL,
+    cfgowner INTEGER(32) UNSIGNED NOT NULL,
+    cfgparser INTEGER(32) UNSIGNED NOT NULL
 );`
 
 	CreateTablePgTsConfigMap = `CREATE TABLE IF NOT EXISTS postgres.pg_ts_config_map
 (
-    mapcfg OID UNSIGNED NOT NULL,
+    mapcfg INTEGER(32) UNSIGNED NOT NULL,
     maptokentype INTEGER(32) NOT NULL,
     mapseqno INTEGER(32) NOT NULL,
-    mapdict OID UNSIGNED NOT NULL
+    mapdict INTEGER(32) UNSIGNED NOT NULL
 );`
 
 	CreateTablePgTsDict = `CREATE TABLE IF NOT EXISTS postgres.pg_ts_dict
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     dictname VARCHAR(32),
-    dictnamespace OID UNSIGNED NOT NULL,
-    dictowner OID UNSIGNED NOT NULL,
-    dicttemplate OID UNSIGNED NOT NULL,
+    dictnamespace INTEGER(32) UNSIGNED NOT NULL,
+    dictowner INTEGER(32) UNSIGNED NOT NULL,
+    dicttemplate INTEGER(32) UNSIGNED NOT NULL,
     dictinitoption TEXT
 );`
 
 	CreateTablePgTsParser = `CREATE TABLE IF NOT EXISTS postgres.pg_ts_parser
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     prsname VARCHAR(32) NOT NULL,
-    prsnamespace OID UNSIGNED NOT NULL,
+    prsnamespace INTEGER(32) UNSIGNED NOT NULL,
     prsstart TEXT NOT NULL,
     prstoken TEXT NOT NULL,
     prsend TEXT NOT NULL,
@@ -753,19 +762,19 @@ const(
 
 	CreateTablePgTsTemplate = `CREATE TABLE IF NOT EXISTS postgres.pg_ts_template
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     tmplname VARCHAR(32) NOT NULL,
-    tmplnamespace OID UNSIGNED NOT NULL,
+    tmplnamespace INTEGER(32) UNSIGNED NOT NULL,
     tmplinit TEXT NOT NULL,
     tmpllexize TEXT NOT NULL
 );`
 
 	CreateTablePgType = `CREATE TABLE IF NOT EXISTS postgres.pg_type
 (
-    `+"`oid`"+` OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
     typname VARCHAR(32) NOT NULL,
-    typnamespace OID UNSIGNED NOT NULL,
-    typowner OID UNSIGNED NOT NULL,
+    typnamespace INTEGER(32) UNSIGNED NOT NULL,
+    typowner INTEGER(32) UNSIGNED NOT NULL,
     typlen SMALLINT NOT NULL,
     typbyval TINYINT(1) NOT NULL,
     typtype CHAR(1) NOT NULL,
@@ -773,9 +782,9 @@ const(
     typispreferred TINYINT(1) NOT NULL,
     typisdefined TINYINT(1) NOT NULL,
     typdelim CHAR(1) NOT NULL,
-    typrelid OID UNSIGNED NOT NULL,
-    typelem OID UNSIGNED NOT NULL,
-    typarray OID UNSIGNED NOT NULL,
+    typrelid INTEGER(32) UNSIGNED NOT NULL,
+    typelem INTEGER(32) UNSIGNED NOT NULL,
+    typarray INTEGER(32) UNSIGNED NOT NULL,
     typinput TEXT NOT NULL,
     typoutput TEXT NOT NULL,
     typreceive TEXT NOT NULL,
@@ -786,10 +795,10 @@ const(
     typalign CHAR(1) NOT NULL,
     typstorage CHAR(1) NOT NULL,
     typnotnull TINYINT(1) NOT NULL,
-    typbasetype OID UNSIGNED NOT NULL,
+    typbasetype INTEGER(32) UNSIGNED NOT NULL,
     typtypmod INTEGER(32) NOT NULL,
     typndims INTEGER(32) NOT NULL,
-    typcollation OID UNSIGNED NOT NULL,
+    typcollation INTEGER(32) UNSIGNED NOT NULL,
     typdefaultbin TEXT,
     typdefault TEXT,
     typacl VARCHAR(255)
@@ -797,9 +806,9 @@ const(
 
 	CreateTablePgUserMapping = `CREATE TABLE IF NOT EXISTS postgres.pg_user_mapping
 (
-    `+"`oid`"+ ` OID UNSIGNED NOT NULL,
-    umuser OID UNSIGNED NOT NULL,
-    umserver OID UNSIGNED NOT NULL,
+    oid INTEGER(32) UNSIGNED NOT NULL,
+    umuser INTEGER(32) UNSIGNED NOT NULL,
+    umserver INTEGER(32) UNSIGNED NOT NULL,
     umoptions TEXT
 );`
 
@@ -820,7 +829,7 @@ const(
 	boot_val TEXT,
 	reset_val TEXT,
 	sourcefile TEXT,
-	sourceline OID UNSIGNED,
+	sourceline INTEGER(32) UNSIGNED,
 	pending_restart TINYINT(1)
 );`
 )
@@ -841,14 +850,14 @@ const (
         rolvaliduntil,
         rolbypassrls,
         setconfig as rolconfig,
-        pg_authid.`+"`oid`"+ `
+        pg_authid.oid
     FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
-    ON (postgres.pg_authid.`+"`oid`"+ ` = setrole AND setdatabase = 0);`
+    ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
 
 	CreateViewPgShadow = `CREATE DEFINER = root VIEW pg_shadow AS
     SELECT
         rolname AS usename,
-        pg_authid.`+"`oid`"+ ` AS usesysid,
+        pg_authid.oid AS usesysid,
         rolcreatedb AS usecreatedb,
         rolsuper AS usesuper,
         rolreplication AS userepl,
@@ -857,14 +866,14 @@ const (
         rolvaliduntil AS valuntil,
         setconfig AS useconfig
     FROM pg_authid LEFT JOIN pg_db_role_setting s
-    ON (pg_authid.`+"`oid`"+ ` = setrole AND setdatabase = 0)
+    ON (pg_authid.oid = setrole AND setdatabase = 0)
     WHERE rolcanlogin;`
 
 	CreateViewPgGroup = `CREATE DEFINER = root VIEW pg_group AS
     SELECT
         rolname AS groname,
-        `+"`oid`"+` AS grosysid,
-        (SELECT member FROM pg_auth_members WHERE roleid = `+"`oid`"+ `) AS grolist
+        oid AS grosysid,
+        (SELECT member FROM pg_auth_members WHERE roleid = oid) AS grolist
     FROM pg_authid
     WHERE NOT rolcanlogin;`
 
@@ -887,8 +896,7 @@ SELECT * FROM pg_all_settings;`
 
 //DATA FOR PG SYSTEM TABLE
 const (
-	DataForTablePgAggregate = `INSERT INTO
-postgres.pg_authid VALUES
+	DataForTablePgAggregate = `INSERT INTO postgres.pg_authid VALUES
 (3373, 'pg_monitor', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
 (3374, 'pg_read_all_settings', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
 (3375, 'pg_read_all_stats', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
@@ -897,19 +905,15 @@ postgres.pg_authid VALUES
 (4570, 'pg_write_server_files', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
 (4571, 'pg_execute_server_program', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
 (4200, 'pg_signal_backend', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
-(10, 'postgres', 1, 1, 1, 1, 1, 1, 1, -1, NULL, NULL)
+(10, 'root@%', 1, 1, 1, 1, 1, 1, 1, -1, NULL, NULL)
 ;`
 
-	DataForTablePgAuthMembers = `INSERT INTO
-postgres.pg_auth_members
-VALUES
+	DataForTablePgAuthMembers = `INSERT INTO postgres.pg_auth_members VALUES
 (3374,3373,10,0),
 (3375,3373,10,0),
 (3377,3373,10,0);`
 
-	DataForTablePgDatabase = `INSERT INTO
-postgres.pg_database
-VALUES
+	DataForTablePgDatabase = `INSERT INTO postgres.pg_database VALUES
 (1,'template1',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',1,1,-1,13441,479,1,1663,'{=c/postgres,postgres=CTc/postgres}'),
 (13441,'template0',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',1,0,-1,13441,479,1,1663,'{=c/postgres,postgres=CTc/postgres}'),
 (13442,'postgres',10,6,'Chinese(Simplified)_China.936','Chinese(Simplified)_China.936',0,1,-1,13441,479,1,1663,NULL);`
@@ -1313,26 +1317,22 @@ VALUES
 (13411, 'foreign_table_options', 13158, 13412, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'p', 'v', 5, 0, 1, 0, 0, 0, 0, 1, 'n', 0, 0, 0, 0, '{postgres=arwdDxt/postgres,=r/postgres}', NULL, NULL);
 `
 
-	DataForTablePgType = `INSERT INTO
-postgres.pg_type VALUES
+	DataForTablePgType = `INSERT INTO postgres.pg_type VALUES
 (25,'text',11,10,-1,0,'b','S',1,1,',',0,0,1009,'textin','textout','textrecv','textsend','-','-','-','i','x',0,0,-1,0,100,NULL,NULL,NULL),
 (1043,'varchar',11,10,-1,0,'b','S',0,1,',',0,0,1015,'varcharin','varcharout','varcharrecv','varcharsend','varchartypmodin','varchartypmodout','-','i','x',0,0,-1,0,100,NULL,NULL,NULL);
 `
 
-	DataForTablePgTablespace = `INSERT INTO
-postgres.pg_tablespace VALUES
+	DataForTablePgTablespace = `INSERT INTO postgres.pg_tablespace VALUES
 (1663,'pg_default',10,NULL,NULL),
 (1664,'pg_global',10,NULL,NULL);`
 
-	DataForTablePgNamespace = `INSERT INTO
-postgres.pg_namespace VALUES
+	DataForTablePgNamespace = `INSERT INTO postgres.pg_namespace VALUES
 (99,'ph_toast',10,NULL),
 (11,'pg_catalog',10,'{postgres=UC/postgres,=U/postgres}'),
 (2200,'public',10,'{postgres=UC/postgres,=U/postgres}'),
 (13158,'information_schema',10,'{postgres=UC/postgres,=U/postgres}');`
 
-	DataForTablePgAllSettings = `INSERT INTO
-postgres.pg_all_settings VALUES
+	DataForTablePgAllSettings = `INSERT INTO postgres.pg_all_settings VALUES
 ('allow_system_table_mods', 'off', NULL, '开发人员选项', '允许修改系统表的结构.', NULL, 'superuser', 'bool', 'default', NULL, NULL, NULL, 'off', 'off', NULL, NULL, 0),
 ('application_name', 'Navicat', NULL, '报告和日志 / 日志内容', '设置在统计和日志中出现的应用程序名称.', NULL, 'user', 'string', 'client', NULL, NULL, NULL, '', 'Navicat', NULL, NULL, 0),
 ('archive_cleanup_command', '', NULL, '预写式日志 / 归档恢复', '设置将在每个重新启动点执行的shell命令.', NULL, 'sighup', 'string', 'default', NULL, NULL, NULL, '', '', NULL, NULL, 0),
@@ -2383,9 +2383,9 @@ postgres.pg_all_settings VALUES
 (1199, 'age', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 2, 0, 1186, '1184 1184', NULL, NULL, NULL, NULL, NULL, 'timestamptz_age', NULL, NULL, NULL),
 (3918, 'interval_support', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 1, 0, 2281, '2281', NULL, NULL, NULL, NULL, NULL, 'interval_support', NULL, NULL, NULL),
 (1200, 'interval', 11, 10, 12, 1, 0, 0, 'interval_support', 0, 0, 0, 1, 0, 'i', 's', 2, 0, 1186, '1186 23', NULL, NULL, NULL, NULL, NULL, 'interval_scale', NULL, NULL, NULL),
-(1215, 'obj_description', 11, 10, 14, 100, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 25, '26 19', NULL, NULL, NULL, NULL, NULL, 'select description from pg_catalog.pg_description where objoid = $1 and classoid = (select `+"`oid`"+ ` from pg_catalog.pg_class where relname = $2 and relnamespace = 11) and objsubid = 0', NULL, NULL, NULL),
+(1215, 'obj_description', 11, 10, 14, 100, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 25, '26 19', NULL, NULL, NULL, NULL, NULL, 'select description from pg_catalog.pg_description where objoid = $1 and classoid = (select oid from pg_catalog.pg_class where relname = $2 and relnamespace = 11) and objsubid = 0', NULL, NULL, NULL),
 (1216, 'col_description', 11, 10, 14, 100, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 25, '26 23', NULL, NULL, NULL, NULL, NULL, 'select description from pg_catalog.pg_description where objoid = $1 and classoid = ''pg_catalog.pg_class''::pg_catalog.regclass and objsubid = $2', NULL, NULL, NULL),
-(1993, 'shobj_description', 11, 10, 14, 100, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 25, '26 19', NULL, NULL, NULL, NULL, NULL, 'select description from pg_catalog.pg_shdescription where objoid = $1 and classoid = (select `+"`oid`"+ ` from pg_catalog.pg_class where relname = $2 and relnamespace = 11)', NULL, NULL, NULL),
+(1993, 'shobj_description', 11, 10, 14, 100, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 25, '26 19', NULL, NULL, NULL, NULL, NULL, 'select description from pg_catalog.pg_shdescription where objoid = $1 and classoid = (select oid from pg_catalog.pg_class where relname = $2 and relnamespace = 11)', NULL, NULL, NULL),
 (1217, 'date_trunc', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 2, 0, 1184, '25 1184', NULL, NULL, NULL, NULL, NULL, 'timestamptz_trunc', NULL, NULL, NULL),
 (1284, 'date_trunc', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 's', 3, 0, 1184, '25 1184 25', NULL, NULL, NULL, NULL, NULL, 'timestamptz_trunc_zone', NULL, NULL, NULL),
 (1218, 'date_trunc', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 2, 0, 1186, '25 1186', NULL, NULL, NULL, NULL, NULL, 'interval_trunc', NULL, NULL, NULL),
@@ -2422,7 +2422,7 @@ postgres.pg_all_settings VALUES
 (942, 'int28mi', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 2, 0, 20, '21 20', NULL, NULL, NULL, NULL, NULL, 'int28mi', NULL, NULL, NULL),
 (943, 'int28mul', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 2, 0, 20, '21 20', NULL, NULL, NULL, NULL, NULL, 'int28mul', NULL, NULL, NULL),
 (948, 'int28div', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 2, 0, 20, '21 20', NULL, NULL, NULL, NULL, NULL, 'int28div', NULL, NULL, NULL),
-(1287, '`+"`oid`"+ `', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 1, 0, 26, '20', NULL, NULL, NULL, NULL, NULL, 'i8tooid', NULL, NULL, NULL),
+(1287, 'oid', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 1, 0, 26, '20', NULL, NULL, NULL, NULL, NULL, 'i8tooid', NULL, NULL, NULL),
 (1288, 'int8', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'i', 's', 1, 0, 20, '26', NULL, NULL, NULL, NULL, NULL, 'oidtoi8', NULL, NULL, NULL),
 (1291, 'suppress_redundant_updates_trigger', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 's', 0, 0, 2279, '', NULL, NULL, NULL, NULL, NULL, 'suppress_redundant_updates_trigger', NULL, NULL, NULL),
 (1292, 'tideq', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 1, 1, 0, 'i', 's', 2, 0, 16, '27 27', NULL, NULL, NULL, NULL, NULL, 'tideq', NULL, NULL, NULL),
@@ -4482,7 +4482,7 @@ postgres.pg_all_settings VALUES
 (3577, 'pg_logical_emit_message', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 3, 0, 3220, '16 25 25', NULL, NULL, NULL, NULL, NULL, 'pg_logical_emit_message_text', NULL, NULL, NULL),
 (3578, 'pg_logical_emit_message', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 3, 0, 3220, '16 25 17', NULL, NULL, NULL, NULL, NULL, 'pg_logical_emit_message_bytea', NULL, NULL, NULL),
 (3566, 'pg_event_trigger_dropped_objects', 11, 10, 12, 10, 100, 0, '-', 'f', 0, 0, 1, 1, 's', 'r', 0, 0, 2249, '', '{26,26,23,16,16,16,25,25,25,25,1009,1009}', '{o,o,o,o,o,o,o,o,o,o,o,o}', '{classid,objid,objsubid,original,normal,is_temporary,object_type,schema_name,object_name,object_identity,address_names,address_args}', NULL, NULL, 'pg_event_trigger_dropped_objects', NULL, NULL, NULL),
-(4566, 'pg_event_trigger_table_rewrite_oid', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 'r', 0, 0, 26, '', '{26}', '{o}', '{`+"`oid`"+ `}', NULL, NULL, 'pg_event_trigger_table_rewrite_oid', NULL, NULL, NULL),
+(4566, 'pg_event_trigger_table_rewrite_oid', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 's', 'r', 0, 0, 26, '', '{26}', '{o}', '{oid}', NULL, NULL, 'pg_event_trigger_table_rewrite_oid', NULL, NULL, NULL),
 (3783, 'pg_logical_slot_get_binary_changes', 11, 10, 12, 1000, 1000, 25, '-', 'f', 0, 0, 0, 1, 'v', 'u', 4, 1, 2249, '19 3220 23 1009', '{19,3220,23,1009,3220,28,17}', '{i,i,i,v,o,o,o}', '{slot_name,upto_lsn,upto_nchanges,options,lsn,xid,data}', '({CONST :consttype 1009 :consttypmod -1 :constcollid 100 :constlen -1 :constbyval false :constisnull false :location 160 :constvalue 16 [ 64 0 0 0 0 0 0 0 0 0 0 0 25 0 0 0 ]})', NULL, 'pg_logical_slot_get_binary_changes', NULL, NULL, NULL),
 (3785, 'pg_logical_slot_peek_binary_changes', 11, 10, 12, 1000, 1000, 25, '-', 'f', 0, 0, 0, 1, 'v', 'u', 4, 1, 2249, '19 3220 23 1009', '{19,3220,23,1009,3220,28,17}', '{i,i,i,v,o,o,o}', '{slot_name,upto_lsn,upto_nchanges,options,lsn,xid,data}', '({CONST :consttype 1009 :consttypmod -1 :constcollid 100 :constlen -1 :constbyval false :constisnull false :location 161 :constvalue 16 [ 64 0 0 0 0 0 0 0 0 0 0 0 25 0 0 0 ]})', NULL, 'pg_logical_slot_peek_binary_changes', NULL, NULL, NULL),
 (3786, 'pg_create_logical_replication_slot', 11, 10, 12, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 3, 1, 2249, '19 19 16', '{19,19,16,19,3220}', '{i,i,i,o,o}', '{slot_name,plugin,temporary,slot_name,lsn}', '({CONST :consttype 16 :consttypmod -1 :constcollid 0 :constlen 1 :constbyval true :constisnull false :location 135 :constvalue 1 [ 0 0 0 0 0 0 0 0 ]})', NULL, 'pg_create_logical_replication_slot', NULL, NULL, NULL),
@@ -4665,10 +4665,10 @@ SELECT
       LIMIT 1
     ) AS lexemes
 FROM pg_catalog.ts_parse(
-        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE `+"`oid`"+ ` = $1 ), $2
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 ), $2
     ) AS parse,
      pg_catalog.ts_token_type(
-        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE `+"`oid`"+ ` = $1 )
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 )
     ) AS tt
 WHERE tt.tokid = parse.tokid
 ', NULL, NULL, NULL),
@@ -4798,3 +4798,26 @@ SELECT (ss.a).n FROM
 (13431, 'plpgsql_validator', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 1, 0, 2278, '26', NULL, NULL, NULL, NULL, NULL, 'plpgsql_validator', '$libdir/plpgsql', NULL, NULL);`
 
 )
+
+// PG PG_Catalog
+const (
+	CreatePgCalogViewPgRoles = `CREATE DEFINER = root VIEW pg_catalog.pg_roles AS
+    SELECT
+        rolname,
+        rolsuper,
+        rolinherit,
+        rolcreaterole,
+        rolcreatedb,
+        rolcanlogin,
+        rolreplication,
+        rolconnlimit,
+        '********' as rolpassword,
+        rolvaliduntil,
+        rolbypassrls,
+        setconfig as rolconfig,
+        pg_authid.oid
+    FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
+    ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
+
+)
+
