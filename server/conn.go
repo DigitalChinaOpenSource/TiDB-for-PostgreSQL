@@ -1094,26 +1094,13 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	//读包获取sql，去除第一位的类型
 	sql := string(cc.lastPacket)[1 : ]
 
+	// todo 完成MySQL错误与PgSQL错误的转换和返回
+	// https://www.postgresql.org/docs/13/errcodes-appendix.html
 	errorResponse, err := convertMysqlErrorToPgError(m, te, sql)
 	if err != nil {
 		return err
 	}
 	cc.lastCode = m.Code
-	// todo 完成MySQL错误与PgSQL错误的转换和返回
-	// https://www.postgresql.org/docs/13/errcodes-appendix.html
-	//errorResponse := pgproto3.ErrorResponse{
-	//	Severity:            "ERROR",
-	//	SeverityUnlocalized: "",
-	//	Code:                code,
-	//	Message:             pgMsg,
-	//	Detail:              "",
-	//	Hint:                "For example, FROM (SELECT ...) [AS] foo.",
-	//	Position:            position,
-	//	// the file name of the source-code location where the error was reported.
-	//	Line:                int32(line),
-	//	// the line number of the source-code location where the error was reported.
-	//	File:				filePath,
-	//}
 
 	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
 		return err
@@ -2489,16 +2476,175 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleCreateDBFail(m,te,sql)
 	case 1008:
 		return handleDropDBFail(m,te,sql)
+	case 1010:
+		//todo mysql data目录下有除数据库文件之外的文件就会报这个错，需要找到pgsql类似情况下的报错，完善报错信息
+		return handleDBDropRmDir(m,te,sql)
+	case 1012:
+		//todo 读取不到系统表记录，有待完善
+		return handleCantFindSystemRec(m,te,sql)
+	case 1013:
+		// todo 获取不到状态，有待完善
+		return handleCantGetStat(m,te,sql)
+	case 1015:
+		// todo 无法锁定文件，有待完善
+		return handleCantLock(m,te,sql)
+	case 1016:
+		// todo 无法打开文件，有待完善
+		return handleCantOpenFile(m,te,sql)
+	case 1017:
+		// todo 文件找不到，有待完善
+		return handleFileNotFound(m,te,sql)
+	case 1018:
+		// todo 无法读取目录，有待完善
+		return handleCantReadDir(m,te,sql)
+	case 1020:
+		// todo Record has changed since last read in table xxx 有待完善
+		return handleCheckRead(m,te,sql)
+	case 1022:
+		// todo Can't write; duplicate key in table xxx 。简单说们就是外键不能重名，这是mysql的限制，tidb可能没有限制外键名称
+		return handleDupKey(m,te,sql)
+	case 1024:
+		// todo 读文件出错，有待完善
+		return handleErrorOnRead(m,te,sql)
+	case 1025:
+		// todo 重命名错误，有待完善
+		return handleErrorOnRename(m,te,sql)
+	case 1026:
+		// todo 写错误，有待完善
+		return handleErrorOnWrite(m,te,sql)
+	case 1027:
+		// todo 锁冲突，有待完善
+		return handleFileUsed(m,te,sql)
+	case 1028:
+		// todo 排序中止，mysql 8.0.18之后被抛弃。有待完善
+		return handleFilSortAbort(m,te,sql)
+	case 1030:
+		// todo 存储储引擎发出的错误 For example, error 28 indicates that you have run out of disk space.
+		return handleGotErrno(m,te,sql)
+	case 1031:
+		//todo 表存储引擎没有这个选项
+		return handleIllegalHA(m,te,sql)
+	case 1032:
+		// todo 找不到键.
+		return handleKeyNotFound(m,te,sql)
+	case 1033:
+		// todo 找不到记录
+		return handleNotFormFile(m,te,sql)
+	case 1034:
+		//todo 不正确的ket文件对于表xxx
+		return handleNotKeyFile(m,te,sql)
+	case 1035:
+		//todo 过时的key file对于表xxx
+		return handleOldKeyFile(m,te,sql)
+	case 1036:
+		// todo 表xxx只读
+		return handleOpenAsReadonly(m,te,sql)
+	case 1037:
+		// todo 处理内存溢出
+		return handleOutOfMemory(m,te,sql)
+	case 1038:
+		// todo 排序内存溢出，考虑增大server的排序缓冲
+		return handleOutOfSortMemory(m,te,sql)
+	case 1040:
+		// todo 连接数过多
+		return handleConCountError(m,te,sql)
+	case 1041:
+		// todo 内存耗尽
+		return handleOutOfResources(m,te,sql)
+	case 1042:
+		// todo 错误的主机名
+		return handleBadHostError(m,te,sql)
+	case 1043:
+		// todo 握手错误
+		return handleHandShakeError(m,te,sql)
+	case 1044:
+		//todo 连接数据库被拒
+		return handleDBAccessDenied(m,te,sql)
 	case 1045:
 		return handleAccessDenied(m,te,sql)
+	case 1046:
+		// todo 没有选择数据库
+		return handleNoDBSelected(m,te,sql)
+	case 1047:
+		//todo 未知的命令
+		return handleUnknownCmd(m,te,sql)
+	case 1048:
+		// todo 字段xxx不能为空
+		return handleBadNullColumn(m,te,sql)
+	case 1049:
+		// todo 未知的数据库
+		return handleUnknownDB(m,te,sql)
 	case 1050:
 		return handleTableExists(m,te,sql)
+	case 1051:
+		//todo 未知的表
+		return handleUnknownTable(m,te,sql)
+	case 1052:
+		//todo 字段多义
+		return handleColumnAmbiguous(m,te,sql)
+	case 1053:
+		//todo 中途停机
+		return handleServerShutDown(m,te,sql)
 	case 1054:
 		return handleUnknownColumn(m,te, sql)
+	case 1055:
+		//todo 错误的分组列 xxx isn't in GROUP BY
+		return handleWrongFieldWithGroup(m,te,sql)
+	case 1056:
+		// todo 无法分组字段xxx   Can't group on xxx
+		return handleWrongField(m,te,sql)
+	case 1057:
+		// todo Statement has sum functions and columns in same statement
+		return handleWrongSumSelect(m,te,sql)
+	case 1058:
+		// todo 解决字段数与值数量对不上的问题
+		return handleWrongValueCount(m,te,sql)
+	case 1059:
+		//todo 名字太长
+		return handleIdentTooLong(m,te,sql)
+	case 1060:
+		//todo 字段名冲突
+		return handleDupColumnName(m,te,sql)
+	case 1061:
+		// todo 键名字冲突
+		return handleDupKeyName(m,te,sql)
 	case 1062:
 		return handleDuplicateKey(m,te,sql)
+	case 1063:
+		// todo 列指定符不正确
+		return handleWrongFieldSpec(m,te,sql)
 	case 1064:
 		return handleParseError(m,te, sql)
+	case 1065:
+		//todo sql空串
+		return handleEmptyQuery(m,te,sql)
+	case 1066:
+		// todo 不是唯一的表
+		return handleNoUniqueTable(m,te,sql)
+	case 1067:
+		// todo 不正确的默认值
+		return handleInvalidDefaultValue(m,te,sql)
+	case 1068:
+		//todo 多主键被定义
+		return handleMultiplePKDefined(m,te,sql)
+	case 1069:
+		//todo 声明了太多的键
+		return handleTooManyKeys(m,te,sql)
+	case 1070:
+		// todo 定义了太多 key part
+		return handleTooManyKeyParts(m,te,sql)
+	case 1071:
+		// todo key too long
+		return handleTooLongKey(m,te,sql)
+	case 1072:
+		// todo 键字段不存在
+		return handleKeyColumnNotExists(m,te,sql)
+	case 1073:
+		//todo blob字段作为键
+		return handleBolbUsedAsKey(m,te,sql)
+	case 1074:
+		// todo 字段长度过大
+		return handleTooBigFieldLen(m,te,sql)
 	case 1105:
 		return handleTypeError(m, te,sql)
 	case 1136:
@@ -2517,458 +2663,117 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleSubqueryNo1Row(m ,te,sql)
 	case 1248:
 		return handleDerivedMustHaveAlias(m,te, sql)
+	case 1264:
+		return handleDataOutOfRange(m,te,sql)
 	case 1364:
 		return handleNoDefaultValue(m,te, sql)
+	case 1406:
+		return handleDataTooLong(m,te,sql)
 	default:
 		return &pgproto3.ErrorResponse{
 			Code: "XX0000",
 			Severity: "ERROR",
-			Message: "Unknown Error",
+			Message: "Unknown Error, error code: "+strconv.Itoa(int(m.Code)),
 		}, err
 	}
 }
 
-//handleWrongNumberOfColsInSelect 处理union时两表字段不对应的情况
-//eg. The used SELECT statements have a different number of columns
-func handleWrongNumberOfColsInSelect(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	pgMsg := "each UNION query must have the same number of columns"
-
-	// mysql 的错徐信息不足以支持计算出position，尤其是在多个union同时使用时.
+//handleTooBigFieldLen 解决字段长度过大的问题
+func handleTooBigFieldLen(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1074 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
 }
 
-//handleDerivedMustHaveAlias 处理派生表缺少别名的错误
-// eg. Every derived table must have its own alias
-func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	brackets := "("
-
-	pgMsg := "subquery in FROM must have an alias"
-	position := strings.Index(sql, brackets) + 3
-
+//handleBolbUsedAsKey 处理将blob字段作为键的问题
+func handleBolbUsedAsKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1073 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
 	return errorResp, nil
 }
 
-//handleSubqueryNo1Row 处理子查询返回数据行数超过一行的错误
-//eg. Subquery returns more than 1 row
-func handleSubqueryNo1Row(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	pgMsg := "more than one row returned by a subquery used as an expression"
-
+func handleKeyColumnNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1072 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message =  pgMsg
-
 	return errorResp, nil
 }
 
-//handleNoPermissionToCreateUser 处理无权创建用户的错误信息
-//eg. 'u'@'192.168.2.111' is not allowed to create new users
-func handleNoPermissionToCreateUser(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	pgMsg := "permission denied to create role"
-
+//handleTooLongKey 处理key 太长的错误
+func handleTooLongKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1071 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
 }
 
-//handleTableAccessDenied 处理数据表访问被拒的错误信息 todo 有待权限完善后测试
-//eg. SELECT command denied to user 'XXX'@'localhost' for table 'db'
-func handleTableAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, beforeTable, apostrophe := m.Message, "table ", "'"
-
-	tableStart := strings.Index(msg, beforeTable) + len(beforeTable)
-	tableLen := strings.Index(msg, apostrophe)
-	table := strings.Trim(msg[tableStart : tableStart + tableLen], apostrophe)
-	pgMsg := fmt.Sprintf("permission denied for table %s", table)
-
+// handleTooManyKeyParts 处理定义太多key part的错误
+func handleTooManyKeyParts(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "2F004",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1070 错误",
 	}
-	setFilePathAndLine(te,errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
 }
 
-//handleColumnAccessDenied 处理字段访问拒绝信息 todo 写这里的时候dctidb权限模块还没做好，所以没有测试，后续需要测试一下。
-// pgsql权限粒度没有达到字段级别，所以pg的错误信息中不会指出哪个字段访问被拒,只会指明表访问被拒，这里与pgsql保持一致、
-func handleColumnAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	// eg. SELECT command denied to user 'e1534'@'192.168.176.100' for column 'id' in table 't1'
-	msg, beforeTable, apostrophe := m.Message, "table ", "'"
-
-	tableStart := strings.Index(msg, beforeTable) + len(beforeTable)
-	tableLen := strings.Index(msg, apostrophe)
-	table := strings.Trim(msg[tableStart : tableStart + tableLen], apostrophe)
-	pgMsg := fmt.Sprintf("permission denied for table %s", table)
-
+//handleTooManyKeys 处理声明的太多键的错误
+func handleTooManyKeys(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "2F004",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1069 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
 }
 
-//handleNoDefaultValue 处理非空字段缺少默认值的情况
-func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, beforeColumn, empty, apostrophe, into, brackets := m.Message, "Field ", " ", "'", "INTO ", "("
 
-	columnStart := strings.Index(msg, beforeColumn) + len(beforeColumn)
-	columnLen := strings.Index(msg[columnStart : ], empty)
-	column := strings.Trim(msg[columnStart : columnStart + columnLen], apostrophe)
-
-	relationStart := strings.Index(strings.ToUpper(sql), into) + len(into)
-	relationLen := strings.Index(sql[relationStart : ], empty)
-	bracketsLen := strings.Index(sql[relationStart : ], brackets)
-
-	var relation string
-	if bracketsLen < relationLen && bracketsLen != -1 {
-		relation = sql[relationStart : relationStart + bracketsLen]
-	}else {
-		relation = sql[relationStart : relationStart + relationLen]
-	}
-	//原版pg对应错误还有一行错误信息，eg.描述:  Failing row contains (null, xxx    , null).，但是MySQL的错误信息不足以凑出第二行的信息。
-	pgMsg := fmt.Sprintf("null value in column \"%s\" of relation \"%s\" violates not-null constraint", column, relation)
-
+//handleMultiplePKDefined 处理多主键被定义的错误
+func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1068 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
 }
 
-//handleAccessDenied 处理登录失败信息 todo 写这里的时候dctidb没有密码，也没法测试，需要加上密码之后测试
-//eg.Access denied for user 'root'@'localhost' (using password: YES)
-func handleAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, beforeUser, at, apostrophe := m.Message, "user ", "@", "'"
-
-	userStart := strings.Index(msg, beforeUser) + len(beforeUser)
-	userLen := strings.Index(msg[userStart : ], at)
-	user := strings.Trim(msg[userStart : userStart + userLen], apostrophe)
-	pgMsg := fmt.Sprintf("password authentication failed for user \"%s\"",user)
-
+//handleInvalidDefaultValue 不正确的默认值
+func handleInvalidDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1067 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
-	return errorResp,nil
-}
-
-//handleDropDBFail 处理数据库不存在，删除数据库失败的错误信息
-func handleDropDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, beforeDatabase,semicolon, apostrophe := m.Message, "database ", ";", "'"
-
-	databaseStart := strings.Index(msg, beforeDatabase) + len(beforeDatabase)
-	databaseLen := strings.Index(msg[databaseStart : ], semicolon)
-	database := strings.Trim(msg[databaseStart : databaseStart + databaseLen], apostrophe)
-	pgMsg := fmt.Sprintf("database \"%s\" does not exist", database)
-
-	errorResponse := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te,errorResponse)
-	errorResponse.Message = pgMsg
-
-	return errorResponse, nil
-}
-
-//handleCreateDBFail 数据库已存在，创建数据库失败
-func handleCreateDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, beforeDatabase,semicolon, apostrophe := m.Message, "database ", ";", "'"
-
-	databaesStart := strings.Index(msg, beforeDatabase) + len(beforeDatabase)
-	databaseLen := strings.Index(msg[databaesStart : ], semicolon)
-	database := strings.Trim(msg[databaesStart : databaesStart + databaseLen], apostrophe)
-	pgMsg := fmt.Sprintf("database \"%s\" already exists", database)
-
-	errorResponse := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResponse)
-	errorResponse.Message = pgMsg
-
-	return errorResponse, nil
-}
-
-//handleTableExists 处理表已经存在，重复创建表的错误信息
-func handleTableExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, point, apostrophe := m.Message, ".", "'"
-
-	relationStart := strings.Index(msg, point) + 1
-	relationLen := strings.Index(msg[relationStart : ], apostrophe)
-	relation := msg[relationStart : relationStart + relationLen]
-	pgMsg := fmt.Sprintf("relation \"%s\" already exists", relation)
-
-	errorResponse := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResponse)
-	errorResponse.Message = pgMsg
-
-	return errorResponse, nil
-}
-
-//handeleColumnMisMatch 处理字段与值的数量匹配不上的情况
-func handeleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	values := "values"
-
-	valueStart := strings.Index(sql, values) + len(values)
-	//这里的游标只能指到values后面的括号，mysql的错误信息里拿不到哪些 value 是多出来的。
-	position := valueStart + 3
-	pgMsg := fmt.Sprintf("INSERT has more expressions than target columns")
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
 	return errorResp, nil
 }
 
-//handleUnknownColumn 处理未知字段名的错误信息
-func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, column, into, apostrophe, bracket,empty := m.Message, "column ", "into ","'", "(", " "
-
-	sel, del, insert, update := "SELECT","DELETE","INSERT","UPDATE"
-
-	columnNameStart := strings.Index(msg, column) + len(column)
-	columnNameLen := strings.Index(msg[columnNameStart : ], empty) + 1
-	columnName := strings.Trim(strings.Trim(msg[columnNameStart : columnNameStart + columnNameLen], empty), apostrophe)
-
-	var relation,pgMsg string
-	if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), insert) {
-		relationStart := strings.Index(sql, into) + len(into)
-		relationLen := strings.Index(sql[relationStart : ], empty)
-		leftBracketLen := strings.Index(sql[relationStart : ], bracket)
-
-		if leftBracketLen != -1 && leftBracketLen < relationLen {
-			relation = sql[relationStart : relationStart + leftBracketLen]
-		} else {
-			relation = sql[relationStart : relationStart + relationLen]
-		}
-		pgMsg = fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist", columnName, relation)
-	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), del) {
-		pgMsg = fmt.Sprintf("column \"%s\" does not exist", columnName)
-	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), sel) {
-		pgMsg = fmt.Sprintf("column \"%s\" does not exist", columnName)
-	} else if strings.HasPrefix(strings.ToUpper(strings.Trim(sql, empty)), update) {
-		relationStart := strings.Index(strings.ToUpper(sql), update)
-		relationLen := strings.Index(strings.Trim(sql[relationStart : ], empty), empty)
-		relation = sql[relationStart : relationStart + relationLen]
-		pgMsg = fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist", columnName, relation)
-	}
-	position := strings.Index(sql, columnName) + 3
-
+//handleNoUniqueTable 处理不是唯一的表的错误
+func handleNoUniqueTable(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1066 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
 	return errorResp, nil
 }
 
-// handleDuplicateKey 处理键冲突的问题
-func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, entry, key, apostrophe, empty := m.Message,"entry ", "key ", "'", " "
-
-	keyStart := strings.Index(msg, key) + len(key) + 1
-	keyName := strings.Trim(msg[keyStart : ], apostrophe)
-
-	valueStart := strings.Index(msg, entry) + len(entry)
-	valueLen := strings.Index(msg[valueStart : ], empty)
-	value := msg[valueStart : valueStart + valueLen]
-	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"\nDescription:  Key value %v already exists.", keyName, value)
-
+//handleEmptyQuery 处理sql是空串的情况
+func handleEmptyQuery(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
+		Code: "XX0000",
 		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
+		Message: "有待处理的MySQL 1065 错误",
 	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
-
 	return errorResp, nil
-}
-
-// handleRelationNotExists 处理表（关系）不存在的错误信息
-func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, point, apostrophe := m.Message, ".", "'"
-
-	tableNameStart := strings.Index(msg,point) + 1
-	nameLen := strings.Index(msg[tableNameStart : ], apostrophe)
-	tableName := msg[tableNameStart : tableNameStart + nameLen]
-	pgMsg := fmt.Sprintf("relation \"%s\" does not exist", tableName)
-	position := strings.Index(sql, tableName) + 3
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
-	return errorResp,nil
-}
-// handleTypeError 处理类型转换错误信息
-func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, quotes, beforeInput := m.Message, "\"", "parsing "
-
-	inputStart := strings.Index(msg, beforeInput) + len(beforeInput)
-	inputLen := strings.Index(msg[inputStart + 1 : ], quotes) + 1
-	input := msg[inputStart : inputStart + inputLen]
-	if !strings.HasSuffix(input, quotes) {
-		input += quotes
-	}
-	pgMsg := fmt.Sprintf("invalid input syntax for : %s", input)
-	position := strings.Index(sql, input)
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "tobe",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
-	return errorResp,nil
-}
-
-// handleParseError 处理编译sql出错的信息
-// eg. You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 5 near "creat table student(id int);"
-func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, nearDelimiter, wrap, quotes, emptyStr := m.Message, "near ", "\n","\""," "
-
-	nearStart := strings.Index(msg, nearDelimiter) + len(nearDelimiter)
-	nearlen := strings.Index(strings.Trim(msg[nearStart : ], emptyStr), emptyStr)
-	lineEnd := strings.Index(strings.Trim(msg[nearStart : ], emptyStr), wrap)
-
-	var finalLen int
-	var behindNear string
-	if nearlen == -1 && lineEnd == -1 {
-		behindNear = strings.Trim(msg[nearStart : ], emptyStr)
-	} else if nearlen == -1 && lineEnd != -1 {
-		behindNear = strings.Trim(msg[nearStart : nearStart + lineEnd], emptyStr)
-	} else {
-		if lineEnd < nearlen && lineEnd != -1 {
-			finalLen = nearStart + lineEnd
-		} else {
-			finalLen = nearStart + nearlen
-		}
-		behindNear = strings.Trim(msg[nearStart : finalLen], emptyStr)
-	}
-
-	if !strings.HasSuffix(behindNear, quotes) {
-		behindNear += quotes
-	}
-
-	pgMsg := fmt.Sprintf("syntax error at or near %s",behindNear)
-
-	// 为什么加3? 在提示信息第二行开头回提示是第几行sql的错误，他也会占偏移量，所以要将其加上。
-	position := strings.Index(sql,strings.Trim(behindNear, quotes)) + 3
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		Code: "42601",
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
-
-	return errorResp, nil
-}
-
-//setFilePathAndLine 通过terror.Error对象获取出错文件和行位置
-func setFilePathAndLine(te *terror.Error, errorResponse *pgproto3.ErrorResponse){
-	//Get the file location and line number where the error occurred
-	var filePath string
-	var line int
-	if te != nil {
-		filePath, line = te.Location()
-	}
-	errorResponse.File, errorResponse.Line = filePath, int32(line)
 }
