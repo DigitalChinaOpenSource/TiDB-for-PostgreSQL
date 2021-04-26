@@ -122,6 +122,7 @@ type Session interface {
 	SetSessionManager(util.SessionManager)
 	Close()
 	Auth(user *auth.UserIdentity, auth []byte, salt []byte) bool
+	NeedPassword(user *auth.UserIdentity) bool
 	ShowProcess() *util.ProcessInfo
 	// PrepareTxnCtx is exported for test.
 	PrepareTxnCtx(context.Context)
@@ -1621,6 +1622,11 @@ func (s *session) Auth(user *auth.UserIdentity, authentication []byte, salt []by
 		}
 	}
 	return false
+}
+
+func (s *session)NeedPassword(user *auth.UserIdentity) bool {
+	pm := privilege.GetPrivilegeManager(s)
+	return pm.NeedPassword(user.Username, user.Hostname)
 }
 
 func getHostByIP(ip string) []string {

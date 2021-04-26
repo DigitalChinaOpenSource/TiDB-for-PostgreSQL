@@ -184,10 +184,10 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	}
 
 	pwd := record.AuthenticationString
-	if len(pwd) != 0 && len(pwd) != mysql.PWDHashLen+1 {
-		logutil.BgLogger().Error("user password from system DB not like sha1sum", zap.String("user", user))
-		return
-	}
+	//if len(pwd) != 0 && len(pwd) != mysql.PWDHashLen+1 {
+	//	logutil.BgLogger().Error("user password from system DB not like sha1sum", zap.String("user", user))
+	//	return
+	//}
 
 	// empty password
 	if len(pwd) == 0 && len(authentication) == 0 {
@@ -201,13 +201,14 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 		return
 	}
 
-	hpwd, err := auth.DecodePassword(pwd)
+	hpwd, err := auth.DecodePasswordByMD5(pwd)
 	if err != nil {
 		logutil.BgLogger().Error("decode password string failed", zap.Error(err))
 		return
 	}
 
-	if !auth.CheckScrambledPassword(salt, hpwd, authentication) {
+	pgSalt := [4]byte{salt[0],salt[1],salt[2],salt[3]}
+	if !auth.CheckPassword(pgSalt, hpwd, string(authentication)) {
 		return
 	}
 
@@ -215,6 +216,23 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	p.host = h
 	success = true
 	return
+}
+
+// NeedPassword
+func (p *UserPrivileges) NeedPassword(user, host string) bool {
+	mysqlPriv := p.Handle.Get()
+	record := mysqlPriv.connectionVerification(user, host)
+	if record == nil {
+		logutil.BgLogger().Error("get user privilege record fail",
+			zap.String("user", user), zap.String("host", host))
+		return false
+	}
+
+	if record.AuthenticationString != "" {
+		return true
+	}
+
+	return false
 }
 
 type checkResult int
