@@ -1090,7 +1090,7 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 		}
 	}
 
-	// todo 处理某些情况下从lastPacket获取不到sl的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
+	// todo 处理某些情况下从lastPacket获取不到sql的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
 	//读包获取sql，去除第一位的类型
 	sql := string(cc.lastPacket)[1 : ]
 
@@ -2476,179 +2476,36 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleCreateDBFail(m,te,sql)
 	case 1008:
 		return handleDropDBFail(m,te,sql)
-	case 1010:
-		//todo mysql data目录下有除数据库文件之外的文件就会报这个错，需要找到pgsql类似情况下的报错，完善报错信息
-		return handleDBDropRmDir(m,te,sql)
-	case 1012:
-		//todo 读取不到系统表记录，有待完善
-		return handleCantFindSystemRec(m,te,sql)
-	case 1013:
-		// todo 获取不到状态，有待完善
-		return handleCantGetStat(m,te,sql)
-	case 1015:
-		// todo 无法锁定文件，有待完善
-		return handleCantLock(m,te,sql)
-	case 1016:
-		// todo 无法打开文件，有待完善
-		return handleCantOpenFile(m,te,sql)
-	case 1017:
-		// todo 文件找不到，有待完善
-		return handleFileNotFound(m,te,sql)
-	case 1018:
-		// todo 无法读取目录，有待完善
-		return handleCantReadDir(m,te,sql)
-	case 1020:
-		// todo Record has changed since last read in table xxx 有待完善
-		return handleCheckRead(m,te,sql)
-	case 1022:
-		// todo Can't write; duplicate key in table xxx 。简单说们就是外键不能重名，这是mysql的限制，tidb可能没有限制外键名称
-		return handleDupKey(m,te,sql)
-	case 1024:
-		// todo 读文件出错，有待完善
-		return handleErrorOnRead(m,te,sql)
-	case 1025:
-		// todo 重命名错误，有待完善
-		return handleErrorOnRename(m,te,sql)
-	case 1026:
-		// todo 写错误，有待完善
-		return handleErrorOnWrite(m,te,sql)
-	case 1027:
-		// todo 锁冲突，有待完善
-		return handleFileUsed(m,te,sql)
-	case 1028:
-		// todo 排序中止，mysql 8.0.18之后被抛弃。有待完善
-		return handleFilSortAbort(m,te,sql)
-	case 1030:
-		// todo 存储储引擎发出的错误 For example, error 28 indicates that you have run out of disk space.
-		return handleGotErrno(m,te,sql)
-	case 1031:
-		//todo 表存储引擎没有这个选项
-		return handleIllegalHA(m,te,sql)
-	case 1032:
-		// todo 找不到键.
-		return handleKeyNotFound(m,te,sql)
-	case 1033:
-		// todo 找不到记录
-		return handleNotFormFile(m,te,sql)
-	case 1034:
-		//todo 不正确的ket文件对于表xxx
-		return handleNotKeyFile(m,te,sql)
-	case 1035:
-		//todo 过时的key file对于表xxx
-		return handleOldKeyFile(m,te,sql)
-	case 1036:
-		// todo 表xxx只读
-		return handleOpenAsReadonly(m,te,sql)
-	case 1037:
-		// todo 处理内存溢出
-		return handleOutOfMemory(m,te,sql)
-	case 1038:
-		// todo 排序内存溢出，考虑增大server的排序缓冲
-		return handleOutOfSortMemory(m,te,sql)
-	case 1040:
-		// todo 连接数过多
-		return handleConCountError(m,te,sql)
-	case 1041:
-		// todo 内存耗尽
-		return handleOutOfResources(m,te,sql)
-	case 1042:
-		// todo 错误的主机名
-		return handleBadHostError(m,te,sql)
-	case 1043:
-		// todo 握手错误
-		return handleHandShakeError(m,te,sql)
-	case 1044:
-		//todo 连接数据库被拒
-		return handleDBAccessDenied(m,te,sql)
 	case 1045:
 		return handleAccessDenied(m,te,sql)
-	case 1046:
-		// todo 没有选择数据库
-		return handleNoDBSelected(m,te,sql)
-	case 1047:
-		//todo 未知的命令
-		return handleUnknownCmd(m,te,sql)
-	case 1048:
-		// todo 字段xxx不能为空
-		return handleBadNullColumn(m,te,sql)
 	case 1049:
-		// todo 未知的数据库
 		return handleUnknownDB(m,te,sql)
 	case 1050:
 		return handleTableExists(m,te,sql)
-	case 1051:
-		//todo 未知的表
-		return handleUnknownTable(m,te,sql)
-	case 1052:
-		//todo 字段多义
-		return handleColumnAmbiguous(m,te,sql)
-	case 1053:
-		//todo 中途停机
-		return handleServerShutDown(m,te,sql)
 	case 1054:
 		return handleUnknownColumn(m,te, sql)
-	case 1055:
-		//todo 错误的分组列 xxx isn't in GROUP BY
-		return handleWrongFieldWithGroup(m,te,sql)
-	case 1056:
-		// todo 无法分组字段xxx   Can't group on xxx
-		return handleWrongField(m,te,sql)
-	case 1057:
-		// todo Statement has sum functions and columns in same statement
-		return handleWrongSumSelect(m,te,sql)
-	case 1058:
-		// todo 解决字段数与值数量对不上的问题
-		return handleWrongValueCount(m,te,sql)
-	case 1059:
-		//todo 名字太长
-		return handleIdentTooLong(m,te,sql)
-	case 1060:
-		//todo 字段名冲突
-		return handleDupColumnName(m,te,sql)
-	case 1061:
-		// todo 键名字冲突
-		return handleDupKeyName(m,te,sql)
 	case 1062:
 		return handleDuplicateKey(m,te,sql)
-	case 1063:
-		// todo 列指定符不正确
-		return handleWrongFieldSpec(m,te,sql)
 	case 1064:
 		return handleParseError(m,te, sql)
-	case 1065:
-		//todo sql空串
-		return handleEmptyQuery(m,te,sql)
-	case 1066:
-		// todo 不是唯一的表
-		return handleNoUniqueTable(m,te,sql)
-	case 1067:
-		// todo 不正确的默认值
-		return handleInvalidDefaultValue(m,te,sql)
 	case 1068:
-		//todo 多主键被定义
 		return handleMultiplePKDefined(m,te,sql)
-	case 1069:
-		//todo 声明了太多的键
-		return handleTooManyKeys(m,te,sql)
-	case 1070:
-		// todo 定义了太多 key part
-		return handleTooManyKeyParts(m,te,sql)
-	case 1071:
-		// todo key too long
-		return handleTooLongKey(m,te,sql)
-	case 1072:
-		// todo 键字段不存在
-		return handleKeyColumnNotExists(m,te,sql)
-	case 1073:
-		//todo blob字段作为键
-		return handleBolbUsedAsKey(m,te,sql)
-	case 1074:
-		// todo 字段长度过大
-		return handleTooBigFieldLen(m,te,sql)
+	case 1091:
+		return handleCantDropFieldOrKey(m,te,sql)
 	case 1105:
 		return handleTypeError(m, te,sql)
+	case 1109:
+		return handleUnknownTableInDelete(m,te,sql)
+	case 1110:
+		return handleFiledSpecifiedTwice(m,te,sql)
+	case 1111:
+		return handleInvalidGroupFuncUse(m,te,sql)
+	case 1113:
+		return handleTableNoColumn(m,te,sql)
 	case 1136:
 		return handeleColumnMisMatch(m, te,sql)
+	case 1138:
+		return handleInvalidUseOfNull(m,te,sql)
 	case 1142:
 		return handleTableAccessDenied(m,te, sql)
 	case 1143:
@@ -2671,109 +2528,9 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleDataTooLong(m,te,sql)
 	default:
 		return &pgproto3.ErrorResponse{
-			Code: "XX0000",
+			Code: "MySQL"+strconv.Itoa(int(m.Code)),
 			Severity: "ERROR",
-			Message: "Unknown Error, error code: "+strconv.Itoa(int(m.Code)),
+			Message: "Unknown Error: " + m.Message,
 		}, err
 	}
-}
-
-//handleTooBigFieldLen 解决字段长度过大的问题
-func handleTooBigFieldLen(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1074 错误",
-	}
-	return errorResp, nil
-}
-
-//handleBolbUsedAsKey 处理将blob字段作为键的问题
-func handleBolbUsedAsKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1073 错误",
-	}
-	return errorResp, nil
-}
-
-func handleKeyColumnNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1072 错误",
-	}
-	return errorResp, nil
-}
-
-//handleTooLongKey 处理key 太长的错误
-func handleTooLongKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1071 错误",
-	}
-	return errorResp, nil
-}
-
-// handleTooManyKeyParts 处理定义太多key part的错误
-func handleTooManyKeyParts(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1070 错误",
-	}
-	return errorResp, nil
-}
-
-//handleTooManyKeys 处理声明的太多键的错误
-func handleTooManyKeys(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1069 错误",
-	}
-	return errorResp, nil
-}
-
-
-//handleMultiplePKDefined 处理多主键被定义的错误
-func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1068 错误",
-	}
-	return errorResp, nil
-}
-
-//handleInvalidDefaultValue 不正确的默认值
-func handleInvalidDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1067 错误",
-	}
-	return errorResp, nil
-}
-
-//handleNoUniqueTable 处理不是唯一的表的错误
-func handleNoUniqueTable(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1066 错误",
-	}
-	return errorResp, nil
-}
-
-//handleEmptyQuery 处理sql是空串的情况
-func handleEmptyQuery(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1065 错误",
-	}
-	return errorResp, nil
 }

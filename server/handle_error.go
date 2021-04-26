@@ -8,6 +8,216 @@ import (
 	"strings"
 )
 
+//handleInvalidUseOfNull 处理设置字段非空时由于原本存在空数据而导致的错误
+// eg.Invalid use of NULL value
+func handleInvalidUseOfNull(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	upperSql, beforeTable, beforeCol, empty :=strings.ToUpper(sql), "TABLE", "MODIFY", " "
+	tableStart := strings.Index(upperSql, beforeTable) + len(beforeTable)
+	tableLen := strings.Index(strings.Trim(sql[tableStart : ], empty), empty)
+	table := strings.Trim(sql[tableStart : ], empty)[ : tableLen]
+
+	colStart := strings.Index(upperSql, beforeCol) + len(beforeCol)
+	colLen := strings.Index(strings.Trim(sql[colStart : ], empty), empty)
+	col := strings.Trim(sql[colStart : ], empty)[ : colLen]
+
+	pgMsg := fmt.Sprintf("column \"%s\" of relation \"%s\" contains null values", col, table)
+
+	errorResp := &pgproto3.ErrorResponse {
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		//pg没有对应的错误，因为pg允许创建表不带任何字段，这里返回mysql原始的错误信息
+		Message: pgMsg,
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+//handleTableNoColumn 处理创建表时没有声明字段的错误
+func handleTableNoColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	errorResp := &pgproto3.ErrorResponse {
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		//pg没有对应的错误，因为pg允许创建表不带任何字段，这里返回mysql原始的错误信息
+		Message: m.Message,
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+//handleInvalidGroupFuncUse 处理错误使用聚合函数的错误
+// eg. Invalid use of group function
+func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	where ,having := "WHERE","HAVING"
+	funcList := [...]string{"AVG(","BIT_AND(","BIT_OR(", "BIT_XOR(", "COUNT(", "GROUP_CONCAT(", "JSON_ARRAYAGG(","JSON_OBJECTAGG(",
+		"MAX(","MIN(","STD(","STDDEV(","STDDEV_POP(","STDDEV_SAMP(","SUM(","VAR_POP(","VAR_SAMP(","VARIANCE("}
+	upperSql := strings.ToUpper(sql)
+
+	//错误是where子句使用聚合函数。所以检查的起点就是where的位置，终点是having子句
+	whereIndex := strings.Index(upperSql, where)
+	havingIndex := strings.Index(upperSql, having)
+
+	//在where子句中的第一个聚合函数位置
+	firstIndex := len(sql)
+
+	for _,f := range funcList {
+		fIndex := strings.Index(upperSql, f)
+		if havingIndex == -1 {
+			if fIndex != -1 && fIndex > whereIndex && fIndex < firstIndex {
+				firstIndex = fIndex
+			}
+		} else {
+			if fIndex != -1 && fIndex < havingIndex && fIndex > whereIndex && fIndex < firstIndex {
+				firstIndex = fIndex
+			}
+		}
+	}
+
+	pgMsg := fmt.Sprintf("aggregate functions are not allowed in WHERE")
+	errorResp := &pgproto3.ErrorResponse {
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(firstIndex + 3),
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+
+
+//handleFiledSpecifiedTwice 字段声明超过一次，可能两次，三次，都报这个错
+// eg.Column 'name' specified twice
+func handleFiledSpecifiedTwice(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	msg, beforeColumn, empty, apostrophe := m.Message, "Column ", " ", "'"
+
+	colStart := strings.Index(msg, beforeColumn) + len(beforeColumn)
+	colLen := strings.Index(msg[colStart : ], empty)
+	col := strings.Trim(msg[colStart : colStart + colLen], apostrophe)
+
+	pgMsg := fmt.Sprintf("column \"%s\" specified more than once",col)
+
+	once := strings.Index(sql, col) + len(col)
+	twice := once + strings.Index(sql[once : ], col)
+
+	errorResp := &pgproto3.ErrorResponse{
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(twice + 3),
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+//handleUnknownTableInDelete 解决delete语法错误导致的错误信息
+func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	del, empty, point,comma := "DELETE", " ", ".",","
+	columnStart := strings.Index(strings.ToUpper(sql), del) + len(del)
+	cutSql := strings.Trim(sql[columnStart : ], empty)
+	// eg1. delete a.name from test
+	// eg2. delete id from test
+	// eg3 delete id,name from test
+	pointLen := strings.Index(cutSql, point)
+	commaLen := strings.Index(cutSql, comma)
+	emptyLen := strings.Index(cutSql, empty)
+	finalLen := len(cutSql)
+	if pointLen != -1 && finalLen > pointLen {
+		finalLen = pointLen
+	}
+	if commaLen != -1 && finalLen > commaLen {
+		finalLen = commaLen
+	}
+	if emptyLen != -1 && finalLen > emptyLen {
+		finalLen = emptyLen
+	}
+	column := cutSql[ : finalLen]
+	pgMsg := fmt.Sprintf("syntax error at or near \"%s\"", column)
+
+	position := strings.Index(sql, column) + 3
+
+	errorResp := &pgproto3.ErrorResponse{
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+//handleCantDropFieldOrKey 解决无法删除字段或键的错误
+func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+
+	msg, beforeColumn, beforeTable, empty := m.Message, "column ", "TABLE", " "
+	columnStart := strings.Index(msg, beforeColumn) + len(beforeColumn)
+	columnLen := strings.Index(msg[columnStart : ], empty)
+	column := msg[columnStart : columnStart + columnLen]
+
+	tableStart := strings.Index(strings.Trim(strings.ToUpper(sql), empty), beforeTable) + len(beforeTable)
+	cutSql := strings.Trim(sql[tableStart : ], empty)
+	tableLen := strings.Index(cutSql, empty) + 1
+	table := cutSql[:tableLen]
+
+	pgMsg := fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist",column, table)
+
+	errorResp := &pgproto3.ErrorResponse{
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		Message: pgMsg,
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+
+	return errorResp, nil
+}
+
+//handleMultiplePKDefined 处理多主键被定义的错误
+// eg. Multiple primary key defined
+func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+
+	msg, beforeTable, brackets, pk := m.Message, "TABLE ", "(", "PRIMARY KEY"
+	tableStart := strings.Index(strings.ToUpper(sql), beforeTable) + len(beforeTable)
+	tableLen := strings.Index(sql, brackets)
+	table := msg[tableStart : tableStart + tableLen]
+
+	firstPKSpec := strings.Index(strings.ToUpper(sql), pk) + len(pk)
+	position := firstPKSpec + strings.Index(strings.ToUpper(sql[firstPKSpec : ]), pk)
+	pgMsg := fmt.Sprintf("multiple primary keys for table \"%s\" are not allowed", table)
+
+	errorResp := &pgproto3.ErrorResponse{
+		Code: "tobe",
+		Severity: "ERROR",
+		Message: pgMsg,
+		Position: int32(position),
+	}
+	setFilePathAndLine(te,errorResp)
+
+	return errorResp, nil
+}
+
+
 // handleParseError 处理编译sql出错的信息
 // eg. You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 5 near "creat table student(id int);"
 func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
@@ -45,22 +255,13 @@ func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "42601",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
-	return errorResp, nil
-}
-
-//handleWrongFieldSpec 列指定符不正确
-func handleWrongFieldSpec(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1063 错误",
-	}
 	return errorResp, nil
 }
 
@@ -80,42 +281,12 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
-	return errorResp, nil
-}
-
-//handleDupKeyName 键名字冲突
-func handleDupKeyName(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1061 错误",
-	}
-	return errorResp, nil
-}
-
-//handleDupColumnName 字段名冲突
-func handleDupColumnName(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1060 错误",
-	}
-	return errorResp, nil
-}
-
-//handleIdentTooLong 名字太长
-func handleIdentTooLong(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1059 错误",
-	}
 	return errorResp, nil
 }
 
@@ -135,26 +306,6 @@ func handleWrongSumSelect(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 		Code: "XX0000",
 		Severity: "ERROR",
 		Message: "有待处理的MySQL 1057 错误",
-	}
-	return errorResp, nil
-}
-
-//handleWrongField 处理无法对字段xx分组的错误
-func handleWrongField(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1056 错误",
-	}
-	return errorResp, nil
-}
-
-//handleWrongFieldWithGroup 处理错误的分组列
-func handleWrongFieldWithGroup(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1055 错误",
 	}
 	return errorResp, nil
 }
@@ -197,42 +348,13 @@ func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
-	return errorResp, nil
-}
-
-//handleServerShutDown 处理中途停机错误
-func handleServerShutDown(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1053 错误",
-	}
-	return errorResp, nil
-}
-
-//handleColumnAmbiguous 处理字段多义，含糊不清错误
-func handleColumnAmbiguous(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1052 错误",
-	}
-	return errorResp, nil
-}
-
-//handleUnknownTable 处理未知的表错误
-func handleUnknownTable(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1051 错误",
-	}
 	return errorResp, nil
 }
 
@@ -249,52 +371,29 @@ func handleTableExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgprot
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResponse)
-	errorResponse.Message = pgMsg
 
 	return errorResponse, nil
 }
 
 //handleUnknownDB 处理数据库不存在的错误
+// eg. Unknown database 'testDB'
 func handleUnknownDB(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1049 错误",
-	}
-	return errorResp, nil
-}
+	msg, beforeDB, apostrophe,empty := m.Message, "database ", "'"," "
+	dbStart := strings.Index(msg, beforeDB) + len(beforeDB)
+	db := strings.Trim(strings.Trim(msg[dbStart : ], empty), apostrophe)
+	pgMsg := fmt.Sprintf("database \"%s\" does not exist\nkeep last connection",db)
 
-//handleBadNullColumn 处理字段xxx不能为空的错误
-func handleBadNullColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1048 错误",
+		Code: "tobe",
+		Severity: "FATAL",
+		Message: pgMsg,
 	}
-	return errorResp, nil
-}
-
-//handleUnknownCmd 处理未知的cmd命令
-func handleUnknownCmd(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1047 错误",
-	}
-	return errorResp, nil
-}
-
-//handleNoDBSelected 处理没有选择数据库的错误
-func handleNoDBSelected(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1046 错误",
-	}
+	setFilePathAndLine(te,errorResp)
 	return errorResp, nil
 }
 
@@ -312,295 +411,13 @@ func handleAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp,nil
-}
-
-//handleDBAccessDenied 处理连接数据库被拒的错误
-func handleDBAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1044 错误",
-	}
-	return errorResp, nil
-}
-
-//handleHandShakeError 处理握手错误
-func handleHandShakeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1043 错误",
-	}
-	return errorResp, nil
-}
-
-//handleBadHostError 处理主机名错误的信息
-func handleBadHostError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1042 错误",
-	}
-	return errorResp, nil
-}
-
-//handleOutOfResources 处理内存耗尽的错误
-func handleOutOfResources(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1041 错误",
-	}
-	return errorResp, nil
-}
-
-//handleConCountError 处理连接数过多的错误
-func handleConCountError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1040 错误",
-	}
-	return errorResp, nil
-}
-
-//handleOutOfSortMemory 处理排序内存溢出
-func handleOutOfSortMemory(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1038 错误",
-	}
-	return errorResp, nil
-}
-
-//handleOutOfMemory 处理内存溢出错误
-func handleOutOfMemory(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1037 错误",
-	}
-	return errorResp, nil
-}
-
-// handleOpenAsReadonly 处理表只读错误
-func handleOpenAsReadonly(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1036 错误",
-	}
-	return errorResp, nil
-}
-
-//handleOldKeyFile 处理过时的key文件错误
-func handleOldKeyFile(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1035 错误",
-	}
-	return errorResp, nil
-}
-
-//handleNotKeyFile 不正确的key file对于表xxx
-func handleNotKeyFile(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1034 错误",
-	}
-	return errorResp, nil
-}
-
-//handleNotFormFile 处理找不到记录的错误
-func handleNotFormFile(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1033 错误",
-	}
-	return errorResp, nil
-}
-
-//handleKeyNotFound 处理找不到键的错误
-func handleKeyNotFound(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1032 错误",
-	}
-	return errorResp, nil
-}
-
-
-//handleIllegalHA 表存储引擎没有这个选项
-func handleIllegalHA(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1031 错误",
-	}
-	return errorResp, nil
-}
-
-//handleGotErrno 处理存储引擎错误
-func handleGotErrno(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1030 错误",
-	}
-	return errorResp, nil
-}
-
-//handleFilSortAbort 处理排序中止错误
-func handleFilSortAbort(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1028 错误",
-	}
-	return errorResp, nil
-}
-
-//handleFileUsed 处理文件被锁导致的冲突
-func handleFileUsed(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1027 错误",
-	}
-	return errorResp, nil
-}
-
-//handleErrorOnWrite 处理写文件错误
-func handleErrorOnWrite(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1026 错误",
-	}
-	return errorResp, nil
-}
-
-//handleErrorOnRename 处理重命名错误
-func handleErrorOnRename(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1025 错误",
-	}
-	return errorResp, nil
-}
-
-//handleErrorOnRead 处理读文件出错信息
-func handleErrorOnRead(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1024 错误",
-	}
-	return errorResp, nil
-}
-
-// handleDupKey 处理外键重名导致的错误
-func handleDupKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1022 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCheckRead 处理读后记录变更错误
-func handleCheckRead(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1020 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCantReadDir
-func handleCantReadDir(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1018 错误",
-	}
-	return errorResp, nil
-}
-
-//handleFileNotFound 处理找不到文件错误
-func handleFileNotFound(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1017 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCantOpenFile 处理无法打开文件的错误
-func handleCantOpenFile(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1016 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCantLock 处理无法锁定文件的错误
-func handleCantLock(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1015 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCantGetStat 处理获取不到状态的错误
-func handleCantGetStat(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1013 错误",
-	}
-	return errorResp, nil
-}
-
-//handleCantFindSystemRec 处理读取不到系统表记录的错误
-func handleCantFindSystemRec(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1012 错误",
-	}
-	return errorResp, nil
-}
-
-//handleDBDropRmDir 处理MySQL data文件夹下有其他文件导致的报错
-func handleDBDropRmDir(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1010 错误",
-	}
-	return errorResp, nil
 }
 
 //handleDropDBFail 处理数据库不存在，删除数据库失败的错误信息
@@ -616,11 +433,11 @@ func handleDropDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te,errorResponse)
-	errorResponse.Message = pgMsg
 
 	return errorResponse, nil
 }
@@ -638,11 +455,11 @@ func handleCreateDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResponse)
-	errorResponse.Message = pgMsg
 
 	return errorResponse, nil
 }
@@ -663,11 +480,11 @@ func handleDataOutOfRange(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te,errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp,nil
 }
@@ -689,11 +506,11 @@ func handleDataTooLong(m *mysql.SQLError, te *terror.Error, sql string) (*pgprot
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -708,11 +525,11 @@ func handleWrongNumberOfColsInSelect(m *mysql.SQLError, te *terror.Error, sql st
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -729,11 +546,12 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
 	return errorResp, nil
 }
@@ -747,11 +565,11 @@ func handleSubqueryNo1Row(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message =  pgMsg
 
 	return errorResp, nil
 }
@@ -765,11 +583,11 @@ func handleNoPermissionToCreateUser(m *mysql.SQLError, te *terror.Error, sql str
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -788,11 +606,11 @@ func handleTableAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "2F004",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te,errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -812,11 +630,11 @@ func handleColumnAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "2F004",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -846,11 +664,11 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message = pgMsg
 
 	return errorResp, nil
 }
@@ -870,11 +688,12 @@ func handeleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pg
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
 	return errorResp, nil
 }
@@ -894,11 +713,12 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
 	return errorResp,nil
 }
@@ -919,11 +739,12 @@ func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "tobe",
+		Message: pgMsg,
+		Position: int32(position),
 		Detail: "",
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
-	errorResp.Message, errorResp.Position = pgMsg, int32(position)
 
 	return errorResp,nil
 }
