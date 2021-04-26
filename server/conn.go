@@ -37,18 +37,15 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/jackc/pgio"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"runtime"
 	"runtime/pprof"
@@ -2122,30 +2119,9 @@ func (cc *clientConn) PgOpenSessionAndDoAuth(ctx context.Context) error {
 		return err
 	}
 
-	// todo 增加密码验证
-	// 测试环境不做密码设置
 	authData := make([]byte, 0)
-
-	hasPassword := "YES"
-	if len(authData) == 0 {
-		hasPassword = "NO"
-	}
-
-	host, err := cc.PeerHost(hasPassword)
+	err = cc.DoAuth(ctx, &auth.UserIdentity{Username: cc.user, Hostname: ""}, authData, cc.salt)
 	if err != nil {
-		return err
-	}
-
-	// 测试环境不做密码认证
-	//if err := cc.DoAuth(ctx); err != nil {
-	//	return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
-	//}
-
-	if !cc.ctx.Auth(&auth.UserIdentity{Username: cc.user, Hostname: host}, authData, cc.salt) {
-		return errAccessDenied.FastGenByArgs(cc.user, host, hasPassword)
-	}
-
-	if err = cc.writeAuthenticationOK(ctx); err != nil {
 		return err
 	}
 
@@ -2160,101 +2136,76 @@ func (cc *clientConn) PgOpenSessionAndDoAuth(ctx context.Context) error {
 }
 
 // DoAuth 进行用户认证
-func (cc *clientConn) DoAuth(ctx context.Context) error {
-
-	// todo 查询是否需要密码，当不需要密码时直接发送 AuthenticationOK
-
+// PostgreSQL 认证时，客户端是不会主动发送认证密码的，需要服务端发出不同类型的密码认证请求，客户端才会返回相应的认证信息
+func (cc *clientConn) DoAuth(ctx context.Context, user *auth.UserIdentity, auth []byte, salt []byte) (err error) {
+	hasPassword := "NO"
+	user.Hostname, err = cc.PeerHost(hasPassword)
+	if err != nil {
+		return err
+	}
 	// 认证需要先发送一个 auth request 给客户端请求密码
 	// 认证形式： AuthenticationKerberosV5 AuthenticationCleartextPassword AuthenticationCryptPassword AuthenticationMD5Password
 	// AuthenticationSCMCredential AuthenticationGSS AuthenticationSSPI AuthenticationGSSContinue
 	// 当客户端发送密码后进行验证
 	// 最后认证成功
 
-	// 首先发送一个 authRequest, 这里使用 MD5 加密要求
-	// 前端必须返回一个 MD5 加密的密码进行验证
-	// salt 为随机生成的 4 个字节
-	a := make([]byte, 4)
-	rand.Read(a)
-	salt := [4]byte{a[0], a[1], a[2], a[3]}
-	authRequest := pgproto3.AuthenticationMD5Password{Salt: salt}
-	if err := cc.WriteData(authRequest.Encode(nil)); err != nil {
-		return errors.New("write AuthenticationMD5Password to client failed: " + err.Error())
-	}
+	// 判断用户是否需要密码登录
+	if cc.ctx.NeedPassword(user) {
+		hasPassword = "YES"
 
-	if err := cc.flush(ctx); err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
-		return err
+		// 发送一个 authRequest, 这里使用 MD5 加密要求
+		// 前端必须返回一个 MD5 加密的密码进行验证
+		// salt 为随机生成的 4 个字节，这里直接取 cc 中生成是 salt 前四位
+		salt := [4]byte{cc.salt[0], cc.salt[1], cc.salt[2], cc.salt[3]}
+		authRequest := pgproto3.AuthenticationMD5Password{Salt: salt}
+		if err = cc.WriteData(authRequest.Encode(nil)); err != nil {
+			return errors.New("write AuthenticationMD5Password to client failed: " + err.Error())
+		}
+
+		if err = cc.flush(ctx); err != nil {
+			return err
+		}
+	} else {
+		// 不需要密码则直接空密码验证
+		if !cc.ctx.Auth(user, auth, cc.salt) {
+			return errAccessDenied.FastGenByArgs(cc.user, user.Hostname, hasPassword)
+		}
+
+		if err = cc.writeAuthenticationOK(ctx); err != nil {
+			return err
+		}
+
+		return
 	}
 
 	// 当发送完成 AuthRequest 后，客户端（SQL Shell）会退出该连接
 	// 然后等待用户重新输入了密码后再次建立连接
 	// 当前仅在 SQL Shell 上运行，至少在 SQL Shell 中存在该问题
 	// 所以在这里进行一个字节的读取时需要判断，当错误为 EOF 时直接正常结束即可
-
 	// 读取客户端发来的密码
 	// 格式： 'p' + len + 'password' + '0'
 	// 长度 = len + password + 1
-	msgType := make([]byte, 1)
-	if _, err := io.ReadFull(cc.bufReadConn, msgType); err != nil {
-		if err.Error() == "EOF" {
-			return err
-		} else {
-			return errors.New("read packet failed：" + err.Error())
-		}
-	}
-	if msgType[0] != 'p' {
-		return errors.New("received is not a password packet" + string(msgType[0]))
-	}
-	pwMessageLen := make([]byte, 4)
-	if _, err := io.ReadFull(cc.bufReadConn, pwMessageLen); err != nil {
-		return errors.New("read packet failed：" + err.Error())
-	}
-
-	pdMessage := make([]byte, int(binary.BigEndian.Uint32(pwMessageLen)-4))
-	if _, err := io.ReadFull(cc.bufReadConn, pdMessage); err != nil {
+	auth, err = cc.readPacket()
+	if err != nil {
 		return err
 	}
 
-	// todo 获取用户名对应的密码进行比较
-	// 测试阶段先假设该数据库密码为 password123
-	// 密码加密方式： 'md5'+md5Sum(md5Sum(password + user) + salt)
-	// 注意： 字符串为16进制 string 两次 md5Sum 输出的值都需要转为16进制的 string 类型再继续运算
-	password := "password123"
-	x := md5.Sum([]byte(password + cc.user))
-	user := hex.EncodeToString(x[:]) + string(salt[:])
-	y := md5.Sum([]byte(user))
-	pd := "md5" + hex.EncodeToString(y[:])
-	if pd == string(pdMessage[:len(pdMessage)-1]) {
-		// 发送密码认证成功 AuthenticationOk
-		return cc.writeAuthenticationOK(ctx)
-	}
-	// 发送密码认证失败 ErrorResponse
-	// 字段意义解释： https://www.postgresql.org/docs/13/protocol-error-fields.html
-	errorResponse := pgproto3.ErrorResponse{
-		Severity:            "ERROR",
-		SeverityUnlocalized: "",
-		Code:                "28P01",
-		Message:             "invalid password",
-		Detail:              "",
-		Hint:                "",
-		Position:            0,
-		InternalPosition:    0,
-		Line:                0,
-	}
-	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
-		return errors.New("write ErrorResponse to client failed：" + err.Error())
+	if auth[0] != 'p' {
+		return errors.New("received is not a password packet" + string(auth[0]))
 	}
 
-	if err := cc.flush(ctx); err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
+	// 去掉第一个 'p' 和最后一个结束符，中间的为认证信息
+	auth = auth[1:len(auth)-1]
+
+	if !cc.ctx.Auth(user, auth, cc.salt) {
+		return errAccessDenied.FastGenByArgs(cc.user, user.Hostname, hasPassword)
+	}
+
+	if err = cc.writeAuthenticationOK(ctx); err != nil {
 		return err
 	}
 
-	err := errors.New("access denied: invalid password")
-
-	return err
+	return
 }
 
 // writeSSLRequest

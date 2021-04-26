@@ -92,6 +92,10 @@ type QueryCtx interface {
 	// Auth verifies user's authentication.
 	Auth(user *auth.UserIdentity, auth []byte, salt []byte) bool
 
+	// NeedPassword Determine whether the user needs a password for authentication
+	// PgSQL Need
+	NeedPassword(user *auth.UserIdentity) bool
+
 	// ShowProcess shows the information about the session.
 	ShowProcess() *util.ProcessInfo
 

@@ -18,6 +18,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strconv"
@@ -155,6 +157,9 @@ var (
 )
 
 func main() {
+	go func() {
+		fmt.Println(http.ListenAndServe("0.0.0.0:8005", nil))
+	}()
 	flag.Parse()
 	if *version {
 		fmt.Println(printer.GetTiDBInfo())

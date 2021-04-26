@@ -328,6 +328,11 @@ func (tc *TiDBContext) Auth(user *auth.UserIdentity, auth []byte, salt []byte) b
 	return tc.session.Auth(user, auth, salt)
 }
 
+// NeedPassword implements QueryCtx NeedPassword method
+func (tc *TiDBContext) NeedPassword(user *auth.UserIdentity) bool {
+	return tc.session.NeedPassword(user)
+}
+
 // FieldList implements QueryCtx FieldList method.
 func (tc *TiDBContext) FieldList(table string) (columns []*ColumnInfo, err error) {
 	fields, err := tc.session.FieldList(table)

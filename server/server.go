@@ -411,6 +411,11 @@ func (s *Server) onConn(conn *clientConn) {
 			})
 			terror.Log(err)
 		}
+
+		// write err to client
+		_ = conn.writeError(ctx, err)
+		_ = conn.flush(ctx)
+
 		// Some keep alive services will send request to TiDB and disconnect immediately.
 		// So we only record metrics.
 		metrics.HandShakeErrorCounter.Inc()
