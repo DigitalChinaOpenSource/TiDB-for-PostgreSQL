@@ -59,6 +59,10 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	//stmt, columns, params, err := cc.ctx.Prepare(parser.Query)
 	stmt, _, _, err := cc.ctx.Prepare(parser.Query, parser.Name)
 
+	if err != nil {
+		return err
+	}
+
 	vars := cc.ctx.GetSessionVars()
 
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
@@ -71,10 +75,6 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	}
 
 	stmt.SetParamsType(paramTypes)
-
-	if err != nil {
-		return err
-	}
 
 	err = cc.writeParseComplete()
 	if err != nil {
@@ -115,7 +115,7 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		paramTypes := stmt.GetParamsType()
 
 		args := make([]types.Datum, numParams)
-		err = parseBindArgs(cc.ctx.GetSessionVars().StmtCtx, args, paramTypes, bind)
+		err = parseBindArgs(cc.ctx.GetSessionVars().StmtCtx, args, paramTypes, bind, stmt.BoundParams())
 		stmt.Reset()
 		if err != nil {
 			return errors.Annotate(err, cc.preparedStmt2String(stmtID))
@@ -246,11 +246,13 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 // handleStmtClose 处理 Close 请求
 func (cc *clientConn) handleStmtClose(ctx context.Context, close pgproto3.Close) error {
 	vars := cc.ctx.GetSessionVars()
-	stmtID, ok := vars.PreparedStmtNameToID[close.Name]
-	if !ok {
-		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_close")
+	var stmtID uint32
+	if close.ObjectType == 'S' {
+		stmtID = vars.PreparedStmtNameToID[close.Name]
+	} else {
+		stmtID = vars.Portal[close.Name]
 	}
+
 	stmt := cc.ctx.GetStatement(int(stmtID))
 	if stmt != nil {
 		return stmt.Close()
@@ -311,10 +313,15 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 }
 
 // parseBindArgs 将客户端传来的参数值解析为 Datum 结构
-func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind) error {
+// PgSQL Modified
+func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind, boundParams [][]byte) error {
 	// todo 传参为文本 text 格式时候的处理
 
+
 	for i := 0; i < len(args); i++ {
+
+		// todo 使用boundParams
+
 		if bind.Parameters[i] == nil {
 			var nilDatum types.Datum
 			nilDatum.SetNull()
@@ -322,8 +329,111 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 		}
 
-		args[i] = types.NewBytesDatum(bind.Parameters[i])
-		continue
+		// todo isUnsigned
+		// isUnsigned 暂时Pg无法判断, 默认为有符号
+		isUnsigned := false
+
+		switch paramTypes[i] {
+		case mysql.TypeNull:
+			var nilDatum types.Datum
+			nilDatum.SetNull()
+			args[i] = nilDatum
+			continue
+		case mysql.TypeTiny:{
+			if isUnsigned {
+				args[i] = types.NewUintDatum(uint64(uint8(bind.Parameters[i][0])))
+			} else {
+				args[i] = types.NewIntDatum(int64(int8(bind.Parameters[i][0])))
+			}
+			continue
+		}
+
+		case mysql.TypeShort, mysql.TypeYear:
+			valInt, err := strconv.Atoi(string(bind.Parameters[i]))
+			if err != nil {
+				return err
+			}
+			if isUnsigned {
+				args[i] = types.NewUintDatum(uint64(uint16(valInt)))
+			} else {
+				args[i] = types.NewIntDatum(int64(int16(valInt)))
+			}
+			continue
+
+		case mysql.TypeInt24, mysql.TypeLong:
+			valInt, err :=strconv.Atoi(string(bind.Parameters[i]))
+			if err != nil {
+				return err
+			}
+			if isUnsigned {
+				args[i] = types.NewUintDatum(uint64(uint32(valInt)))
+			} else {
+				args[i] = types.NewIntDatum(int64(int32(valInt)))
+			}
+			continue
+
+		case mysql.TypeLonglong:
+			valInt, err :=strconv.Atoi(string(bind.Parameters[i]))
+			if err != nil {
+				return err
+			}
+			if isUnsigned {
+				args[i] = types.NewUintDatum(uint64(valInt))
+			} else {
+				args[i] = types.NewIntDatum(int64(valInt))
+			}
+			continue
+
+		case mysql.TypeFloat:
+			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 32)
+			if err != nil {
+				return err
+			}
+			args[i] = types.NewFloat32Datum(float32(valFloat))
+			continue
+
+		case mysql.TypeDouble:
+			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 64)
+			if err != nil {
+				return err
+			}
+			args[i] = types.NewFloat64Datum(valFloat)
+			continue
+
+		case mysql.TypeDate, mysql.TypeTimestamp, mysql.TypeDatetime:
+			// fixme 日期待测试 待修复
+			args[i] = types.NewDatum(string(bind.Parameters[i]))
+			continue
+
+		case mysql.TypeDuration:
+			// fixme 日期待测试 待修复
+			args[i] = types.NewDatum(string(bind.Parameters[i]))
+			continue
+		case mysql.TypeNewDecimal:
+			// fixme decimal 待测试 待修复
+			var dec types.MyDecimal
+			err := sc.HandleTruncate(dec.FromString(bind.Parameters[i]))
+			if err != nil {
+				return err
+			}
+			args[i] = types.NewDecimalDatum(&dec)
+			continue
+
+		case mysql.TypeBlob, mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob:
+			// fixme 待测试 待修复
+			args[i] = types.NewBytesDatum(bind.Parameters[i])
+			continue
+
+		case mysql.TypeUnspecified, mysql.TypeVarchar, mysql.TypeVarString, mysql.TypeString,
+			mysql.TypeEnum, mysql.TypeSet, mysql.TypeGeometry, mysql.TypeBit:
+			// fixme decimal 待测试 待修复
+			tmp := string(hack.String(bind.Parameters[i]))
+			args[i] = types.NewDatum(tmp)
+			continue
+		default:
+			err := errUnknownFieldType.GenWithStack("stmt unknown field type %d", paramTypes[i])
+			return err
+		}
 	}
 
 	return nil
@@ -368,9 +478,9 @@ func parseExecArgs(sc *stmtctx.StatementContext, args []types.Datum, boundParams
 		switch tp {
 		case mysql.TypeNull:
 			var nilDatum types.Datum
-			nilDatum.SetNull()
-			args[i] = nilDatum
-			continue
+				nilDatum.SetNull()
+				args[i] = nilDatum
+				continue
 
 		case mysql.TypeTiny:
 			if len(paramValues) < (pos + 1) {
