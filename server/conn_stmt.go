@@ -62,6 +62,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	if err != nil {
 		return err
 	}
+
 	vars := cc.ctx.GetSessionVars()
 
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中

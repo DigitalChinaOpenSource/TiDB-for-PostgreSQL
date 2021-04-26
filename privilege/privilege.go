@@ -48,6 +48,10 @@ type Manager interface {
 	// ConnectionVerification verifies user privilege for connection.
 	ConnectionVerification(user, host string, auth, salt []byte, tlsState *tls.ConnectionState) (string, string, bool)
 
+	// NeedPassword Determine whether the user needs a password for authentication
+	// PgSQL Need
+	NeedPassword(user, host string) bool
+
 	// GetAuthWithoutVerification uses to get auth name without verification.
 	GetAuthWithoutVerification(user, host string) (string, string, bool)
 

@@ -1062,7 +1062,7 @@ func (e *SimpleExec) executeSetPwd(s *ast.SetPwdStmt) error {
 	}
 
 	// update mysql.user
-	sql := fmt.Sprintf(`UPDATE %s.%s SET authentication_string='%s' WHERE User='%s' AND Host='%s';`, mysql.SystemDB, mysql.UserTable, auth.EncodePassword(s.Password), u, h)
+	sql := fmt.Sprintf(`UPDATE %s.%s SET authentication_string='%s' WHERE User='%s' AND Host='%s';`, mysql.SystemDB, mysql.UserTable, auth.EncodePasswordByMD5(s.User.Username, s.Password), u, h)
 	_, _, err = e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
 	domain.GetDomain(e.ctx).NotifyUpdatePrivilege(e.ctx)
 	return err
