@@ -1092,20 +1092,17 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 		}
 	}
 
-	cc.lastCode = m.Code
+	// todo 处理某些情况下从lastPacket获取不到sql的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
+	//读包获取sql，去除第一位的类型
+	sql := string(cc.lastPacket)[1 : ]
+
 	// todo 完成MySQL错误与PgSQL错误的转换和返回
 	// https://www.postgresql.org/docs/13/errcodes-appendix.html
-	errorResponse := pgproto3.ErrorResponse{
-		Severity:            "ERROR",
-		SeverityUnlocalized: "",
-		Code:                "28P01",
-		Message:             m.Message,
-		Detail:              "",
-		Hint:                "",
-		Position:            0,
-		InternalPosition:    0,
-		Line:                0,
+	errorResponse, err := convertMysqlErrorToPgError(m, te, sql)
+	if err != nil {
+		return err
 	}
+	cc.lastCode = m.Code
 
 	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
 		return err
@@ -1372,7 +1369,6 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 		metrics.ExecuteErrorCounter.WithLabelValues(metrics.ExecuteErrorToLabel(err)).Inc()
 		return err
 	}
-
 	if len(stmts) == 0 {
 		return cc.writeCommandComplete()
 	}
@@ -1655,12 +1651,10 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			}
 
 			pgio.SetInt32(data[1:], int32(len(data[1:])))
-
 			if err = cc.WriteData(data); err != nil {
 				return err
 			}
 		}
-
 		if stmtDetail != nil {
 			stmtDetail.WriteSQLRespDuration += time.Since(start)
 		}
@@ -2320,7 +2314,6 @@ func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) erro
 	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
 		return err
 	}
-
 	return cc.flush(ctx)
 }
 
@@ -2464,4 +2457,71 @@ func loadSSLCertificates()(tlsConfig *tls.Config,err error){
 		Certificates: []tls.Certificate{tlsCert},
 	}
 	return tlsConfig,nil
+}
+// convertMysqlErrorToPgError 从mysql消息体中获取信息转换出pgsql所需要的信息
+func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string) (response *pgproto3.ErrorResponse, err error) {
+	switch m.Code {
+	case 1007:
+		return handleCreateDBFail(m,te,sql)
+	case 1008:
+		return handleDropDBFail(m,te,sql)
+	case 1045:
+		return handleAccessDenied(m,te,sql)
+	case 1049:
+		return handleUnknownDB(m,te,sql)
+	case 1050:
+		return handleTableExists(m,te,sql)
+	case 1054:
+		return handleUnknownColumn(m,te, sql)
+	case 1062:
+		return handleDuplicateKey(m,te,sql)
+	case 1064:
+		return handleParseError(m,te, sql)
+	case 1068:
+		return handleMultiplePKDefined(m, te, sql)
+	case 1091:
+		return handleCantDropFieldOrKey(m, te, sql)
+	case 1105:
+		return handleTypeError(m, te, sql)
+	case 1109:
+		return handleUnknownTableInDelete(m, te, sql)
+	case 1110:
+		return handleFiledSpecifiedTwice(m, te, sql)
+	case 1111:
+		return handleInvalidGroupFuncUse(m, te, sql)
+	case 1113:
+		return handleTableNoColumn(m, te, sql)
+	case 1136:
+		return handeleColumnMisMatch(m, te,sql)
+	case 1138:
+		return handleInvalidUseOfNull(m, te,sql)
+	case 1142:
+		return handleTableAccessDenied(m, te, sql)
+	case 1143:
+		return handleColumnAccessDenied(m, te, sql)
+	case 1146:
+		return handleRelationNotExists(m, te, sql)
+	case 1211:
+		return handleNoPermissionToCreateUser(m, te, sql)
+	case 1222:
+		return handleWrongNumberOfColsInSelect(m, te, sql)
+	case 1242:
+		return handleSubqueryNo1Row(m ,te, sql)
+	case 1248:
+		return handleDerivedMustHaveAlias(m, te, sql)
+	case 1264:
+		return handleDataOutOfRange(m, te, sql)
+	case 1364:
+		return handleNoDefaultValue(m, te, sql)
+	case 1406:
+		return handleDataTooLong(m, te, sql)
+	case 1426:
+		return handleTooBigPrecision(m, te, sql)
+	default:
+		return &pgproto3.ErrorResponse {
+			Code: "MySQL"+strconv.Itoa(int(m.Code)),
+			Severity: "ERROR",
+			Message: "Unknown Error: " + m.Message,
+		}, err
+	}
 }
