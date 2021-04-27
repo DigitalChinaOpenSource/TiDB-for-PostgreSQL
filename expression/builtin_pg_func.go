@@ -1,6 +1,7 @@
 package expression
 
 import (
+	"fmt"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
@@ -29,6 +30,7 @@ func (c *currentDatabaseFunctionClass) getFunction(ctx sessionctx.Context, args 
 	return sig, nil
 }
 
+//set_config
 
 type pgSettingsDatabaseFunctionClass struct {
 	baseFunctionClass
@@ -68,6 +70,8 @@ func (b *builtinPgSettingsSig) evalString(row chunk.Row) (string, bool, error) {
 	}
 	return currentSysVals, currentSysVals == "", nil
 }
+
+//pg_encoding_to_char
 
 type pgEncodingToCharFunctionClass struct {
 	baseFunctionClass
@@ -156,6 +160,7 @@ var encodingToChar =[]EncodingToInt{
 	{"SHIFT_JIS_2004", 932},
 }
 
+//pg_has_database_privilege
 
 type pgHasDatabasePrivilegeFunctionClass struct {
 	baseFunctionClass
@@ -197,5 +202,250 @@ func (b *builtinPgHasDatabasePrivilegeSig) evalString(row chunk.Row)(string, boo
 	return "true", false, nil
 }
 
+//pg_has_table_privilege
+
+type pgHasTablePrivilegeFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgHasTablePrivilegeFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil {
+		return nil ,err
+	}
+	argsTps := make([]types.EvalType,0,3)
+	argsTps = append(argsTps, types.ETString, types.ETString)
+	if len(args) > 2 {
+		argsTps = append(argsTps)
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argsTps...)
+	if err!=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgHasTablePrivilegeSig{bf}
+	return sig, nil
+}
+
+type builtinPgHasTablePrivilegeSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgHasTablePrivilegeSig) Clone() builtinFunc {
+	newSig := &builtinPgHasTablePrivilegeSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgHasTablePrivilegeSig) evalString(row chunk.Row)(string, bool, error){
+
+	return "true", false, nil
+}
+
+//pg_has_schema_privilege
+
+type pgHasSchemaPrivilegeFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgHasSchemaPrivilegeFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil {
+		return nil ,err
+	}
+	argsTps := make([]types.EvalType,0,3)
+	argsTps = append(argsTps, types.ETString, types.ETString)
+	if len(args) > 2 {
+		argsTps = append(argsTps)
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argsTps...)
+	if err!=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgHasSchemaPrivilegeSig{bf}
+	return sig, nil
+}
+
+type builtinPgHasSchemaPrivilegeSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgHasSchemaPrivilegeSig) Clone() builtinFunc {
+	newSig := &builtinPgHasSchemaPrivilegeSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgHasSchemaPrivilegeSig) evalString(row chunk.Row)(string, bool, error){
+
+	return "true", false, nil
+}
+
+// pg_is_in_recovery
+
+type pgIsInRecoveryFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgIsInRecoveryFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString)
+	if err != nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgIsInRecovery{bf}
+	return sig, nil
+}
+
+type builtinPgIsInRecovery struct {
+	baseBuiltinFunc
+}
+
+//暂且先这样处理,这里涉及到Pg内部的系统逻辑,这里没有合适的方法去实现
+func (b *builtinPgIsInRecovery) evalString(row chunk.Row)(string, bool, error){
+
+	return "FALSE", false, nil
+}
+
+// pg_is_wal_replay_paused
+type pgIsWalReplayPausedFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgIsWalReplayPausedFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString)
+	if err != nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgIsWalReplayPaused{bf}
+	return sig, nil
+}
+
+type builtinPgIsWalReplayPaused struct {
+	baseBuiltinFunc
+}
+
+//todo 暂且先这样处理,这里涉及到Pg内部的系统逻辑,这里没有合适的方法去实现
+func (b *builtinPgIsWalReplayPaused) evalString(row chunk.Row)(string, bool, error){
+	return "TRUE", false, nil
+}
+
+// pg_get_userbyid
+type pgGetUserByIdFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgGetUserByIdFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgGetUserByIdSig{bf}
+	return sig, nil
+}
+
+type builtinPgGetUserByIdSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgGetUserByIdSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgGetUserByIdSig) evalString(row chunk.Row)(string, bool, error){
+	id, isNull, err := b.args[0].EvalInt(b.ctx,row)
+	if isNull || err != nil {
+		return "", isNull, err
+	}
+	userName := fmt.Sprintf("unknown(OID=%d)", id)
+	if id == 10{
+		userName = b.ctx.GetSessionVars().User.Username
+	}
+	return userName, false, nil
+}
+
+// PgFuncShobjDescription
+type pgShobjDescriptionFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgShobjDescriptionFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt, types.ETString)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgShobjDescriptionSig{bf}
+	return sig, nil
+}
+
+type builtinPgShobjDescriptionSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgShobjDescriptionSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgShobjDescriptionSig) evalString(row chunk.Row)(string, bool, error){
+
+	return "[null]", false, nil
+}
+
+// PgFuncObjDescription
+type pgObjDescriptionFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgObjDescriptionFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgObjDescriptionSig{bf}
+	return sig, nil
+}
+
+type builtinPgObjDescriptionSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgObjDescriptionSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgObjDescriptionSig) evalString(row chunk.Row)(string, bool, error){
+	return "[null]", false, nil
+}
 
 

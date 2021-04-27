@@ -315,6 +315,7 @@ func bootstrap(s Session) {
 		if dom.DDL().OwnerManager().IsOwner() {
 			doDDLWorks(s)
 			doDMLWorks(s)
+			doCreatePgViewsWorks(s)
 			logutil.BgLogger().Info("bootstrap successful",
 				zap.Duration("take time", time.Since(startTime)))
 			return
@@ -1303,7 +1304,6 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateExprPushdownBlacklist)
 	// Create opt_rule_blacklist table.
 	mustExecute(s, CreateOptRuleBlacklist)
-
 	// Create postgres Database
 	mustExecute(s,"CREATE DATABASE IF NOT EXISTS postgres;")
 	// Create postgres pg_aggregate Table
@@ -1431,6 +1431,8 @@ func doDDLWorks(s Session) {
 	// Create postgres pg_user_mapping Table
 	mustExecute(s, CreateTablePgUserMapping)
 
+	mustExecute(s, CreateTablePgAllSettings)
+
 	mustExecute(s, "USE postgres;")
 	// Create postgres pg_roles View
 	mustExecute(s, CreateViewPgRoles)
@@ -1440,8 +1442,20 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateViewPgUser)
 	// Create postgres pg_group View
 	mustExecute(s, CreateViewPgGroup)
+
+	mustExecute(s, CreateViewPgSettings)
+
+	// Create postgres Database
+	mustExecute(s,"CREATE DATABASE IF NOT EXISTS pg_catalog;")
+
+	mustExecute(s , CreatePgCalogViewPgRoles)
 }
 
+func doCreatePgViewsWorks(s Session){
+	mustExecute(s, "USE postgres")
+
+	//mustExecute(s, CreateViewPgRoles)
+}
 // doDMLWorks executes DML statements in bootstrap stage.
 // All the statements run in a single transaction.
 func doDMLWorks(s Session) {
@@ -1499,6 +1513,12 @@ func doDMLWorks(s Session) {
 	mustExecute(s, DataForTablePgTablespace)
 
 	mustExecute(s, DataForTablePgNamespace)
+
+	mustExecute(s, DataForTablePgAllSettings)
+
+	mustExecute(s ,DataForTablePgProc)
+
+	mustExecute(s, DataForTablePgClass)
 
 	_, err := s.Execute(context.Background(), "COMMIT")
 	if err != nil {

@@ -902,6 +902,13 @@ var funcs = map[string]functionClass{
 	ast.PgFuncSetConfig: &pgSettingsDatabaseFunctionClass{baseFunctionClass{ast.PgFuncSetConfig,2,3}},
 	ast.PgFuncEncodingToChar: &pgEncodingToCharFunctionClass{baseFunctionClass{ast.PgFuncEncodingToChar,1,1}},
 	ast.PgFuncHasDatabasePrivilege: &pgHasDatabasePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasDatabasePrivilege,2,3}},
+	ast.PgFuncHasTablePrivilege: &pgHasTablePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasTablePrivilege,2,3}},
+	ast.PgFuncHasSchemaPrivilege: &pgHasSchemaPrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasSchemaPrivilege,2,3}},
+	ast.PgFuncIsInRecovery: &pgIsInRecoveryFunctionClass{baseFunctionClass{ast.PgFuncIsInRecovery,0,0}},
+	ast.PgFuncIsWalReplayPaused: &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused,0,0}},
+	ast.PgFuncGetUserById: &pgGetUserByIdFunctionClass{baseFunctionClass{ast.PgFuncGetUserById,1,1}},
+	ast.PgFuncShobjDescription: &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription,2,2}},
+	ast.PgFuncObjDescription: &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription,1,1}},
 }
 
 // IsFunctionSupported check if given function name is a builtin sql function.
