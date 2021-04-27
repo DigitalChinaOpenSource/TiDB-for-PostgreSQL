@@ -1050,17 +1050,22 @@ func (cc *clientConn) flush(ctx context.Context) error {
 	return cc.pkt.flush()
 }
 
+// 这个暂且先这么写,后面是否选择使用,待定
 func (cc *clientConn) writeOK(ctx context.Context) error {
-	msg := cc.ctx.LastMessage()
-	return cc.writeOkWith(ctx, msg, cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), cc.ctx.Status(), cc.ctx.WarningCount())
+	//msg := cc.ctx.LastMessage()
+	if err := cc.writeCommandComplete(); err != nil {
+		return err
+	}
+	return cc.writeReadForQuery(ctx,cc.ctx.Status())
 }
 
+// 这个方法没什么用,后面可以考虑删除
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
 
-	return cc.writeReadForQuery(ctx, status)
+	return nil
 }
 
 // writeError 向客户端写回错误信息
@@ -1365,7 +1370,7 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 		return err
 	}
 	if len(stmts) == 0 {
-		return cc.writeOK(ctx)
+		return cc.writeCommandComplete()
 	}
 
 	var appendMultiStmtWarning bool
@@ -1431,24 +1436,41 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 		if err != nil {
 			return err
 		}
+
+		// 如果是预处理查询,则不需要返回ReadyForQuery
+		isPrepareStmt := rs.IsPrepareStmt()
+		if isPrepareStmt{
+			return nil
+		}
 	} else {
 		var handled bool
-		handled, err = cc.handleQuerySpecial(ctx, status)
+		// 对stmt做一个特殊的处理
+		err = cc.handleQueryWithStmt(stmt)
+		if err != nil {
+			return err
+		}
+		handled, err = cc.handleQuerySpecial(ctx)
 		if handled {
 			execStmt := cc.ctx.Value(session.ExecStmtVarKey)
 			if execStmt != nil {
 				execStmt.(*executor.ExecStmt).FinishExecuteStmt(0, err == nil, false)
 			}
-
 		}
 		if err != nil {
+			return err
+		}
+	}
+
+	// 如果是最后一个查询,则需要返回ReadyForQuery
+	if lastStmt{
+		if err:= cc.writeReadForQuery(ctx,status);err!=nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bool, error) {
+func (cc *clientConn) handleQuerySpecial(ctx context.Context) (bool, error) {
 	handled := false
 	loadDataInfo := cc.ctx.Value(executor.LoadDataVarKey)
 	if loadDataInfo != nil {
@@ -1476,7 +1498,24 @@ func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bo
 			return handled, err
 		}
 	}
-	return handled, cc.writeOkWith(ctx, cc.ctx.LastMessage(), cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), status, cc.ctx.WarningCount())
+	return handled, cc.writeCommandComplete()
+}
+
+func (cc *clientConn) handleQueryWithStmt(stmt ast.StmtNode) error{
+	// 判断 stmt 的类型
+	// 如果是 SET 类型的语句
+	// 其余的暂不做处理
+	if set, OK := stmt.(*ast.SetStmt);OK {
+		key := set.Variables[0].Name
+		value := set.Variables[0].Value.(ast.ValueExpr).GetDatumString()
+		par := make(map[string]string)
+		par[key]=value
+		if err := cc.writeParameterStatus(par); err != nil{
+			return err
+		}
+	}
+
+	return nil
 }
 
 // handleFieldList returns the field list for a table.
@@ -1560,14 +1599,13 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 // binary specifies the way to dump data. It throws any error while dumping data.
 // serverStatus, a flag bit represents server information
 // PostgreSQL Modified
+// 判断是否为预处理查询,决定是否返回readyQuery,不在这儿做
 func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
 	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
-	isPrepareStmt := rs.IsPrepareStmt()
-
 	// 当为预处理查询执行时，在执行完成后不需要返回 RowDescription
-	gotColumnInfo := isPrepareStmt
+	gotColumnInfo := rs.IsPrepareStmt()
 
 	var stmtDetail *execdetails.StmtExecDetails
 	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
@@ -1626,12 +1664,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		return err
 	}
 
-	// 当为预处理查询执行时，在执行完成后不需要返回 ReadyForQuery
-	if isPrepareStmt {
-		return nil
-	}
-
-	return cc.writeReadForQuery(ctx, serverStatus)
+	return nil
 }
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
@@ -1988,8 +2021,18 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 		return err
 	}
 
+	parameters := map[string]string{
+		"client_encoding": "UTF8",
+		"DateStyle": "ISO, YMD",
+		"integer_datetimes": "on",
+		"is_superuser": "on",
+		"server_encoding": "UTF8",
+		"server_version": "8.3.11",
+		"TimeZone": "PRC",
+	}
+
 	// 发送 ParameterStatus
-	if err := cc.writeParameterStatus(); err != nil{
+	if err := cc.writeParameterStatus(parameters); err != nil{
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2172,17 +2215,7 @@ func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) er
 
 // writeParameterStatus 用于写回一些参数给客户端 ParameterStatus
 // pgAdmin 需要 client_encoding 这个参数
-func (cc *clientConn) writeParameterStatus() error {
-	parameters := map[string]string{
-		"client_encoding": "UTF8",
-		"DateStyle": "ISO, YMD",
-		"integer_datetimes": "on",
-		"is_superuser": "on",
-		"server_encoding": "UTF8",
-		"server_version": "8.3.11",
-		"TimeZone": "PRC",
-	}
-
+func (cc *clientConn) writeParameterStatus(parameters map[string]string) error {
 	for k ,v := range parameters{
 		parameterStatus := &pgproto3.ParameterStatus{Name: k, Value: v}
 		if err :=  cc.WriteData(parameterStatus.Encode(nil)); err != nil{
@@ -2227,6 +2260,8 @@ func (cc *clientConn) writeCommandComplete() error {
 	// mysql 中暂且不知道是否存在oid，现在默认为 0
 	if stmtType == "INSERT" {
 		msg = stmtType + " 0 " + affectedRows
+	} else if stmtType == "SET" {
+		msg = stmtType
 	} else {
 		msg = stmtType + " " + affectedRows
 	}
@@ -2298,6 +2333,9 @@ func (cc *clientConn) WriteData(data []byte) error {
 func convertColumnInfoToRowDescription(columns []*ColumnInfo) pgproto3.RowDescription {
 	// todo 完善两者字段结构信息的转换
 
+	if strings.Contains(columns[0].Name,"("){
+		columns[0].Name = strings.Split(columns[0].Name,"(")[0]
+	}
 	fieldDescriptions := make([]pgproto3.FieldDescription, len(columns))
 	for index, _ := range columns {
 		fieldDescriptions[index] = pgproto3.FieldDescription{

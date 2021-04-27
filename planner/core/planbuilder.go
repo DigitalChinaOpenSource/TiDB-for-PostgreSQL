@@ -1912,6 +1912,7 @@ func (b *PlanBuilder) buildShow(ctx context.Context, show *ast.ShowStmt) (Plan, 
 			IfNotExists: show.IfNotExists,
 			GlobalScope: show.GlobalScope,
 			Extended:    show.Extended,
+			VariableName:show.VariableName,
 		},
 	}.Init(b.ctx)
 	isView := false
@@ -3250,6 +3251,8 @@ func buildShowSchema(s *ast.ShowStmt, isView bool, isSequence bool) (schema *exp
 		ftypes = []byte{mysql.TypeVarchar, mysql.TypeVarchar, mysql.TypeVarchar, mysql.TypeLonglong}
 	case ast.ShowVariables, ast.ShowStatus:
 		names = []string{"Variable_name", "Value"}
+	case ast.ShowVariable:
+		names = []string{s.VariableName}
 	case ast.ShowCollation:
 		names = []string{"Collation", "Charset", "Id", "Default", "Compiled", "Sortlen"}
 		ftypes = []byte{mysql.TypeVarchar, mysql.TypeVarchar, mysql.TypeLonglong,
