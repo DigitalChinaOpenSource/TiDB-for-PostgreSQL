@@ -2440,45 +2440,47 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1064:
 		return handleParseError(m,te, sql)
 	case 1068:
-		return handleMultiplePKDefined(m,te,sql)
+		return handleMultiplePKDefined(m, te, sql)
 	case 1091:
-		return handleCantDropFieldOrKey(m,te,sql)
+		return handleCantDropFieldOrKey(m, te, sql)
 	case 1105:
-		return handleTypeError(m, te,sql)
+		return handleTypeError(m, te, sql)
 	case 1109:
-		return handleUnknownTableInDelete(m,te,sql)
+		return handleUnknownTableInDelete(m, te, sql)
 	case 1110:
-		return handleFiledSpecifiedTwice(m,te,sql)
+		return handleFiledSpecifiedTwice(m, te, sql)
 	case 1111:
-		return handleInvalidGroupFuncUse(m,te,sql)
+		return handleInvalidGroupFuncUse(m, te, sql)
 	case 1113:
-		return handleTableNoColumn(m,te,sql)
+		return handleTableNoColumn(m, te, sql)
 	case 1136:
 		return handeleColumnMisMatch(m, te,sql)
 	case 1138:
-		return handleInvalidUseOfNull(m,te,sql)
+		return handleInvalidUseOfNull(m, te,sql)
 	case 1142:
-		return handleTableAccessDenied(m,te, sql)
+		return handleTableAccessDenied(m, te, sql)
 	case 1143:
-		return handleColumnAccessDenied(m,te, sql)
+		return handleColumnAccessDenied(m, te, sql)
 	case 1146:
-		return handleRelationNotExists(m, te,sql)
+		return handleRelationNotExists(m, te, sql)
 	case 1211:
-		return handleNoPermissionToCreateUser(m,te, sql)
+		return handleNoPermissionToCreateUser(m, te, sql)
 	case 1222:
-		return handleWrongNumberOfColsInSelect(m,te,sql)
+		return handleWrongNumberOfColsInSelect(m, te, sql)
 	case 1242:
-		return handleSubqueryNo1Row(m ,te,sql)
+		return handleSubqueryNo1Row(m ,te, sql)
 	case 1248:
-		return handleDerivedMustHaveAlias(m,te, sql)
+		return handleDerivedMustHaveAlias(m, te, sql)
 	case 1264:
-		return handleDataOutOfRange(m,te,sql)
+		return handleDataOutOfRange(m, te, sql)
 	case 1364:
-		return handleNoDefaultValue(m,te, sql)
+		return handleNoDefaultValue(m, te, sql)
 	case 1406:
-		return handleDataTooLong(m,te,sql)
+		return handleDataTooLong(m, te, sql)
+	case 1426:
+		return handleTooBigPrecision(m, te, sql)
 	default:
-		return &pgproto3.ErrorResponse{
+		return &pgproto3.ErrorResponse {
 			Code: "MySQL"+strconv.Itoa(int(m.Code)),
 			Severity: "ERROR",
 			Message: "Unknown Error: " + m.Message,

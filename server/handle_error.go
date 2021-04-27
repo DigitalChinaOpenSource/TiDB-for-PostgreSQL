@@ -8,6 +8,20 @@ import (
 	"strings"
 )
 
+//handleTooBigPrecision 处理指定精度过大的错误
+func handleTooBigPrecision(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	errorResp := &pgproto3.ErrorResponse {
+		Severity: "ERROR",
+		SeverityUnlocalized: "",
+		Code: "tobe",
+		Message: m.Message,
+		Detail: "",
+		Hint: "",
+	}
+	setFilePathAndLine(te, errorResp)
+	return errorResp, nil
+}
+
 //handleInvalidUseOfNull 处理设置字段非空时由于原本存在空数据而导致的错误
 // eg.Invalid use of NULL value
 func handleInvalidUseOfNull(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
@@ -94,8 +108,6 @@ func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) 
 
 	return errorResp, nil
 }
-
-
 
 //handleFiledSpecifiedTwice 字段声明超过一次，可能两次，三次，都报这个错
 // eg.Column 'name' specified twice
@@ -287,26 +299,6 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	}
 	setFilePathAndLine(te, errorResp)
 
-	return errorResp, nil
-}
-
-// handleWrongValueCount 解决字段数与值数量不对应的问题
-func handleWrongValueCount(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1058 错误",
-	}
-	return errorResp, nil
-}
-
-//handleWrongSumSelect 处理语句有和函数和列在同一语句的错误
-func handleWrongSumSelect(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	errorResp := &pgproto3.ErrorResponse{
-		Code: "XX0000",
-		Severity: "ERROR",
-		Message: "有待处理的MySQL 1057 错误",
-	}
 	return errorResp, nil
 }
 
