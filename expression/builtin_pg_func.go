@@ -1,6 +1,7 @@
 package expression
 
 import (
+	"fmt"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
@@ -334,10 +335,117 @@ type builtinPgIsWalReplayPaused struct {
 	baseBuiltinFunc
 }
 
-//暂且先这样处理,这里涉及到Pg内部的系统逻辑,这里没有合适的方法去实现
+//todo 暂且先这样处理,这里涉及到Pg内部的系统逻辑,这里没有合适的方法去实现
 func (b *builtinPgIsWalReplayPaused) evalString(row chunk.Row)(string, bool, error){
-
 	return "TRUE", false, nil
+}
+
+// pg_get_userbyid
+type pgGetUserByIdFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgGetUserByIdFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgGetUserByIdSig{bf}
+	return sig, nil
+}
+
+type builtinPgGetUserByIdSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgGetUserByIdSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgGetUserByIdSig) evalString(row chunk.Row)(string, bool, error){
+	id, isNull, err := b.args[0].EvalInt(b.ctx,row)
+	if isNull || err != nil {
+		return "", isNull, err
+	}
+	userName := fmt.Sprintf("unknown(OID=%d)", id)
+	if id == 10{
+		userName = b.ctx.GetSessionVars().User.Username
+	}
+	return userName, false, nil
+}
+
+// PgFuncShobjDescription
+type pgShobjDescriptionFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgShobjDescriptionFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt, types.ETString)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgShobjDescriptionSig{bf}
+	return sig, nil
+}
+
+type builtinPgShobjDescriptionSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgShobjDescriptionSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgShobjDescriptionSig) evalString(row chunk.Row)(string, bool, error){
+
+	return "[null]", false, nil
+}
+
+// PgFuncObjDescription
+type pgObjDescriptionFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgObjDescriptionFunctionClass) getFunction(ctx sessionctx.Context, args []Expression)(builtinFunc, error){
+	if err := p.verifyArgs(args); err != nil{
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	if err !=nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgObjDescriptionSig{bf}
+	return sig, nil
+}
+
+type builtinPgObjDescriptionSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgObjDescriptionSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIdSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgObjDescriptionSig) evalString(row chunk.Row)(string, bool, error){
+	return "[null]", false, nil
 }
 
 

@@ -1202,6 +1202,7 @@ type ShowContents struct {
 	IfNotExists bool // Used for `show create database if not exists`.
 	GlobalScope bool // Used by show variables.
 	Extended    bool // Used for `show extended columns from ...`
+	VariableName string
 }
 
 // LogicalShow represents a show plan.
