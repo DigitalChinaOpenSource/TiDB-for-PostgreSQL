@@ -399,6 +399,11 @@ func (s *Server) Close() {
 func (s *Server) onConn(conn *clientConn) {
 	ctx := logutil.WithConnID(context.Background(), conn.connectionID)
 	if err := conn.handshake(ctx); err != nil {
+		//客户端强行中止连接，会发送EOF报文，这里不认为是错误信息
+		if err.Error() == "EOF" {
+			return
+		}
+
 		if plugin.IsEnable(plugin.Audit) && conn.ctx != nil {
 			conn.ctx.GetSessionVars().ConnectionInfo = conn.connectInfo()
 			err = plugin.ForeachPlugin(plugin.Audit, func(p *plugin.Plugin) error {

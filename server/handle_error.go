@@ -13,7 +13,8 @@ func handleTooBigPrecision(m *mysql.SQLError, te *terror.Error, sql string) (*pg
 	errorResp := &pgproto3.ErrorResponse {
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//pg不会报这个error
+		Code: "XX000",
 		Message: m.Message,
 		Detail: "",
 		Hint: "",
@@ -39,7 +40,8 @@ func handleInvalidUseOfNull(m *mysql.SQLError, te *terror.Error, sql string) (*p
 	errorResp := &pgproto3.ErrorResponse {
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		// 语法错误
+		Code: "42601",
 		//pg没有对应的错误，因为pg允许创建表不带任何字段，这里返回mysql原始的错误信息
 		Message: pgMsg,
 		Detail: "",
@@ -55,7 +57,8 @@ func handleTableNoColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 	errorResp := &pgproto3.ErrorResponse {
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//internal_error，MySQL无对应错误，因为pg容忍表没有字段
+		Code: "XX000",
 		//pg没有对应的错误，因为pg允许创建表不带任何字段，这里返回mysql原始的错误信息
 		Message: m.Message,
 		Detail: "",
@@ -98,7 +101,8 @@ func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) 
 	errorResp := &pgproto3.ErrorResponse {
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//grouping_error
+		Code: "42803",
 		Message: pgMsg,
 		Position: int32(firstIndex + 3),
 		Detail: "",
@@ -126,7 +130,8 @@ func handleFiledSpecifiedTwice(m *mysql.SQLError, te *terror.Error, sql string) 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//duplicate_column
+		Code: "42701",
 		Message: pgMsg,
 		Position: int32(twice + 3),
 		Detail: "",
@@ -166,7 +171,8 @@ func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string)
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//语法错误
+		Code: "42601",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
@@ -195,7 +201,8 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//internal_error
+		Code: "XX000",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -219,7 +226,8 @@ func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*
 	pgMsg := fmt.Sprintf("multiple primary keys for table \"%s\" are not allowed", table)
 
 	errorResp := &pgproto3.ErrorResponse{
-		Code: "tobe",
+		//invalid_table_definition
+		Code: "42P16",
 		Severity: "ERROR",
 		Message: pgMsg,
 		Position: int32(position),
@@ -266,6 +274,7 @@ func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
+		//语法错误
 		Code: "42601",
 		Message: pgMsg,
 		Position: int32(position),
@@ -292,7 +301,8 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//unique_violation
+		Code: "23505",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -339,7 +349,8 @@ func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//undefined_column
+		Code: "42703",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
@@ -362,7 +373,8 @@ func handleTableExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgprot
 	errorResponse := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//duplicate_table
+		Code: "42P07",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -381,7 +393,7 @@ func handleUnknownDB(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3
 	pgMsg := fmt.Sprintf("database \"%s\" does not exist\nkeep last connection",db)
 
 	errorResp := &pgproto3.ErrorResponse{
-		Code: "tobe",
+		Code: "3D000",
 		Severity: "FATAL",
 		Message: pgMsg,
 	}
@@ -402,7 +414,8 @@ func handleAccessDenied(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//privilege_not_granted
+		Code: "01007",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -424,7 +437,8 @@ func handleDropDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 	errorResponse := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//invalid_catalog_name
+		Code: "3D000",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -446,7 +460,8 @@ func handleCreateDBFail(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	errorResponse := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//duplicate_database
+		Code: "42P04",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -471,7 +486,8 @@ func handleDataOutOfRange(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//numeric_value_out_of_range
+		Code: "22003",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -497,7 +513,8 @@ func handleDataTooLong(m *mysql.SQLError, te *terror.Error, sql string) (*pgprot
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//string_data_length_mismatch
+		Code: "22026",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -516,7 +533,8 @@ func handleWrongNumberOfColsInSelect(m *mysql.SQLError, te *terror.Error, sql st
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//语法错误
+		Code: "42601",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -537,7 +555,8 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//语法错误
+		Code: "42601",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
@@ -556,7 +575,8 @@ func handleSubqueryNo1Row(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//cardinality_violation
+		Code: "21000",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -574,7 +594,8 @@ func handleNoPermissionToCreateUser(m *mysql.SQLError, te *terror.Error, sql str
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//privilege_not_granted
+		Code: "01007",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -655,7 +676,7 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		Code: "42601",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -679,7 +700,8 @@ func handeleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pg
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//语法错误
+		Code: "42601",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
@@ -704,7 +726,7 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		Code: "42P01",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
@@ -717,7 +739,6 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 // handleTypeError 处理类型转换错误信息
 func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	msg, quotes, beforeInput := m.Message, "\"", "parsing "
-
 	inputStart := strings.Index(msg, beforeInput) + len(beforeInput)
 	inputLen := strings.Index(msg[inputStart + 1 : ], quotes) + 1
 	input := msg[inputStart : inputStart + inputLen]
@@ -730,7 +751,8 @@ func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "tobe",
+		//datatype_mismatch
+		Code: "42804",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",

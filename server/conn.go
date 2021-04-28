@@ -1025,6 +1025,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 	return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 }
 
+// useDB
 func (cc *clientConn) useDB(ctx context.Context, db string) (err error) {
 	// if input is "use `SELECT`", mysql client just send "SELECT"
 	// so we add `` around db.
@@ -1040,6 +1041,7 @@ func (cc *clientConn) useDB(ctx context.Context, db string) (err error) {
 	return
 }
 
+// flush
 func (cc *clientConn) flush(ctx context.Context) error {
 	defer trace.StartRegion(ctx, "FlushClientConn").End()
 	failpoint.Inject("FakeClientConn", func() {
@@ -1050,7 +1052,7 @@ func (cc *clientConn) flush(ctx context.Context) error {
 	return cc.pkt.flush()
 }
 
-// 这个暂且先这么写,后面是否选择使用,待定
+// writeOK 这个暂且先这么写,后面是否选择使用,待定
 func (cc *clientConn) writeOK(ctx context.Context) error {
 	//msg := cc.ctx.LastMessage()
 	if err := cc.writeCommandComplete(); err != nil {
@@ -1059,7 +1061,7 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 	return cc.writeReadForQuery(ctx,cc.ctx.Status())
 }
 
-// 这个方法没什么用,后面可以考虑删除
+// writeOkWith 这个方法没什么用,后面可以考虑删除
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
@@ -1093,8 +1095,12 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	}
 
 	// todo 处理某些情况下从lastPacket获取不到sql的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
-	//读包获取sql，去除第一位的类型
-	sql := string(cc.lastPacket)[1 : ]
+
+	//读包获取sql，去除第一位的类型，
+	var sql string
+	if cc.lastPacket != nil {
+		sql = string(cc.lastPacket)[1 : ]
+	}
 
 	// todo 完成MySQL错误与PgSQL错误的转换和返回
 	// https://www.postgresql.org/docs/13/errcodes-appendix.html
