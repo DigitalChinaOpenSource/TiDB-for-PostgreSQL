@@ -139,7 +139,6 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	if err != nil {
 		return err
 	}
-
 	return cc.flush(ctx)
 }
 
@@ -201,7 +200,6 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 			return err
 		}
 	}
-
 	return cc.flush(ctx)
 }
 
@@ -235,7 +233,6 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}
-
 	err = cc.writeResultset(ctx, rs, true, 0, 0)
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))

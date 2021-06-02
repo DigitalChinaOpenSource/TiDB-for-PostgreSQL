@@ -948,9 +948,13 @@ func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamM
 	return SetParamTypes(args, paramExprs, cols)
 }
 
-// SetParamTypes 设置参数类型,此时args里元素为2，index0 为条件的左侧，即表的各个字段。index1 为参数值。
+// SetParamTypes 设置参数类型.
 // 只考虑了参数一个方法参数数量为1,或者是2的情况，比如 cast一个参数。eq 参数数量是2.
 func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
+	//如果参数类型已经完全设置完毕，则退出
+	if CheckParamFullySeted(paramExprs) {
+		return nil
+	}
 	if len(args) == 1 {
 		// 当前考虑的是cast方法，只有一个参数的情况。直接返回上层处理。
 		return args
@@ -974,4 +978,14 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 		// todo 完善多参数的处理逻辑
 		return nil
 	}
+}
+
+// CheckParamFullySeted 检查params是否完全设置完毕
+func CheckParamFullySeted(paramExprs *[]ast.ParamMarkerExpr) bool {
+	for _,p := range *paramExprs {
+		if p.(*driver.ParamMarkerExpr).Type.Tp == 0 {
+			return false
+		}
+	}
+	return true
 }
