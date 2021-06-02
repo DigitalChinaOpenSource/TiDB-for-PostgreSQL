@@ -832,6 +832,31 @@ const(
 	sourceline INTEGER(32) UNSIGNED,
 	pending_restart TINYINT(1)
 );`
+
+	CreateTablePgStatActivity = `CREATE TABLE IF NOT EXISTS postgres.pg_stat_activity
+(
+	datid	INTEGER(32) UNSIGNED,
+	datname	VARCHAR(32),
+	pid		INTEGER(32) UNSIGNED,
+	leader_pid	INTEGER(32) UNSIGNED,
+	usesysid	INTEGER(32) UNSIGNED,
+	username	VARCHAR(32),
+	application_name	TEXT,
+	client_hostname		TEXT,
+	client_addr			VARCHAR(32),
+	client_port			INTEGER(32) UNSIGNED,
+	backend_start		TEXT,
+	xact_start			TEXT,
+	query_start			TEXT,
+	state_change		TEXT,
+	wait_event_type		TEXT,
+	wait_event			TEXT,
+	state				TEXT,
+	backend_xid			INTEGER(32) UNSIGNED,
+	backend_xmin		INTEGER(32) UNSIGNED,
+	query				TEXT,
+	backend_type		TEXT
+);`
 )
 
 // PG SYSTEM VIEW SQL
