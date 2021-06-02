@@ -1433,6 +1433,8 @@ func doDDLWorks(s Session) {
 
 	mustExecute(s, CreateTablePgAllSettings)
 
+	mustExecute(s, CreateTablePgStatActivity)
+
 	mustExecute(s, "USE postgres;")
 	// Create postgres pg_roles View
 	mustExecute(s, CreateViewPgRoles)

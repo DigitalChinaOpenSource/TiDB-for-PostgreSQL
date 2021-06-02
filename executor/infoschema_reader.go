@@ -491,6 +491,7 @@ func (e *memtableRetriever) setDataFromTables(ctx sessionctx.Context, schemas []
 					table.Comment,         // TABLE_COMMENT
 					table.ID,              // TIDB_TABLE_ID
 					shardingInfo,          // TIDB_ROW_ID_SHARDING_INFO
+					nil,				   //
 				)
 				rows = append(rows, record)
 			} else {
@@ -1886,4 +1887,122 @@ func adjustColumns(input [][]types.Datum, outColumns []*model.ColumnInfo, table 
 		rows[i] = row
 	}
 	return rows
+}
+
+type pgMemTableRetriever struct {
+	dummyCloser
+	table		*model.TableInfo
+	columns 	[]*model.ColumnInfo
+	retrieved  	bool
+	initialized bool
+	rows        [][]types.Datum
+	dbs         []*model.DBInfo
+	dbsIdx      int
+	tblIdx      int
+	rowIdx      int
+}
+
+func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Context)([][]types.Datum, error) {
+	if e.retrieved {
+		return nil, nil
+	}
+
+	//Cache the ret full rows in schemataRetriever
+	if !e.initialized {
+		is := infoschema.GetInfoSchema(sctx)
+		dbs := is.AllSchemas()
+		sort.Sort(infoschema.SchemasSorter(dbs))
+		switch e.table.Name.O {
+		case infoschema.TablePgInformationsSchemaCatalogName:
+			e.setDataForPgInformationSchemaCatalogName()
+		case infoschema.TablePgSchemata:
+			e.setDataForPgSchemata(sctx, dbs)
+		case infoschema.TablePgAdministrableRoleAuthorizations:
+			e.setDataForPgAdministrableRoleAuthorizations()
+		case infoschema.TablePgEnabledRoles:
+			e.setDataForPgEnabledRoles()
+			// todo set data for tables
+		}
+		e.initialized = true
+	}
+
+	//Adjust the amount of each return
+	maxCount := 1024
+	retCount := maxCount
+	if e.rowIdx+maxCount > len(e.rows) {
+		retCount = len(e.rows) - e.rowIdx
+		e.retrieved = true
+	}
+	ret := make([][]types.Datum, retCount)
+	for i := e.rowIdx; i < e.rowIdx+retCount; i++ {
+		ret[i-e.rowIdx] = e.rows[i]
+	}
+	e.rowIdx += retCount
+	return adjustColumns(ret, e.columns, e.table), nil
+}
+// setDataForPgInformationSchemaCatalogName set data for pgTable information_schema_catalog_name
+// todo 这个值应该是动态的，这里先写死
+func (e *pgMemTableRetriever) setDataForPgInformationSchemaCatalogName(){
+	var rows [][]types.Datum
+	rows = append(rows,
+		types.MakeDatums(
+			"postgres",  // catalog_name
+		),
+	)
+	e.rows = rows
+}
+
+// setDataForPgAdministrableRoleAuthorizations set data for pgTable administrable_role_authorizations
+func (e *pgMemTableRetriever) setDataForPgAdministrableRoleAuthorizations() {
+	var rows [][]types.Datum
+	rows = append(rows,
+		types.MakeDatums(
+			"root",   // grantee
+			"admin",		// role_name
+			"YES",			// is_grantable
+		),
+	)
+	e.rows = rows
+}
+
+// setDataForPgSchemata set data for pgTable schemata
+// todo 这里的 catalog_name 和 schema_owner 应该是动态获取，暂时写死
+func (e *pgMemTableRetriever) setDataForPgSchemata(ctx sessionctx.Context, schemas []*model.DBInfo) {
+	checker := privilege.GetPrivilegeManager(ctx)
+	rows := make([][]types.Datum, 0, len(schemas))
+
+	for _, schema := range schemas {
+
+		if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, "", "", mysql.AllPrivMask) {
+			continue
+		}
+
+		record := types.MakeDatums(
+			"postgres", 		// catalog_name
+			schema.Name.O,         	// schema_name
+			"root",               	// schema_owner
+			nil,             		// default_character_set_catalog
+			nil,					// default_character_set_schema
+			nil,					// default_character_set_name
+			nil, 					// sql_path
+		)
+		rows = append(rows, record)
+	}
+	e.rows = rows
+}
+
+// setDataForPgEnabledRoles set data for pgTable enabled_roles
+func (e *pgMemTableRetriever) setDataForPgEnabledRoles() {
+	var rows [][]types.Datum
+	rows = append(rows,
+		types.MakeDatums(
+			"root",  // catalog_name
+		),
+	)
+	rows = append(rows,
+		types.MakeDatums(
+			"admin",  // catalog_name
+		),
+	)
+	e.rows = rows
 }
