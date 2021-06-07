@@ -32,9 +32,9 @@ mkdir -p  $GOPATH/src/github.com/digitalchina
 
 cd  $GOPATH/src/github.com/digitalchina
 
-git clone 地址待定
+git clone https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.git
 
-cd tidb/tidb-server
+cd TiDB-for-PostgreSQL/tidb-server
 
 go run main.go
 ```
@@ -59,6 +59,7 @@ test=# show tables;
 (2 行记录)
 ```
 
+## cluster deployment
 TiDB for PostgreSQL also supports cluster deployment.
 
 Our current modification work does not involve the communication module of each component in the cluster. Therefore, the connection of TiDB for PostgreSQL to pd and tikv will not be affected in any way.
@@ -93,7 +94,7 @@ Deploy three tikv nodes
 ./tikv-server --pd="pdhost:2379" --addr="kvhost3:20160"  --data-dir=tikv  --log-file=tikv3.log
 ```
 
-Deploy a TiDB for PostgreSQL node. You need to compile the TiDB for PostgreSQL project into a binary file named tidb-server and upload it to this server
+Deploy a TiDB for PostgreSQL node. You need to compile the TiDB for PostgreSQL project into a binary file named tidb-server and upload it to this server for replace the original tidb-server
 
 ```shell
 ./tidb-server --store=tikv  --path="pdhost:2379" --log-file=tidb.log
@@ -126,6 +127,6 @@ PostgreSQL 13
 
 ## License
 
-Open source license is pending.
+Apache-2.0 License
 
 

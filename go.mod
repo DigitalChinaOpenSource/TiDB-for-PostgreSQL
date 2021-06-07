@@ -85,12 +85,12 @@ require (
 	google.golang.org/grpc v1.26.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.3.0 // indirect
-	honnef.co/go/tools v0.0.1-2020.1.6 // indirect
+	honnef.co/go/tools v0.0.1-2020.1.6    // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 	sourcegraph.com/sourcegraph/appdash v0.0.0-20190731080439-ebfcffb1b5c0
 	sourcegraph.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
 )
 
-replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => newgitlab.digitalchina.com/qiruia/dcparser v0.0.0-20210427084200-b4eac7acc2e2
+replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210604102014-5a0758192631
 
 go 1.13
