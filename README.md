@@ -59,7 +59,7 @@ test=# show tables;
 (2 行记录)
 ```
 
-## cluster deployment
+## Cluster deployment
 TiDB for PostgreSQL also supports cluster deployment.
 
 Our current modification work does not involve the communication module of each component in the cluster. Therefore, the connection of TiDB for PostgreSQL to pd and tikv will not be affected in any way.
