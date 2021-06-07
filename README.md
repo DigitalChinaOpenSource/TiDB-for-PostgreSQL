@@ -69,8 +69,8 @@ We recommend using binary file to deploy TiDB for PostgreSQL cluster.
 First, download the official binary package file and unzip it.
 
 ```shell
-wget http://download.pingcap.org/tidb-latest-linux-amd64.tar.gz
-wget http://download.pingcap.org/tidb-latest-linux-amd64.sha256
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
 
 sha256sum -c tidb-latest-linux-amd64.sha256
 
