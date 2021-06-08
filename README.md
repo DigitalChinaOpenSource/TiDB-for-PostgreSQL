@@ -37,6 +37,10 @@ git clone https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.git
 cd TiDB-for-PostgreSQL/tidb-server
 
 go run main.go
+
+# If you get an error: export ordinal to larger
+# Please run the following cmd:
+go run -buildmode=exe  main.go
 ```
 
 After starting the main program of TiDB for PostgreSQL , it will run on port 4000 of the host.
