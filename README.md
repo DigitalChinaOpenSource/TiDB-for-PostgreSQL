@@ -63,6 +63,17 @@ test=# show tables;
 (2 行记录)
 ```
 
+## Docker 
+
+```shell
+# Log in to your dockerhub account
+docker login
+
+# Pull the image and start the container
+docker pull dcleeray/tidb-for-pg
+docker run -it --name tidbforpg -p 4000:4000 -d  dcleeray/tidb-for-pg:latest
+```
+
 ## Cluster deployment
 TiDB for PostgreSQL also supports cluster deployment.
 
@@ -105,8 +116,6 @@ Deploy a TiDB for PostgreSQL node. You need to compile the TiDB for PostgreSQL p
 ```
 
 With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and you can connect to TiDB for PostgreSQL cluster in the same way as you did with single TiDB for PostgreSQL demonstrated earlier.
-
-
 
 ## Contribute code to TiDB for postgresql
 
