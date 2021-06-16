@@ -1,0 +1,10 @@
+language: go
+
+go:
+  - 1.13.x
+env:
+  - GO111MODULE=on
+install:
+  - go build tidb-server/main.go
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
