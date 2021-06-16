@@ -1,6 +1,6 @@
 # TiDB for postgresql
 [![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/pupillord/TiDB-for-PostgreSQL)
+[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)](https://goreportcard.com/report/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![codecov](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL/branch/main/graph/badge.svg?token=OZ16DNE6JH)](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 
