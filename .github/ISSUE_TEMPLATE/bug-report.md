@@ -15,5 +15,3 @@ Please answer these questions before submitting your issue. Thanks!
 ### 2. What did you expect to see?
 
 ### 3. What did you see instead?
-
-### 4. What version of TiDB are you using? (`tidb-server -V` or run `select tidb_version();` on TiDB)
