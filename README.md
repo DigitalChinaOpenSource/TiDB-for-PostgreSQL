@@ -1,6 +1,8 @@
 # TiDB for postgresql
+
+[![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LICENSE)
 [![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/pupillord/TiDB-for-PostgreSQL)
+[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)](https://goreportcard.com/report/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![codecov](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL/branch/main/graph/badge.svg?token=OZ16DNE6JH)](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 
@@ -124,6 +126,7 @@ With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and
 ## Contribute code to TiDB for postgresql
 
 We greatly welcome and appreciate developers who are interested in TiDB for PostgreSQL to make contributions. At present, we provide several directions to get started.
+
 ### Schema structure
 
 The database structure of PostgreSQL is very different from that of MySQL, which is also a big problem we encountered in our development. It involves the realization of database system tables, system views, and system functions. It’s a lot of work and very hard. Developers are required to be very familiar with the database table structure of both PostgreSQL and MySQL.
@@ -131,7 +134,6 @@ The database structure of PostgreSQL is very different from that of MySQL, which
 ### Postgresql grammatical features
 
 Compared with MySQL, PostgreSQL has many new syntax features. For example, Returning can return specified column or all columns of the modified row. Implementing a syntax involves modifying codes of the Parser module, TiDB for PostgreSQL's internal plan structure, plan optimization, plan execution, and data write-back, and many other parts. It’s really very hard. We recommend that developers start with clauses such as RETURNING and modify them on the basis of the original code. After being familiar with the logic of TiDB for PostgreSQL planning and execution, you can try to implement a brand new statement.
-
 
 ## Version notice
 
@@ -141,9 +143,6 @@ TiDB v4.0.11
 
 PostgreSQL 13
 
-
 ## License
 
 Apache-2.0 License
-
-
