@@ -127,6 +127,8 @@ With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and
 
 We greatly welcome and appreciate developers who are interested in TiDB for PostgreSQL to make contributions. At present, we provide several directions to get started.
 
+[Contribution Guide](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/CONTRIBUTING.md)
+
 ### Schema structure
 
 The database structure of PostgreSQL is very different from that of MySQL, which is also a big problem we encountered in our development. It involves the realization of database system tables, system views, and system functions. It’s a lot of work and very hard. Developers are required to be very familiar with the database table structure of both PostgreSQL and MySQL.

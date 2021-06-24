@@ -1,58 +1,99 @@
-# Quick Start
+## Quick start
 
-#### Run TiDB with Docker (Standalone mode)
+First, make sure you have a Go environment, because TiDB for PostgreSQL is based on the Go language.
 
-You can quickly test TiDB with Docker, the source repository contains the Dockerfile which contains local tidb-server.
+TiDB for PostgreSQL can be started on a single node without pd and tikv.
 
-To install Docker on your system, you can read the document on https://docs.docker.com/
+If there is no pd and tikv, it will create mock pd and mock tikv to maintain the stable operation of the system.
 
-```
-docker pull pingcap/tidb:latest
-docker run --name tidb-server -d -p 4000:4000 pingcap/tidb:latest
-```
+The following is an example of locally compiling and running TiDB for PostgreSQL on localhost.
 
-`docker pull` may take a while to download images ~560M.
+```shell
+mkdir -p  $GOPATH/src/github.com/digitalchina
 
-Then you can use official mysql client to connect to TiDB.
+cd  $GOPATH/src/github.com/digitalchina
 
-```
-mysql -h 127.0.0.1 -P 4000 -u root -D test --prompt="tidb> "  
-```
+git clone https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.git
 
-Notice: OS X user may use `docker-machine ip` to connect it.
+cd TiDB-for-PostgreSQL/tidb-server
 
-#### __Or run TiDB on TiKV cluster__ 
+go run main.go
 
-Read the documents for [Ansible deployment](https://pingcap.com/docs/stable/how-to/deploy/orchestrated/ansible/) or [Docker deployment](https://pingcap.com/docs/stable/how-to/deploy/orchestrated/docker/).
-
-#### __Pre-requirement__
-
-Go environment. Currently a 64-bit version of go >= 1.9 is required.
-```
-git clone https://github.com/pingcap/tidb.git $GOPATH/src/github.com/pingcap/tidb
-cd $GOPATH/src/github.com/pingcap/tidb
-make
+# If you get an error: export ordinal to larger
+# Please run the following cmd:
+go run -buildmode=exe  main.go
 ```
 
-#### __Run as MySQL protocol server__
+After starting the main program of TiDB for PostgreSQL , it will run on port 4000 of the host.
+
+How to use PostgreSQL client to connect to TiDB for PostgreSQL? Here, we take the command line tool psql that comes with PostgreSQL as an example.
 
 ```
-make
-cd bin && ./tidb-server
+Server [localhost]:
+Database [postgres]: test
+Port [5433]: 4000
+Username [postgres]: root
+psql (13.1, server 8.3.11)
+Type "help" to get help information.
+
+test=# show tables;
+ Tables_in_test
+----------------
+ t1
+ t2
+(2 行记录)
 ```
 
-In case you want to compile a specific location:
+## Docker
 
+```shell
+# Log in to your dockerhub account
+docker login
+
+# Pull the image and start the container
+docker pull dcleeray/tidb-for-pg
+docker run -it --name tidbforpg -p 4000:4000 -d  dcleeray/tidb-for-pg:latest
 ```
-make server TARGET=$GOPATH/bin/tidb-server
+
+## Cluster deployment
+TiDB for PostgreSQL also supports cluster deployment.
+
+Our current modification work does not involve the communication module of each component in the cluster. Therefore, the connection of TiDB for PostgreSQL to pd and tikv will not be affected in any way.
+
+We recommend using binary file to deploy TiDB for PostgreSQL cluster.
+
+First, download the official binary package file and unzip it.
+
+```shell
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
+
+sha256sum -c tidb-latest-linux-amd64.sha256
+
+tar -xzf tidb-latest-linux-amd64.tar.gz
+cd tidb-latest-linux-amd64/bin
 ```
 
-The default server port is `4000` and can be changed by flag `-P <port>`.
+Second, deploy each node in the cluster in order. According to the cluster architecture of TiDB for PostgreSQL, pd nodes are deployed first, then the tikv node, and finally the TiDB for PostgreSQL node. The number of nodes in the cluster is not specified, but there is at least one of each type.
 
-Run `./tidb-server -h` to see more flag options.
+Deploy a pd node
 
-After you started tidb-server, you can use official `mysql` client to connect to TiDB.
-
+```shell
+./pd-server --name=pd1 --data-dir=pd1 --client-urls="http://pdhost:2379" --peer-urls="http://host:2380" -L "info" --log-file=pd.log
 ```
-mysql -h 127.0.0.1 -P 4000 -u root -D test --prompt="tidb> " 
+
+Deploy three tikv nodes
+
+```shell
+./tikv-server --pd="pdhost:2379" --addr="kvhost1:20160"  --data-dir=tikv  --log-file=tikv1.log
+./tikv-server --pd="pdhost:2379" --addr="kvhost2:20160"  --data-dir=tikv  --log-file=tikv2.log
+./tikv-server --pd="pdhost:2379" --addr="kvhost3:20160"  --data-dir=tikv  --log-file=tikv3.log
 ```
+
+Deploy a TiDB for PostgreSQL node. You need to compile the TiDB for PostgreSQL project into a binary file named tidb-server and upload it to this server for replace the original tidb-server
+
+```shell
+./tidb-server --store=tikv  --path="pdhost:2379" --log-file=tidb.log
+```
+
+With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and you can connect to TiDB for PostgreSQL cluster in the same way as you did with single TiDB for PostgreSQL demonstrated earlier.
