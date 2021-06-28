@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pingcap/log"
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/store"
 	"github.com/pingcap/tidb/store/tikv"

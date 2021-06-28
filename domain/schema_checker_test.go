@@ -17,7 +17,7 @@ import (
 	"time"
 
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/store/tikv"
 )
 

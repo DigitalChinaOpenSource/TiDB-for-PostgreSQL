@@ -15,7 +15,7 @@ package handle_test
 
 import (
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/testkit"

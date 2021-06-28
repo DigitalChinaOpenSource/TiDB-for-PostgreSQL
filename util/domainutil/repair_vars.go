@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pingcap/parser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 )
 
 type repairInfo struct {

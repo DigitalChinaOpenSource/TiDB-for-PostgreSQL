@@ -14,7 +14,7 @@
 package types
 
 import (
-	parser_types "github.com/pingcap/parser/types"
+	parser_types "github.com/DigitalChinaOpenSource/DCParser/types"
 	mysql "github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/util/dbterror"
 )

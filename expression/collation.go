@@ -14,8 +14,8 @@
 package expression
 
 import (
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/charset"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/logutil"

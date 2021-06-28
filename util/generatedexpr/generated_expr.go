@@ -17,10 +17,10 @@ import (
 	"fmt"
 
 	"github.com/pingcap/errors"
-	"github.com/pingcap/parser"
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/charset"
-	"github.com/pingcap/parser/model"
+	"github.com/DigitalChinaOpenSource/DCParser"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/charset"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/util"
 )
 

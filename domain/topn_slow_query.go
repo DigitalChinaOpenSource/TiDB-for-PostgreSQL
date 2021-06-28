@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/pingcap/tidb/util/execdetails"
 )
 

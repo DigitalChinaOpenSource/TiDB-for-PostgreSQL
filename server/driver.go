@@ -32,8 +32,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/auth"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util"

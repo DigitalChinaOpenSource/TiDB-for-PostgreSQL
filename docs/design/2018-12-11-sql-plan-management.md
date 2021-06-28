@@ -45,7 +45,7 @@ MySQL does not support SQL plan management, so this will add syntaxes that not s
 
 To implement it, we need the following main steps:
 
-- Normalize the SQL text. We can take this https://github.com/pingcap/parser/pull/32 as an example.
+- Normalize the SQL text. We can take this https://github.com/DigitalChinaOpenSource/DCParser/pull/32 as an example.
 - Support the syntax in the parser.
 - Store the binding SQL and AST of the hinted SQL in a system table. Since there is a unique mapping from SQL text to AST, we can just store the SQL and parse it to AST for later use. A background goroutine will check if there are new bindings and update the local cache.
 - When another SQL comes, we first check if there is a matched SQL in the cache. If so, we can traverse the AST to add hints. Since comparing text for every SQL may affect unrelated SQLs a lot, we can calculate a hash value and first check if there is matching hash values.

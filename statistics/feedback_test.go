@@ -17,7 +17,7 @@ import (
 	"bytes"
 
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/codec"
 )

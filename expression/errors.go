@@ -14,7 +14,7 @@
 package expression
 
 import (
-	pmysql "github.com/pingcap/parser/mysql"
+	pmysql "github.com/DigitalChinaOpenSource/DCParser/mysql"
 	mysql "github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"

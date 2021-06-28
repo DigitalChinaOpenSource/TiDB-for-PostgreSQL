@@ -15,8 +15,8 @@ package expression
 
 import (
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/charset"
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/charset"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/collate"

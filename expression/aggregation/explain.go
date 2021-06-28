@@ -17,7 +17,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 )
 
 // ExplainAggFunc generates explain information for a aggregation function.

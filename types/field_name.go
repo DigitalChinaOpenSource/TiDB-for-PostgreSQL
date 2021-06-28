@@ -16,7 +16,7 @@ package types
 import (
 	"strings"
 
-	"github.com/pingcap/parser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 )
 
 // FieldName records the names used for mysql protocol.

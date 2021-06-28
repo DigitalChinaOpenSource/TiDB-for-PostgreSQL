@@ -27,11 +27,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/log"
-	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/parser/terror"
 	pumpcli "github.com/pingcap/tidb-tools/tidb-binlog/pump_client"
 	"github.com/pingcap/tidb/bindinfo"
 	"github.com/pingcap/tidb/config"

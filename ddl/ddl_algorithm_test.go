@@ -15,7 +15,7 @@ package ddl_test
 
 import (
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/pingcap/tidb/ddl"
 )
 

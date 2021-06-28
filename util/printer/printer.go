@@ -20,7 +20,7 @@ import (
 	_ "runtime" // import link package
 	_ "unsafe"  // required by go:linkname
 
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/util/israce"
 	"github.com/pingcap/tidb/util/logutil"

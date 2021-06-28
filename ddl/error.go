@@ -16,7 +16,7 @@ package ddl
 import (
 	"fmt"
 
-	parser_mysql "github.com/pingcap/parser/mysql"
+	parser_mysql "github.com/DigitalChinaOpenSource/DCParser/mysql"
 	mysql "github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/util/dbterror"
 )

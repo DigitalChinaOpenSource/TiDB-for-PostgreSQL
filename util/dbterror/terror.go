@@ -14,7 +14,7 @@
 package dbterror
 
 import (
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/errno"
 )
 

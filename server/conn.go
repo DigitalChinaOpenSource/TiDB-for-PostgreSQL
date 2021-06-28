@@ -74,11 +74,11 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/pingcap/parser"
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/auth"
-	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/auth"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/executor"
 	"github.com/pingcap/tidb/kv"
@@ -2374,7 +2374,7 @@ func convertColumnInfoToRowDescription(columns []*ColumnInfo) pgproto3.RowDescri
 
 // convertMySQLDataTypeToPgSQLDataType 将 MySQL 数据类型 转换为 PgSQL 数据类型
 // MySQL 数据类型为 Uint8 PgSQL数据类型为OID Uint32
-// MySQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/pingcap/parser@v0.0.0-20210108074737-814a888e05e2/mysql/type.go:17
+// MySQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/DigitalChinaOpenSource/DCParser@v0.0.0-20210108074737-814a888e05e2/mysql/type.go:17
 // PgSQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/jackc/pgtype@v1.6.2/pgtype.go:16
 func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	// todo 完善 mysql 和 pgsql 对应的数据类型

@@ -14,7 +14,7 @@
 
 set -uo pipefail
 
-grep "replace.*github.com/pingcap/parser" go.mod
+grep "replace.*github.com/DigitalChinaOpenSource/DCParser" go.mod
 grep_ret=$?
 
 if [ $grep_ret -eq 0 ];then

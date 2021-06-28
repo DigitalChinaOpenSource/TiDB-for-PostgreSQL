@@ -14,7 +14,7 @@
 package server
 
 import (
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 )
 
 const maxColumnNameSize = 256

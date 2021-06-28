@@ -16,8 +16,8 @@ package parser
 import (
 	"strings"
 
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/format"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/format"
 )
 
 // GetDefaultDB checks if all columns in the AST have explicit DBName. If not, return specified DBName.

@@ -77,7 +77,7 @@ TiDB 分为三层架构，TiDB Server（SQL执行引擎），TiKV Server（数�
 
 那么如何在TiDB for PgSQL 中实现一个PgSQL的关键词或者语法。
 
-1. 这里需要用到另一个仓库[DCParser ](https://github.com/DigitalChinaOpenSource/DCParser)，基于TiDB [Parser](https://github.com/pingcap/parser)开发。该仓库用于解析SQL语句，将文本语句解析成相应的树结构的结构体，所以想要实现一个关键字或者语法，首先需要在DCParser中添加该关键字和语法的解析模式。
+1. 这里需要用到另一个仓库[DCParser ](https://github.com/DigitalChinaOpenSource/DCParser)，基于TiDB [Parser](https://github.com/DigitalChinaOpenSource/DCParser)开发。该仓库用于解析SQL语句，将文本语句解析成相应的树结构的结构体，所以想要实现一个关键字或者语法，首先需要在DCParser中添加该关键字和语法的解析模式。
 
 2. 对于兼容的关键字和语法，根据其功能的不同，在计划制定，优化，执行三个阶段，对该关键字的功能进行实现。由于不同的关键字功能不一样，整个过程中可能需要在不同的位置去实现，所以这一块需要对TiDB的整个执行框架非常了解，大家可以通过TiDB社区进行学习。
 

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/pingcap/log"
-	"github.com/pingcap/parser"
+	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/logutil"
