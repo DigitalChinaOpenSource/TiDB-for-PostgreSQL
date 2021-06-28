@@ -40,7 +40,7 @@ require (
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/basictracer-go v1.0.0
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pingcap/br v4.0.11-0.20210119023619-139df44843ab+incompatible
+	github.com/Orion7r/br v4.0.11-0.20210628072456-a316d8c4fd09+incompatible
 	github.com/pingcap/check v0.0.0-20200212061837-5e12011dc712
 	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/pingcap/failpoint v0.0.0-20200702092429-9f69995143ce
@@ -48,7 +48,7 @@ require (
 	github.com/pingcap/goleveldb v0.0.0-20191226122134-f82aafb29989
 	github.com/pingcap/kvproto v0.0.0-20201126113434-70db5fb4b0dc
 	github.com/pingcap/log v0.0.0-20201112100606-8f1e84a3abc8
-	github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe
+	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210628023842-8b1d530491a5
 	github.com/pingcap/sysutil v0.0.0-20201130064824-f0c8aa6a6966
 	github.com/pingcap/tidb-tools v4.0.9-0.20201127090955-2707c97b3853+incompatible
 	github.com/pingcap/tipb v0.0.0-20200618092958-4fad48b4c8c3
@@ -90,7 +90,5 @@ require (
 	sourcegraph.com/sourcegraph/appdash v0.0.0-20190731080439-ebfcffb1b5c0
 	sourcegraph.com/sourcegraph/appdash-data v0.0.0-20151005221446-73f23eafcf67
 )
-
-replace github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe => github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210604102014-5a0758192631
 
 go 1.13

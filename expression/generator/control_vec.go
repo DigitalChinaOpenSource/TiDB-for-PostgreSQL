@@ -51,7 +51,7 @@ import (
 )
 
 // NOTE: Control expressions optionally evaluate some branches depending on conditions, but vectorization executes all
-// branches, during which the unnecessary branches may return errors or warnings. To avoid this case, when branches 
+// branches, during which the unnecessary branches may return errors or warnings. To avoid this case, when branches
 // meet errors or warnings, the vectorization falls back the scalar execution.
 
 `
@@ -168,13 +168,13 @@ func (b *builtinCaseWhen{{ .TypeName }}Sig) vecEval{{ .TypeName }}(input *chunk.
 		eLseSlice = bufElse.{{ .TypeNameInColumn }}s()
 		{{- end }}
 	}
-	
+
 	{{- if .Fixed }}
 	result.Resize{{ .TypeNameInColumn }}(n, false)
 	resultSlice := result.{{ .TypeNameInColumn }}s()
 	{{- else }}
 	result.Reserve{{ .TypeNameInColumn }}(n)
-	{{- end }}		
+	{{- end }}
 ROW:
 	for i := 0; i < n; i++ {
 		for j := 0; j < l/2; j++ {
@@ -202,7 +202,7 @@ ROW:
 				result.AppendNull()
 			} else {
 				result.Append{{ .TypeNameInColumn }}(eLse.Get{{ .TypeNameInColumn }}(i))
-			}	
+			}
 			{{- end }}
 		} else {
 			{{- if .Fixed }}
@@ -406,7 +406,7 @@ func (b *builtinIf{{ .TypeName }}Sig) vecEval{{ .TypeName }}(input *chunk.Chunk,
 		}
       	return b.fallbackEval{{ .TypeName }}(input, result)
    	}
-	
+
 	buf2, err := b.bufAllocator.get(types.ET{{ .ETName }}, n)
 	if err != nil {
 		return err
@@ -490,7 +490,7 @@ import (
 	"testing"
 
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/pingcap/tidb/types"
 )
 

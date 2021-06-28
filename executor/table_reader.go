@@ -18,7 +18,7 @@ import (
 	"sort"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/pingcap/parser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/kv"

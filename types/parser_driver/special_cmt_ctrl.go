@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pingcap/parser"
+	"github.com/DigitalChinaOpenSource/DCParser"
 )
 
 // To add new features that needs to be downgrade-compatible,

@@ -2,8 +2,8 @@ package aggfuncs_test
 
 import (
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/ast"
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 )
 
 func (s *testSuite) TestMergePartialResult4Varsamp(c *C) {

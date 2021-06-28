@@ -28,7 +28,7 @@ package core
 
 import (
 	"fmt"
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"math"
 	"strconv"
 

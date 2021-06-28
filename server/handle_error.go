@@ -16,8 +16,8 @@ package server
 import (
 	"fmt"
 	"github.com/jackc/pgproto3/v2"
-	"github.com/pingcap/parser/mysql"
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"strings"
 )
 

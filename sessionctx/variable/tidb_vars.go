@@ -29,7 +29,7 @@ package variable
 import (
 	"os"
 
-	"github.com/pingcap/parser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/uber-go/atomic"
 )

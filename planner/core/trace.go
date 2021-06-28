@@ -14,7 +14,7 @@
 package core
 
 import (
-	"github.com/pingcap/parser/ast"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 )
 
 // Trace represents a trace plan.

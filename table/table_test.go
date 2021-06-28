@@ -15,7 +15,7 @@ package table
 
 import (
 	. "github.com/pingcap/check"
-	"github.com/pingcap/parser/terror"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	mysql "github.com/pingcap/tidb/errno"
 )
 
