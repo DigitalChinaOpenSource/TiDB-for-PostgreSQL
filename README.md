@@ -10,6 +10,7 @@
 
 TiDB for PostgreSQL is an open source launched by Digital China Cloud Base to promote and integrate into the open source community of TiDB. In addition to its high availability, horizontal scalability, and cloud-native features, TiDB for PostgreSQL is compatible with the PostgreSQL protocol. On the one hand, you can use the PostgreSQL client to connect to TiDB for PostgreSQL, which we have basically completed. On the other hand, you can also use the unique grammatical features of PostgreSQL in your business system, which is in the development process.
 
+More details can be found in the [Design Document](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/DESIGN_DOCUMENT.md)
 
 ## Background
 
@@ -126,6 +127,8 @@ With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and
 ## Contribute code to TiDB for postgresql
 
 We greatly welcome and appreciate developers who are interested in TiDB for PostgreSQL to make contributions. At present, we provide several directions to get started.
+
+[Learning Guide](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LEARNING_GUIDANCE.zh.md)
 
 [Contribution Guide](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/CONTRIBUTING.md)
 
