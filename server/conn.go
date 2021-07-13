@@ -1452,7 +1452,7 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 			return executor.ErrQueryInterrupted
 		}
 
-		err = cc.writeResultset(ctx, rs, false, status, 0)
+		err = cc.writeResultset(ctx, rs, nil, status, 0)
 		if err != nil {
 			return err
 		}
@@ -1567,10 +1567,12 @@ func (cc *clientConn) handleFieldList(ctx context.Context, sql string) (err erro
 }
 
 // writeResultset writes data into a resultset and uses rs.Next to get row data back.
-// If binary is true, the data would be encoded in BINARY format.
+// If resultFormat is nil, the data would be encoded in Text format.
+// If resultFormat just one value, the data would be encoded in Text(0) or Binary(1) format
+// If resultFormat have many values, each column would be encoded in Text(0) or Binary(1) format.
 // serverStatus, a flag bit represents server information.
 // fetchSize, the desired number of rows to be fetched each time when client uses cursor.
-func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16, fetchSize int) (runErr error) {
+func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFormat []int16, serverStatus uint16, fetchSize int) (runErr error) {
 	defer func() {
 		// close ResultSet when cursor doesn't exist
 		r := recover()
@@ -1593,7 +1595,7 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary b
 		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
 		return nil
 	} else {
-		err = cc.writeChunks(ctx, rs, binary, serverStatus)
+		err = cc.writeChunks(ctx, rs,  serverStatus, resultFormat)
 	}
 
 	return err
@@ -1616,11 +1618,10 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 }
 
 // writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
-// binary specifies the way to dump data. It throws any error while dumping data.
 // serverStatus, a flag bit represents server information
 // PostgreSQL Modified
 // 判断是否为预处理查询,决定是否返回readyQuery,不在这儿做
-func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
+func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, serverStatus uint16, rf []int16) error {
 	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
@@ -1642,7 +1643,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			// We need to call Next before we get columns.
 			// Otherwise, we will get incorrect columns info.
 			columns := rs.Columns()
-			//err = cc.writeColumnInfo(columns, serverStatus)
+			// err = cc.writeColumnInfo(columns, serverStatus)
 			err = cc.WriteRowDescription(columns)
 			if err != nil {
 				return err
@@ -1661,8 +1662,8 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		data = pgio.AppendInt32(data, -1)
  		for i := 0; i < rowCount; i++ {
 			data = data[0:5]
-			if binary {
-				data, err = dumpBinaryRowData(data, rs.Columns(), req.GetRow(i))
+			if len(rf) > 0 {
+				data, err = dumpRowData(data, rs.Columns(), req.GetRow(i), rf)
 			} else {
 				data, err = dumpTextRowData(data, rs.Columns(), req.GetRow(i))
 			}
@@ -1760,7 +1761,7 @@ func (cc *clientConn) writeChunksWithFetchSize(ctx context.Context, rs ResultSet
 	return cc.writeEOF(serverStatus)
 }
 
-func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, binary bool) error {
+func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, resultFormat []int16) error {
 	for i, rs := range rss {
 		lastRs := i == len(rss)-1
 		if r, ok := rs.(*tidbResultSet).recordSet.(sqlexec.MultiQueryNoDelayResult); ok {
@@ -1777,7 +1778,7 @@ func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, 
 		if !lastRs {
 			status |= mysql.ServerMoreResultsExists
 		}
-		if err := cc.writeResultset(ctx, rs, binary, status, 0); err != nil {
+		if err := cc.writeResultset(ctx, rs, resultFormat, status, 0); err != nil {
 			return err
 		}
 	}
@@ -2403,7 +2404,7 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	case mysql.TypeDate:
 		return pgtype.DateOID
 	case mysql.TypeDuration:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.TimeOID  //与Time并不完全想对应
 	case mysql.TypeDatetime:
 		return pgtype.TimestampOID
 	case mysql.TypeYear:

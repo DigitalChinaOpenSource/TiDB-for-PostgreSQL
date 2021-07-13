@@ -468,6 +468,21 @@ func dumpTextRow(buffer []byte, columns []*ColumnInfo, row chunk.Row) ([]byte, e
 	return buffer, nil
 }
 
+// dumpRowData 向客户端写会RowData
+// PgSQL 在扩展查询中，会指定每一列返回数据的格式，可能是Text(0)或者Binary(1)
+// 当 resultFormat 只有一个值，代表着整行格式都为Text(0)或者Binary(1)
+func dumpRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) ([]byte,error) {
+	if len(rf) == 1 {
+		if rf[0] == 1 {
+			return dumpBinaryRowData(data, columns, row)
+		} else {
+			return dumpTextRowData(data, columns, row)
+		}
+	}
+
+	return dumpTextOrBinaryRowData(data , columns , row , rf)
+}
+
 // dumpBinaryRowData 向客户端以 Binary 格式写回 RowData
 // MySQL 报文协议为小端序，在 PgSQL 中报文为大端序
 // 每次只写入一行数据
@@ -589,6 +604,122 @@ func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte,
 			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
 		default:
 			return nil, errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
+		}
+	}
+
+	return data, nil
+}
+
+// dumpTextOrRowData
+func dumpTextOrBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) ([]byte, error) {
+	data = pgio.AppendUint16(data, uint16(len(columns)))
+
+	for i, col := range columns {
+		if row.IsNull(i) {
+			data = pgio.AppendInt32(data, -1)
+			continue
+		}
+
+		tmp := make([]byte, 0, 20)
+
+		// 只有 text 和 binary 两种
+		// binary
+		if rf[i] == 1 {
+			switch col.Type {
+			case mysql.TypeTiny:
+				data = pgio.AppendInt32(data, 1)
+				data = append(data, byte(row.GetInt64(i)))
+			case mysql.TypeShort, mysql.TypeYear:
+				data = pgio.AppendInt32(data, 2)
+				data = dumpUint16ByBigEndian(data, uint16(row.GetInt64(i)))
+			case mysql.TypeInt24, mysql.TypeLong:
+				data = pgio.AppendInt32(data, 4)
+				data = dumpUint32ByBigEndian(data, uint32(row.GetInt64(i)))
+			case mysql.TypeLonglong:
+				data = pgio.AppendInt32(data, 8)
+				data = dumpUint64ByBigEndian(data, row.GetUint64(i))
+			case mysql.TypeFloat:
+				data = pgio.AppendInt32(data, 4)
+				data = dumpUint32ByBigEndian(data, math.Float32bits(row.GetFloat32(i)))
+			case mysql.TypeDouble:
+				data = pgio.AppendInt32(data, 8)
+				data = dumpUint64ByBigEndian(data, math.Float64bits(row.GetFloat64(i)))
+			case mysql.TypeNewDecimal:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+			case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
+				mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
+				data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+			case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
+				tmp := make([]byte, 0)
+				tmp = dumpBinaryDateTimeByBigEndian(tmp, row.GetTime(i))
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeDuration:
+				tmp := make([]byte, 0)
+				tmp = dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeEnum:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+			case mysql.TypeSet:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+			case mysql.TypeJSON:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+			default:
+				return nil, errInvalidType.GenWithStack("invalid type %v", col.Type)
+			}
+		} else {
+			switch col.Type {
+			case mysql.TypeTiny, mysql.TypeShort, mysql.TypeInt24, mysql.TypeLong:
+				tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeYear:
+				year := row.GetInt64(i)
+				tmp = nil
+				if year == 0 {
+					tmp = append(tmp, '0', '0', '0', '0')
+				} else {
+					tmp = strconv.AppendInt(tmp, year, 10)
+				}
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeLonglong:
+				if mysql.HasUnsignedFlag(uint(col.Flag)) {
+					tmp = strconv.AppendUint(nil, row.GetUint64(i), 10)
+				} else {
+					tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
+				}
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeFloat:
+				prec := -1
+				if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
+					prec = int(col.Decimal)
+				}
+				tmp = appendFormatFloat(nil, float64(row.GetFloat32(i)), prec, 32)
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeDouble:
+				prec := types.UnspecifiedLength
+				if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
+					prec = int(col.Decimal)
+				}
+				tmp = appendFormatFloat(nil, row.GetFloat64(i), prec, 64)
+				data = dumpLengthEncodedStringByEndian(data, tmp)
+			case mysql.TypeNewDecimal:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+			case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
+				mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
+				data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+			case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetTime(i).String()))
+			case mysql.TypeDuration:
+				dur := row.GetDuration(i, int(col.Decimal))
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(dur.String()))
+			case mysql.TypeEnum:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+			case mysql.TypeSet:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+			case mysql.TypeJSON:
+				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+			default:
+				return nil, errInvalidType.GenWithStack("invalid type %v", col.Type)
+			}
 		}
 	}
 
