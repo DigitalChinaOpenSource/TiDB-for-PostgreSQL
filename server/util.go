@@ -152,7 +152,7 @@ func dumpLengthEncodedString(buffer []byte, bytes []byte) []byte {
 	return buffer
 }
 
-func dumpLengthEncodedStringByEndian(buffer []byte, bytes []byte) []byte {
+func dumpLengthEncodedStringByBigEndian(buffer []byte, bytes []byte) []byte {
 	buffer = pgio.AppendInt32(buffer, int32(len(bytes)))
 	buffer = append(buffer, bytes...)
 	return buffer
@@ -496,10 +496,11 @@ func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byt
 			continue
 		}
 		switch columns[i].Type {
-		case mysql.TypeTiny:
-			data = pgio.AppendInt32(data, 1)
-			data = append(data, byte(row.GetInt64(i)))
-		case mysql.TypeShort, mysql.TypeYear:
+		// postgresql does not have a tiny type
+		//case mysql.TypeTiny:
+		//	data = pgio.AppendInt32(data, 1)
+		//	data = append(data, byte(row.GetInt64(i)))
+		case mysql.TypeTiny, mysql.TypeShort, mysql.TypeYear:
 			data = pgio.AppendInt32(data, 2)
 			data = dumpUint16ByBigEndian(data, uint16(row.GetInt64(i)))
 		case mysql.TypeInt24, mysql.TypeLong:
@@ -515,24 +516,23 @@ func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byt
 			data = pgio.AppendInt32(data, 8)
 			data = dumpUint64ByBigEndian(data, math.Float64bits(row.GetFloat64(i)))
 		case mysql.TypeNewDecimal:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
 		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
 			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-			data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+			data = dumpLengthEncodedStringByBigEndian(data, row.GetBytes(i))
 		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
 			tmp := make([]byte, 0)
 			tmp = dumpBinaryDateTimeByBigEndian(tmp, row.GetTime(i))
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeDuration:
-			tmp := make([]byte, 0)
-			tmp = dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			tmp := dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeEnum:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetEnum(i).String()))
 		case mysql.TypeSet:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetSet(i).String()))
 		case mysql.TypeJSON:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetJSON(i).String()))
 		default:
 			return nil, errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
 		}
@@ -555,7 +555,7 @@ func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte,
 		switch col.Type {
 		case mysql.TypeTiny, mysql.TypeShort, mysql.TypeInt24, mysql.TypeLong:
 			tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeYear:
 			year := row.GetInt64(i)
 			tmp = nil
@@ -564,44 +564,44 @@ func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte,
 			} else {
 				tmp = strconv.AppendInt(tmp, year, 10)
 			}
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeLonglong:
 			if mysql.HasUnsignedFlag(uint(columns[i].Flag)) {
 				tmp = strconv.AppendUint(nil, row.GetUint64(i), 10)
 			} else {
 				tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
 			}
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeFloat:
 			prec := -1
 			if columns[i].Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
 				prec = int(col.Decimal)
 			}
 			tmp = appendFormatFloat(nil, float64(row.GetFloat32(i)), prec, 32)
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeDouble:
 			prec := types.UnspecifiedLength
 			if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
 				prec = int(col.Decimal)
 			}
 			tmp = appendFormatFloat(nil, row.GetFloat64(i), prec, 64)
-			data = dumpLengthEncodedStringByEndian(data, tmp)
+			data = dumpLengthEncodedStringByBigEndian(data, tmp)
 		case mysql.TypeNewDecimal:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
 		case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
 			mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-			data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+			data = dumpLengthEncodedStringByBigEndian(data, row.GetBytes(i))
 		case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetTime(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetTime(i).String()))
 		case mysql.TypeDuration:
 			dur := row.GetDuration(i, int(col.Decimal))
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(dur.String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(dur.String()))
 		case mysql.TypeEnum:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetEnum(i).String()))
 		case mysql.TypeSet:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetSet(i).String()))
 		case mysql.TypeJSON:
-			data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+			data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetJSON(i).String()))
 		default:
 			return nil, errInvalidType.GenWithStack("invalid type %v", columns[i].Type)
 		}
@@ -626,10 +626,7 @@ func dumpTextOrBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row, 
 		// binary
 		if rf[i] == 1 {
 			switch col.Type {
-			case mysql.TypeTiny:
-				data = pgio.AppendInt32(data, 1)
-				data = append(data, byte(row.GetInt64(i)))
-			case mysql.TypeShort, mysql.TypeYear:
+			case mysql.TypeTiny, mysql.TypeShort, mysql.TypeYear:
 				data = pgio.AppendInt32(data, 2)
 				data = dumpUint16ByBigEndian(data, uint16(row.GetInt64(i)))
 			case mysql.TypeInt24, mysql.TypeLong:
@@ -645,24 +642,22 @@ func dumpTextOrBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row, 
 				data = pgio.AppendInt32(data, 8)
 				data = dumpUint64ByBigEndian(data, math.Float64bits(row.GetFloat64(i)))
 			case mysql.TypeNewDecimal:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
 			case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
 				mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-				data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+				data = dumpLengthEncodedStringByBigEndian(data, row.GetBytes(i))
 			case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
-				tmp := make([]byte, 0)
 				tmp = dumpBinaryDateTimeByBigEndian(tmp, row.GetTime(i))
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeDuration:
-				tmp := make([]byte, 0)
 				tmp = dumpBinaryTimeByBigEndian(row.GetDuration(i, 0).Duration)
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeEnum:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetEnum(i).String()))
 			case mysql.TypeSet:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetSet(i).String()))
 			case mysql.TypeJSON:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetJSON(i).String()))
 			default:
 				return nil, errInvalidType.GenWithStack("invalid type %v", col.Type)
 			}
@@ -670,7 +665,7 @@ func dumpTextOrBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row, 
 			switch col.Type {
 			case mysql.TypeTiny, mysql.TypeShort, mysql.TypeInt24, mysql.TypeLong:
 				tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeYear:
 				year := row.GetInt64(i)
 				tmp = nil
@@ -679,44 +674,44 @@ func dumpTextOrBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row, 
 				} else {
 					tmp = strconv.AppendInt(tmp, year, 10)
 				}
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeLonglong:
 				if mysql.HasUnsignedFlag(uint(col.Flag)) {
 					tmp = strconv.AppendUint(nil, row.GetUint64(i), 10)
 				} else {
 					tmp = strconv.AppendInt(nil, row.GetInt64(i), 10)
 				}
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeFloat:
 				prec := -1
 				if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
 					prec = int(col.Decimal)
 				}
 				tmp = appendFormatFloat(nil, float64(row.GetFloat32(i)), prec, 32)
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeDouble:
 				prec := types.UnspecifiedLength
 				if col.Decimal > 0 && int(col.Decimal) != mysql.NotFixedDec && col.Table == "" {
 					prec = int(col.Decimal)
 				}
 				tmp = appendFormatFloat(nil, row.GetFloat64(i), prec, 64)
-				data = dumpLengthEncodedStringByEndian(data, tmp)
+				data = dumpLengthEncodedStringByBigEndian(data, tmp)
 			case mysql.TypeNewDecimal:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetMyDecimal(i).String()))
 			case mysql.TypeString, mysql.TypeVarString, mysql.TypeVarchar, mysql.TypeBit,
 				mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
-				data = dumpLengthEncodedStringByEndian(data, row.GetBytes(i))
+				data = dumpLengthEncodedStringByBigEndian(data, row.GetBytes(i))
 			case mysql.TypeDate, mysql.TypeDatetime, mysql.TypeTimestamp:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetTime(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetTime(i).String()))
 			case mysql.TypeDuration:
 				dur := row.GetDuration(i, int(col.Decimal))
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(dur.String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(dur.String()))
 			case mysql.TypeEnum:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetEnum(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetEnum(i).String()))
 			case mysql.TypeSet:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetSet(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetSet(i).String()))
 			case mysql.TypeJSON:
-				data = dumpLengthEncodedStringByEndian(data, hack.Slice(row.GetJSON(i).String()))
+				data = dumpLengthEncodedStringByBigEndian(data, hack.Slice(row.GetJSON(i).String()))
 			default:
 				return nil, errInvalidType.GenWithStack("invalid type %v", col.Type)
 			}
