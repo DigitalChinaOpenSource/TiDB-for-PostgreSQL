@@ -397,6 +397,33 @@ func handleTableExists(m *mysql.SQLError, te *terror.Error, sql string) (*pgprot
 	return errorResponse, nil
 }
 
+// return the name of the table from MySQL error message
+func getTableName(msg string, immediateBefore string, immediateAfter string) string {
+	tableStart := strings.Index(msg, immediateBefore) + 1
+	tableLen := strings.Index(msg[tableStart:], immediateAfter)
+	tableName := msg[tableStart : tableStart+tableLen]
+
+	return tableName
+}
+
+//handleUndefinedTable 处理表不存在的错误
+func handleUndefinedTable(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+	tableName := getTableName(m.Message, ".", "'")
+	pgMsg := fmt.Sprintf("table \"%s\" does not exist", tableName)
+
+	errorResponse := &pgproto3.ErrorResponse{
+		Severity:            "ERROR",
+		SeverityUnlocalized: "",
+		//undefined_table
+		Code:    "42P01",
+		Message: pgMsg,
+		Detail:  "",
+		Hint:    "",
+	}
+	setFilePathAndLine(te, errorResponse)
+	return errorResponse, nil
+}
+
 //handleUnknownDB 处理数据库不存在的错误
 // eg. Unknown database 'testDB'
 func handleUnknownDB(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
