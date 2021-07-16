@@ -2109,7 +2109,7 @@ func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) 
 		}
 		return gssEncRequest, nil
 	default:
-		return nil, errors.New("unknown startup message code: " + string(code))
+		return nil, errors.New("unknown startup message code: " + fmt.Sprint(code))
 	}
 }
 
