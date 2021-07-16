@@ -1131,8 +1131,7 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	// 发送错误后需要发送 ReadyForQuery 通知客户端可以继续执行命令
 	// 所以这里需要获取到事务状态是否处于空闲阶段
 	// todo 获取事务状态
-	cc.writeReadyForQuery(ctx, cc.ctx.Status())
-	return cc.flush(ctx)
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 }
 
 // writeEOF writes an EOF packet.
@@ -2331,8 +2330,8 @@ func (cc *clientConn) writeReadyForQuery(ctx context.Context, status uint16) err
 		return err
 	}
 
-	readForReady := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
-	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
+	readyForQuery := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
+	if err := cc.WriteData(readyForQuery.Encode(nil)); err != nil{
 		return err
 	}
 	return cc.flush(ctx)
@@ -2482,6 +2481,8 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleUnknownDB(m,te,sql)
 	case 1050:
 		return handleTableExists(m,te,sql)
+	case 1051:
+		return handleUndefinedTable(m, te, sql)
 	case 1054:
 		return handleUnknownColumn(m,te, sql)
 	case 1062:
