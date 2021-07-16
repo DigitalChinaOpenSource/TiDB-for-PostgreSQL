@@ -1066,7 +1066,7 @@ func (cc *clientConn) flush(ctx context.Context) error {
 	return cc.pkt.flush()
 }
 
-// writeOK 这个暂且先这么写,后面是否选择使用,待定
+// writeOK You can choose this method when you need to return complete and readyforquery directly to the client
 func (cc *clientConn) writeOK(ctx context.Context) error {
 	//msg := cc.ctx.LastMessage()
 	if err := cc.writeCommandComplete(); err != nil {
@@ -1390,7 +1390,7 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 		return err
 	}
 	if len(stmts) == 0 {
-		return cc.writeCommandComplete()
+		return cc.writeOK(ctx)
 	}
 
 	var appendMultiStmtWarning bool
@@ -2383,11 +2383,9 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	switch mysqlType {
 	case mysql.TypeUnspecified:
 		return pgtype.UnknownOID
-	case mysql.TypeTiny:
+	case mysql.TypeTiny, mysql.TypeShort:
 		return pgtype.Int2OID
-	case mysql.TypeShort:
-		return pgtype.Int2OID
-	case mysql.TypeLong:
+	case mysql.TypeLong, mysql.TypeInt24:
 		return pgtype.Int4OID
 	case mysql.TypeFloat:
 		return pgtype.Float4OID
@@ -2399,8 +2397,6 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 		return pgtype.TimestampOID
 	case mysql.TypeLonglong:
 		return pgtype.Int8OID
-	case mysql.TypeInt24:  //未找到对应类型
-		return pgtype.UnknownOID
 	case mysql.TypeDate:
 		return pgtype.DateOID
 	case mysql.TypeDuration:
@@ -2418,22 +2414,16 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	case mysql.TypeJSON:
 		return pgtype.JSONOID
 	case mysql.TypeNewDecimal:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.NumericOID
 	case mysql.TypeEnum:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.UnknownOID  //未找到对应类型dumpLengthEncodedStringByEndian
 	case mysql.TypeSet:
 		return pgtype.UnknownOID  //未找到对应类型
-	case mysql.TypeTinyBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeMediumBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeLongBlob:
+	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob:
 		return pgtype.ByteaOID
 	case mysql.TypeBlob:
 		return pgtype.ByteaOID
-	case mysql.TypeVarString:
-		return pgtype.TextOID
-	case mysql.TypeString:
+	case mysql.TypeVarString, mysql.TypeString:
 		return pgtype.TextOID
 	case mysql.TypeGeometry:
 		return pgtype.UnknownOID  //未找到对应类型
