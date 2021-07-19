@@ -254,7 +254,9 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 		for i := 1; i < len(markers); i++ {
 			val, index = markers[i], i -1
 			for {
-				if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order {
+				if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order ||
+					(val.(*driver.ParamMarkerExpr).Order == markers[index].(*driver.ParamMarkerExpr).Order &&
+						val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset){
 					markers[index + 1] = markers[index]
 				} else {
 					break
