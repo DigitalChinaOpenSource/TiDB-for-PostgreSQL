@@ -161,7 +161,8 @@ func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
 		0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x00,// application name
 		0x70, 0x73, 0x71, 0x6c, 0x00,//psql
 		0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x65, 0x6e, 0x63, 0x6f, 0x64, 0x69, 0x6e, 0x67, 0x00,// client encoding
-		0x55, 0x54, 0x46, 0x38, 0x00, 0x00,//UTF8
+		0x55, 0x54, 0x46, 0x38, 0x00, //UTF8
+		0x00,
 	}
 	cc := &clientConn{
 		bufReadConn: &bufferedReadConn{
@@ -192,6 +193,32 @@ func (ts *ConnTestSuite) TestReceiveSSLRequestPG (c *C) {
 	_, ok := response.(*pgproto3.SSLRequest)
 	c.Assert(ok,IsTrue)
 }
+
+// TiDB for PG should write back correct authentication ok message when called
+func (ts *ConnTestSuite) TestAuthenticationOKPG (c *C) {
+	c.Parallel()
+	var outBuffer bytes.Buffer
+	cc := &clientConn{
+		connectionID: 1,
+		server: &Server{
+			capability: defaultCapability,
+		},
+		pkt: &packetIO{
+			bufWriter: bufio.NewWriter(&outBuffer),
+		},
+	}
+	err := cc.writeAuthenticationOK(context.TODO())
+	c.Assert(err, IsNil)
+	expected := new(bytes.Buffer)
+	expected.Write([]byte{
+		0x52, //Message code
+		0x00, 0x00, 0x00, 0x08, // Length = 8
+		0x00, 0x00, 0x00, 0x00, // Authentication ok
+	})
+
+	c.Assert(outBuffer.Bytes(), DeepEquals, expected.Bytes())
+}
+
 
 func (ts *ConnTestSuite) TestIssue1768(c *C) {
 	c.Parallel()
