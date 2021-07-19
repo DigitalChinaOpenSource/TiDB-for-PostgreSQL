@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/executor"
@@ -63,6 +63,19 @@ func (ts *ConnTestSuite) TestMalformHandshakeHeader(c *C) {
 	data := []byte{0x00}
 	var p handshakeResponse41
 	_, err := parseHandshakeResponseHeader(context.Background(), &p, data)
+	c.Assert(err, NotNil)
+}
+
+// Test a malformed handsake packet from pg client, must error
+func (ts *ConnTestSuite) TestMalformHandshakeHeaderPG (c *C) {
+	c.Parallel()
+	data := []byte{0x00}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	_, err := cc.ReceiveStartupMessage()
 	c.Assert(err, NotNil)
 }
 
@@ -132,6 +145,30 @@ func (ts *ConnTestSuite) TestParseHandshakeResponse(c *C) {
 	err = parseOldHandshakeResponseBody(context.Background(), &p, data, offset)
 	c.Assert(err, IsNil)
 	c.Assert(p.User, Equals, "root")
+}
+
+func (ts *ConnTestSuite) TestParseHandshakePG (c *C) {
+	c.Parallel()
+	// here are packet got from running: psql "sslmode=disable host=localhost"
+	data := []byte{
+		0x00, 0x00, 0x00, 0x4e, // Length = 48
+		0x00, 0x03, 0x00, 0x00, // Protocol Version: major = 3, minor = 0
+		0x75, 0x73, 0x65, 0x72, 0x00, // user
+		0x64, 0x61, 0x76, 0x69, 0x64, 0x00, // david
+		0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x00,//database
+		0x64, 0x61, 0x76, 0x69, 0x64, 0x00,//david
+		0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x00,// application name
+		0x70, 0x73, 0x71, 0x6c, 0x00,//psql
+		0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x65, 0x6e, 0x63, 0x6f, 0x64, 0x69, 0x6e, 0x67, 0x00,// client encoding
+		0x55, 0x54, 0x46, 0x38, 0x00, 0x00,//UTF8
+	}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	_, err := cc.ReceiveStartupMessage()
+	c.Assert(err, IsNil)
 }
 
 func (ts *ConnTestSuite) TestIssue1768(c *C) {
