@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/jackc/pgproto3/v2"
 	"io"
 
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
@@ -146,12 +147,12 @@ func (ts *ConnTestSuite) TestParseHandshakeResponse(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(p.User, Equals, "root")
 }
-
-func (ts *ConnTestSuite) TestParseHandshakePG (c *C) {
+// Test that tidb for pg is capable of converting the start up message to the correct pgproto3 object
+func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
 	c.Parallel()
-	// here are packet got from running: psql "sslmode=disable host=localhost"
+	// here are packet got from running psql via command[psql "sslmode=disable host=localhost"]
 	data := []byte{
-		0x00, 0x00, 0x00, 0x4e, // Length = 48
+		0x00, 0x00, 0x00, 0x4e, // Length = 78
 		0x00, 0x03, 0x00, 0x00, // Protocol Version: major = 3, minor = 0
 		0x75, 0x73, 0x65, 0x72, 0x00, // user
 		0x64, 0x61, 0x76, 0x69, 0x64, 0x00, // david
@@ -167,8 +168,29 @@ func (ts *ConnTestSuite) TestParseHandshakePG (c *C) {
 			rb: bufio.NewReader(bytes.NewReader(data)),
 		},
 	}
-	_, err := cc.ReceiveStartupMessage()
+	response, err := cc.ReceiveStartupMessage()
 	c.Assert(err, IsNil)
+	_, ok := response.(*pgproto3.StartupMessage)
+	c.Assert(ok,IsTrue)
+}
+
+// Test that tidb for pg can correctly construct corresponding pgproto3 response
+func (ts *ConnTestSuite) TestReceiveSSLRequestPG (c *C) {
+	c.Parallel()
+	// here are packet got from running psql via command[psql "host=localhost"]
+	data := []byte{
+		0x00, 0x00, 0x00, 0x08, // Length = 8
+		0x04, 0xd2, 0x16, 0x2f, // Protocol: SSL Request (80877103)
+	}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	response, err := cc.ReceiveStartupMessage()
+	c.Assert(err, IsNil)
+	_, ok := response.(*pgproto3.SSLRequest)
+	c.Assert(ok,IsTrue)
 }
 
 func (ts *ConnTestSuite) TestIssue1768(c *C) {
