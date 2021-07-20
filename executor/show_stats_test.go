@@ -251,10 +251,9 @@ func (s *testShowStatsSuite) TestShowStatusSnapshot(c *C) {
 	tk.MustExec(updateSafePoint)
 
 	snapshotTime := time.Now()
-
+	result := tk.MustQuery("show table status;")
+	c.Check(result.Rows()[0][0], Matches, "t")
 	tk.MustExec("drop table t;")
 	tk.MustQuery("show table status;").Check(testkit.Rows())
 	tk.MustExec("set @@tidb_snapshot = '" + snapshotTime.Format("2006-01-02 15:04:05.999999") + "'")
-	result := tk.MustQuery("show table status;")
-	c.Check(result.Rows()[0][0], Matches, "t")
 }

@@ -18,12 +18,12 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/pingcap/check"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/executor"
 	plannercore "github.com/pingcap/tidb/planner/core"
@@ -957,9 +957,9 @@ func (s *testSuite5) TestShowBuiltin(c *C) {
 	res := tk.MustQuery("show builtins;")
 	c.Assert(res, NotNil)
 	rows := res.Rows()
-	c.Assert(267, Equals, len(rows))
+	c.Assert(278, Equals, len(rows))
 	c.Assert("abs", Equals, rows[0][0].(string))
-	c.Assert("yearweek", Equals, rows[266][0].(string))
+	c.Assert("yearweek", Equals, rows[277][0].(string))
 }
 
 func (s *testSuite5) TestShowClusterConfig(c *C) {
