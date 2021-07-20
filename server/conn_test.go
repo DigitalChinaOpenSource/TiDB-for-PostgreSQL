@@ -18,11 +18,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
-	"github.com/jackc/pgproto3/v2"
-	"io"
-
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/jackc/pgproto3/v2"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/config"
@@ -35,6 +34,7 @@ import (
 	"github.com/pingcap/tidb/util/arena"
 	"github.com/pingcap/tidb/util/testkit"
 	"github.com/pingcap/tidb/util/testleak"
+	"io"
 )
 
 type ConnTestSuite struct {
@@ -67,7 +67,7 @@ func (ts *ConnTestSuite) TestMalformHandshakeHeader(c *C) {
 	c.Assert(err, NotNil)
 }
 
-// Test a malformed handsake packet from pg client, must error
+// Test a malformed handshake packet from pg client, must error
 func (ts *ConnTestSuite) TestMalformHandshakeHeaderPG (c *C) {
 	c.Parallel()
 	data := []byte{0x00}
@@ -314,7 +314,7 @@ type dispatchInput struct {
 	out []byte
 }
 
-func (ts *ConnTestSuite) TestDispatch(c *C) {
+/*func (ts *ConnTestSuite) TestDispatch(c *C) {
 	userData := append([]byte("root"), 0x0, 0x0)
 	userData = append(userData, []byte("test")...)
 	userData = append(userData, 0x0)
@@ -413,9 +413,9 @@ func (ts *ConnTestSuite) TestDispatch(c *C) {
 	}
 
 	ts.testDispatch(c, inputs, 0)
-}
+}*/
 
-func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
+/*func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
 	userData := append([]byte("root"), 0x0, 0x0)
 	userData = append(userData, []byte("test")...)
 	userData = append(userData, 0x0)
@@ -516,6 +516,27 @@ func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
 	}
 
 	ts.testDispatch(c, inputs, mysql.ClientProtocol41)
+}*/
+
+func (ts *ConnTestSuite) TestDispatchSimpleQueryPG(c *C) {
+	do1Response, _ := hex.DecodeString("540000001a00016100000040410001000000170004ffffffff0000440000000b00010000000131430000000d53454c4543542031005a0000000549")
+	inputs := []dispatchInput{
+		{
+			com: 'X', // quit command
+			in:  nil,
+			err: io.EOF, // when client quit, there should be a eof error
+			out: nil,
+		},
+		{
+			com: 'Q',
+			in:  []byte("select * from t;"),
+			err: nil,
+			out: do1Response,
+		},
+
+	}
+
+	ts.testDispatch(c, inputs, mysql.ClientProtocol41)
 }
 
 func (ts *ConnTestSuite) testDispatch(c *C, inputs []dispatchInput, capability uint32) {
@@ -532,9 +553,11 @@ func (ts *ConnTestSuite) testDispatch(c *C, inputs []dispatchInput, capability u
 		session: se,
 		stmts:   make(map[int]*TiDBStatement),
 	}
-	_, err = se.Execute(context.Background(), "create table test.t(a int)")
+	_, err = se.Execute(context.Background(), "use test")
 	c.Assert(err, IsNil)
-	_, err = se.Execute(context.Background(), "insert into test.t values (1)")
+	_, err = se.Execute(context.Background(), "create table t(a int)")
+	c.Assert(err, IsNil)
+	_, err = se.Execute(context.Background(), "insert into t values (1)")
 	c.Assert(err, IsNil)
 
 	var outBuffer bytes.Buffer
