@@ -23,14 +23,14 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/cznic/mathutil"
-	"github.com/cznic/sortutil"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
+	"github.com/cznic/sortutil"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/executor/aggfuncs"
@@ -1470,7 +1470,8 @@ func (b *executorBuilder) buildMemTable(v *plannercore.PhysicalMemTable) Executo
 					columns: v.Columns,
 				},
 			}
-		case strings.ToLower(infoschema.TableColumns):
+		case strings.ToLower(infoschema.TableColumns),
+			strings.ToLower(infoschema.TablePgColumns):
 			return &MemTableReaderExec{
 				baseExecutor: newBaseExecutor(b.ctx, v.Schema(), v.ID()),
 				table:        v.Table,
@@ -1514,6 +1515,22 @@ func (b *executorBuilder) buildMemTable(v *plannercore.PhysicalMemTable) Executo
 					table:      v.Table,
 					outputCols: v.Columns,
 					extractor:  v.Extractor.(*plannercore.TiFlashSystemTableExtractor),
+				},
+			}
+		case strings.ToLower(infoschema.TablePgSchemata),
+			strings.ToLower(infoschema.TablePgTables),
+			strings.ToLower(infoschema.TablePgCollations),
+			strings.ToLower(infoschema.TablePgViews),
+			strings.ToLower(infoschema.TablePgSequences),
+			strings.ToLower(infoschema.TablePgTableConstraints),
+			strings.ToLower(infoschema.TablePgCharacterSets),
+			strings.ToLower(infoschema.TablePgCollationCharacterSetApplicability):
+			return &MemTableReaderExec{
+				baseExecutor: newBaseExecutor(b.ctx, v.Schema(), v.ID()),
+				table: v.Table,
+				retriever: &pgMemTableRetriever{
+					table: v.Table,
+					columns: v.Columns,
 				},
 			}
 		}

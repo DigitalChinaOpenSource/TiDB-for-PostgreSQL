@@ -37,13 +37,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
-	"github.com/pingcap/kvproto/pkg/metapb"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
+	"github.com/pingcap/kvproto/pkg/metapb"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain/infosync"
 	"github.com/pingcap/tidb/kv"
@@ -71,9 +71,9 @@ const (
 	// TableStatistics is the string constant of infoschema table
 	TableStatistics = "STATISTICS"
 	// TableCharacterSets is the string constant of infoschema charactersets memory table
-	TableCharacterSets = "CHARACTER_SETS"
+	TableCharacterSets = "TiDB_CHARACTER_SETS"
 	// TableCollations is the string constant of infoschema collations memory table.
-	TableCollations = "COLLATIONS"
+	TableCollations = "TIDB_COLLATIONS"
 	tableFiles      = "FILES"
 	// CatalogVal is the string constant of TABLE_CATALOG.
 	CatalogVal = "def"
@@ -108,7 +108,7 @@ const (
 	tableOptimizerTrace  = "OPTIMIZER_TRACE"
 	tableTableSpaces     = "TABLESPACES"
 	// TableCollationCharacterSetApplicability is the string constant of infoschema memory table.
-	TableCollationCharacterSetApplicability = "COLLATION_CHARACTER_SET_APPLICABILITY"
+	TableCollationCharacterSetApplicability = "TiDB_COLLATION_CHARACTER_SET_APPLICABILITY"
 	// TableProcesslist is the string constant of infoschema table.
 	TableProcesslist = "PROCESSLIST"
 	// TableTiDBIndexes is the string constant of infoschema table
@@ -1365,12 +1365,14 @@ var pgTableAttributesCols = []columnInfo{
 var pgTableCharacterSetsCols = []columnInfo{
 	{name: "character_set_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "character_set_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "character_set_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "character_set_name", tp: mysql.TypeVarchar, size: 32},
 	{name: "character_repertoire", tp: mysql.TypeVarchar, size: 64},
 	{name: "form_of_use", tp: mysql.TypeVarchar, size: 64},
 	{name: "default_collate_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "default_collate_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "default_collate_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "default_collate_name", tp: mysql.TypeVarchar, size: 32},
+	{name: "DESCRIPTION", tp: mysql.TypeVarchar, size: 60, comment: "TiDB table cols"},
+	{name: "MAXLEN", tp: mysql.TypeLonglong, size: 3, comment: "TiDB table cols"},
 }
 // pgTableCheckConstraintRoutineUsageCols is table check_constraint_routine_usage columns
 // https://www.postgresql.org/docs/13/infoschema-check-constraint-routine-usage.html
@@ -1393,20 +1395,25 @@ var pgTableCheckConstraintsCols = []columnInfo{
 // pgTableCollationsCols is table collations columns
 // https://www.postgresql.org/docs/13/infoschema-collations.html
 var pgTableCollationsCols = []columnInfo{
-	{name: "constraint_catalog", tp: mysql.TypeVarchar, size: 64},
-	{name: "constraint_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "constraint_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "check_clause", tp: mysql.TypeVarchar, size: 64},
+	{name: "collation_catalog", tp: mysql.TypeVarchar, size: 64},
+	{name: "collation_schema", tp: mysql.TypeVarchar, size: 64},
+	{name: "collation_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "pad_attribute", tp: mysql.TypeVarchar, size: 64},
+	{name: "CHARACTER_SET_NAME", tp: mysql.TypeVarchar, size: 32, comment: "TiDB table cols"},
+	{name: "ID", tp: mysql.TypeLonglong, size: 11, comment: "TiDB table cols"},
+	{name: "IS_DEFAULT", tp: mysql.TypeVarchar, size: 3, comment: "TiDB table cols"},
+	{name: "IS_COMPILED", tp: mysql.TypeVarchar, size: 3, comment: "TiDB table cols"},
+	{name: "SORTLEN", tp: mysql.TypeLonglong, size: 3, comment: "TiDB table cols"},
 }
 // pgTableCollationCharacterSetApplicabilityCols is table collation_character_set_applicability columns
 // https://www.postgresql.org/docs/13/infoschema-collation-character-set-applicab.html
 var pgTableCollationCharacterSetApplicabilityCols = []columnInfo{
 	{name: "collation_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "collation_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "collation_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "collation_name", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag},
 	{name: "character_set_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "character_set_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "character_set_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "character_set_name", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag},
 }
 // pgTableColumnColumnUsageCols is table column_column_usage columns
 // https://www.postgresql.org/docs/13/infoschema-column-column-usage.html
@@ -1464,20 +1471,20 @@ var pgTableColumnUdtUsageCols = []columnInfo{
 // pgTableColumnsCols is table columns columns
 // https://www.postgresql.org/docs/13/infoschema-columns.html
 var pgTableColumnsCols = []columnInfo{
-	{name: "table_catalog", tp: mysql.TypeVarchar, size: 64},
+	{name: "table_catalog", tp: mysql.TypeVarchar, size: 512},
 	{name: "table_schema", tp: mysql.TypeVarchar, size: 64},
 	{name: "table_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "column_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "ordinal_position", tp: mysql.TypeInt24, size: 32},
-	{name: "column_default", tp: mysql.TypeVarchar, size: 64},
-	{name: "is_nullable", tp: mysql.TypeVarchar, size: 64},
+	{name: "ordinal_position", tp: mysql.TypeLonglong, size: 64},
+	{name: "column_default", tp: mysql.TypeBlob, size: 196606},
+	{name: "is_nullable", tp: mysql.TypeVarchar, size: 3},
 	{name: "data_type", tp: mysql.TypeVarchar, size: 64},
-	{name: "character_maximum_length", tp: mysql.TypeInt24, size: 64},
-	{name: "character_octet_length", tp: mysql.TypeInt24, size: 64},
-	{name: "numeric_precision", tp: mysql.TypeInt24, size: 64},
-	{name: "numeric_precision_radix", tp: mysql.TypeInt24, size: 64},
-	{name: "numeric_scale", tp: mysql.TypeInt24, size: 64},
-	{name: "datetime_precision", tp: mysql.TypeInt24, size: 64},
+	{name: "character_maximum_length", tp: mysql.TypeLonglong, size: 21},
+	{name: "character_octet_length", tp: mysql.TypeLonglong, size: 21},
+	{name: "numeric_precision", tp: mysql.TypeLonglong, size: 21},
+	{name: "numeric_precision_radix", tp: mysql.TypeLonglong, size: 21},
+	{name: "numeric_scale", tp: mysql.TypeLonglong, size: 21},
+	{name: "datetime_precision", tp: mysql.TypeLonglong, size: 21},
 	{name: "interval_type", tp: mysql.TypeVarchar, size: 64},
 	{name: "interval_precision", tp: mysql.TypeInt24, size: 64},
 	{name: "character_set_catalog", tp: mysql.TypeVarchar, size: 64},
@@ -1485,7 +1492,7 @@ var pgTableColumnsCols = []columnInfo{
 	{name: "character_set_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "collation_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "collation_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "collation_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "collation_name", tp: mysql.TypeVarchar, size: 32},
 	{name: "domain_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "domain_schema", tp: mysql.TypeVarchar, size: 64},
 	{name: "domain_name", tp: mysql.TypeVarchar, size: 64},
@@ -1506,8 +1513,13 @@ var pgTableColumnsCols = []columnInfo{
 	{name: "identity_minimum", tp: mysql.TypeVarchar, size: 64},
 	{name: "identity_cycle", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_generated", tp: mysql.TypeVarchar, size: 64},
-	{name: "generation_expression", tp: mysql.TypeVarchar, size: 64},
+	{name: "generation_expression", tp: mysql.TypeBlob, size: 589779, flag: mysql.NotNullFlag},
 	{name: "is_updatable", tp: mysql.TypeVarchar, size: 64},
+	{name: "COLUMN_TYPE", tp: mysql.TypeBlob, size: 196606, comment: "TiDB Table Cols"},
+	{name: "COLUMN_KEY", tp: mysql.TypeVarchar, size: 3, comment: "TiDB Table Cols"},
+	{name: "EXTRA", tp: mysql.TypeVarchar, size: 30, comment: "TiDB Table Cols"},
+	{name: "PRIVILEGES", tp: mysql.TypeVarchar, size: 80, comment: "TiDB Table Cols"},
+	{name: "COLUMN_COMMENT", tp: mysql.TypeVarchar, size: 1024, comment: "TiDB Table Cols"},
 }
 // pgTableConstraintColumnUsageCols is table constraint_column_usage columns
 // https://www.postgresql.org/docs/13/infoschema-constraint-column-usage.html
@@ -1915,15 +1927,16 @@ var pgTableSchemataCols = []columnInfo{
 	{name: "schema_owner", tp: mysql.TypeVarchar, size: 64},
 	{name: "default_character_set_catalog", tp: mysql.TypeVarchar, size: 64},
 	{name: "default_character_set_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "default_character_set_name", tp: mysql.TypeVarchar, size: 32},
+	{name: "default_character_set_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "sql_path", tp: mysql.TypeVarchar, size: 512},
+	{name: "DEFAULT_COLLATION_NAME", tp: mysql.TypeVarchar, size: 32,comment: "TiDB Schemata col"},
 }
 // pgTableSequencesCols is table sequences columns
 // https://www.postgresql.org/docs/13/infoschema-sequences.html
 var pgTableSequencesCols = []columnInfo{
 	{name: "sequence_catalog", tp: mysql.TypeVarchar, size: 64},
-	{name: "sequence_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "sequence_name", tp: mysql.TypeVarchar, size: 64},
+	{name: "sequence_schema", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "sequence_name", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
 	{name: "data_type", tp: mysql.TypeVarchar, size: 64},
 	{name: "numeric_precision", tp: mysql.TypeVarchar, size: 64},
 	{name: "numeric_precision_radix", tp: mysql.TypeVarchar, size: 32},
@@ -1931,8 +1944,16 @@ var pgTableSequencesCols = []columnInfo{
 	{name: "start_value", tp: mysql.TypeVarchar, size: 64},
 	{name: "minimum_value", tp: mysql.TypeVarchar, size: 64},
 	{name: "maximum_value", tp: mysql.TypeVarchar, size: 64},
-	{name: "increment", tp: mysql.TypeVarchar, size: 64},
+	{name: "increment", tp: mysql.TypeLonglong, size: 21, flag: mysql.NotNullFlag},
 	{name: "cycle_option", tp: mysql.TypeVarchar, size: 64},
+	{name: "TABLE_CATALOG", tp: mysql.TypeVarchar, size: 512, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "CACHE", tp: mysql.TypeTiny, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "CACHE_VALUE", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "CYCLE", tp: mysql.TypeTiny, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "MAX_VALUE", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "MIN_VALUE", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "START", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "COMMENT", tp: mysql.TypeVarchar, size: 64, comment: "TiDB Table Cols"},
 }
 // pgTableSqlFeaturesCols is table sql_features columns
 // https://www.postgresql.org/docs/13/infoschema-sql-features.html
@@ -1974,7 +1995,7 @@ var pgTableSqlSizingCols = []columnInfo{
 // pgTableTableConstraintsCols is table table_constraints columns
 // https://www.postgresql.org/docs/13/infoschema-table-constraints.html
 var pgTableTableConstraintsCols = []columnInfo{
-	{name: "constraint_catalog", tp: mysql.TypeVarchar, size: 64},
+	{name: "constraint_catalog", tp: mysql.TypeVarchar, size: 512},
 	{name: "constraint_schema", tp: mysql.TypeVarchar, size: 64},
 	{name: "constraint_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "table_catalog", tp: mysql.TypeVarchar, size: 64},
@@ -2012,6 +2033,25 @@ var pgTableTablesCols = []columnInfo{
 	{name: "is_insertable_into", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_typed", tp: mysql.TypeVarchar, size: 64},
 	{name: "commit_action", tp: mysql.TypeVarchar, size: 64},
+	{name: "ENGINE", tp: mysql.TypeVarchar, size: 64, comment: "TiDB Table Cols"},
+	{name: "VERSION", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "ROW_FORMAT", tp: mysql.TypeVarchar, size: 10, comment: "TiDB Table Cols"},
+	{name: "TABLE_ROWS", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "AVG_ROW_LENGTH", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "DATA_LENGTH", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "MAX_DATA_LENGTH", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "INDEX_LENGTH", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "DATA_FREE", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "AUTO_INCREMENT", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "CREATE_TIME", tp: mysql.TypeDatetime, size: 19, comment: "TiDB Table Cols"},
+	{name: "UPDATE_TIME", tp: mysql.TypeDatetime, size: 19, comment: "TiDB Table Cols"},
+	{name: "CHECK_TIME", tp: mysql.TypeDatetime, size: 19, comment: "TiDB Table Cols"},
+	{name: "TABLE_COLLATION", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag, deflt: "utf8_bin", comment: "TiDB Table Cols"},
+	{name: "CHECKSUM", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "CREATE_OPTIONS", tp: mysql.TypeVarchar, size: 255, comment: "TiDB Table Cols"},
+	{name: "TABLE_COMMENT", tp: mysql.TypeVarchar, size: 2048, comment: "TiDB Table Cols"},
+	{name: "TIDB_TABLE_ID", tp: mysql.TypeLonglong, size: 21, comment: "TiDB Table Cols"},
+	{name: "TIDB_ROW_ID_SHARDING_INFO", tp: mysql.TypeVarchar, size: 255, comment: "TiDB Table Cols"},
 }
 // pgTableTransformsCols is table transforms columns
 // https://www.postgresql.org/docs/13/infoschema-transforms.html
@@ -2163,16 +2203,20 @@ var pgTableViewTableUsageCols = []columnInfo{
 // pgTableViewsCols is table views columns
 // https://www.postgresql.org/docs/13/infoschema-views.html
 var pgTableViewsCols = []columnInfo{
-	{name: "table_catalog", tp: mysql.TypeVarchar, size: 64},
-	{name: "table_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "table_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "view_definition", tp: mysql.TypeVarchar, size: 64},
-	{name: "check_option", tp: mysql.TypeVarchar, size: 64},
-	{name: "is_updatable", tp: mysql.TypeVarchar, size: 64},
+	{name: "table_catalog", tp: mysql.TypeVarchar, size: 512, flag: mysql.NotNullFlag},
+	{name: "table_schema", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "table_name", tp: mysql.TypeVarchar, size: 64, flag: mysql.NotNullFlag},
+	{name: "view_definition", tp: mysql.TypeLongBlob, flag: mysql.NotNullFlag},
+	{name: "check_option", tp: mysql.TypeVarchar, size: 8, flag: mysql.NotNullFlag},
+	{name: "is_updatable", tp: mysql.TypeVarchar, size: 3, flag: mysql.NotNullFlag},
 	{name: "is_insertable_into", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_trigger_updatable", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_trigger_deletable", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_trigger_insertable_into", tp: mysql.TypeVarchar, size: 64},
+	{name: "DEFINER", tp: mysql.TypeVarchar, size: 77, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "SECURITY_TYPE", tp: mysql.TypeVarchar, size: 7, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "CHARACTER_SET_CLIENT", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
+	{name: "COLLATION_CONNECTION", tp: mysql.TypeVarchar, size: 32, flag: mysql.NotNullFlag, comment: "TiDB Table Cols"},
 }
 
 
