@@ -644,10 +644,15 @@ func (ts *ConnTestSuite) TestConnExecutionTimeout(c *C) {
 		session: se,
 		stmts:   make(map[int]*TiDBStatement),
 	}
+
+	var outBuffer bytes.Buffer
 	cc := &clientConn{
 		connectionID: uint32(connID),
 		server: &Server{
 			capability: defaultCapability,
+		},
+		pkt: &packetIO{
+			bufWriter: bufio.NewWriter(&outBuffer),
 		},
 		ctx:   tc,
 		alloc: arena.NewAllocator(32 * 1024),
