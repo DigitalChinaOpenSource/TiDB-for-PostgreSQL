@@ -1027,7 +1027,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return cc.handleStmtDescription(ctx, desc)
 	case 'H':            /* flush */
 	case 'S':            /* sync */
-		return cc.writeReadyForQuery(ctx,cc.ctx.Status())
+		return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 	case 'X':
 		return io.EOF
 	case 'd':            /* copy data */
@@ -1072,7 +1072,7 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
-	return cc.writeReadyForQuery(ctx,cc.ctx.Status())
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 }
 
 // writeOkWith 这个方法没什么用,后面可以考虑删除
@@ -1985,7 +1985,7 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 		return err
 	}
 
-	msg, ok := m.(*pgproto3.StartupMessage);
+	msg, ok := m.(*pgproto3.StartupMessage)
 
 	// 如果接收到的包不为启动包则报错
 	if !ok {
@@ -2059,7 +2059,7 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 	}
 
 	// 发送 ReadyForQuery 表示一切准备就绪。"I"表示空闲(没有在事务中)
-	if err := cc.writeReadyForQuery(ctx, mysql.ServerStatusAutocommit); err != nil{
+	if err := cc.writeReadyForQuery(ctx, mysql.ServerStatusAutocommit); err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2332,9 +2332,10 @@ func (cc *clientConn) writeReadyForQuery(ctx context.Context, status uint16) err
 	}
 
 	readyForQuery := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
-	if err := cc.WriteData(readyForQuery.Encode(nil)); err != nil{
+	if err := cc.WriteData(readyForQuery.Encode(nil)); err != nil {
 		return err
 	}
+
 	return cc.flush(ctx)
 }
 
@@ -2419,9 +2420,7 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 		return pgtype.UnknownOID  //未找到对应类型dumpLengthEncodedStringByEndian
 	case mysql.TypeSet:
 		return pgtype.UnknownOID  //未找到对应类型
-	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeBlob:
+	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob,mysql.TypeBlob:
 		return pgtype.ByteaOID
 	case mysql.TypeVarString, mysql.TypeString:
 		return pgtype.TextOID
