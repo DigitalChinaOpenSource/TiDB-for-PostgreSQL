@@ -356,6 +356,8 @@ func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 		relationLen := strings.Index(strings.Trim(sql[relationStart : ], empty), empty)
 		relation = sql[relationStart : relationStart + relationLen]
 		pgMsg = fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist", columnName, relation)
+	} else {
+		pgMsg = m.Message
 	}
 	position := strings.Index(sql, columnName) + 3
 
