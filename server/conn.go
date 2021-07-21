@@ -1029,7 +1029,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 	case 'S':            /* sync */
 		return cc.writeReadyForQuery(ctx,cc.ctx.Status())
 	case 'X':
-		return nil
+		return io.EOF
 	case 'd':            /* copy data */
 	case 'c':            /* copy done */
 	case 'f':            /* copy fail */

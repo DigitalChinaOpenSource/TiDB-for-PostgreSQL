@@ -21,11 +21,11 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/pingcap/check"
-	"github.com/pingcap/failpoint"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
+	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/ddl"
 	ddltestutil "github.com/pingcap/tidb/ddl/testutil"
 	ddlutil "github.com/pingcap/tidb/ddl/util"
@@ -429,7 +429,7 @@ func (s *testSuite6) TestCreateDropView(c *C) {
 	tk.MustExec("create view v as select * from t_v1;")
 	tk.MustExec("create or replace view v  as select * from t_v2;")
 	tk.MustQuery("select * from information_schema.views where table_name ='v';").Check(
-		testkit.Rows("def test v SELECT `test`.`t_v2`.`a`,`test`.`t_v2`.`b` FROM `test`.`t_v2` CASCADED NO @ DEFINER utf8mb4 utf8mb4_bin"))
+		testkit.Rows("postgres test v SELECT `test`.`t_v2`.`a`,`test`.`t_v2`.`b` FROM `test`.`t_v2` CASCADED NO <nil> <nil> <nil> <nil> @ DEFINER utf8mb4 utf8mb4_bin"))
 }
 
 func (s *testSuite6) TestCreateDropIndex(c *C) {
