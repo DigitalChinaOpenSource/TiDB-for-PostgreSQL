@@ -2504,7 +2504,7 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1113:
 		return handleTableNoColumn(m, te, sql)
 	case 1136:
-		return handeleColumnMisMatch(m, te,sql)
+		return handleColumnMisMatch(m, te,sql)
 	case 1138:
 		return handleInvalidUseOfNull(m, te,sql)
 	case 1142:

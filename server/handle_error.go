@@ -729,8 +729,8 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 
 
 
-//handeleColumnMisMatch 处理字段与值的数量匹配不上的情况
-func handeleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+//handleColumnMisMatch 处理字段与值的数量匹配不上的情况
+func handleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	values := "values"
 
 	valueStart := strings.Index(sql, values) + len(values)
