@@ -15,6 +15,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/jackc/pgproto3/v2"
@@ -42,6 +43,29 @@ type testCase struct {
 	expectedErrorPacket []byte   // the error packet captured using pgsql
 }
 
+
+func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
+	c.Parallel()
+	expected, _ := hex.DecodeString("4500000071534552524f5200564552524f5200433432503031004d7461626c65202274657374756e646566696e65647461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c31323136005244726f704572726f724d73674e6f6e4578697374656e740000")
+	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
+	expected = expected[5:]
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists testundefinedtable",
+		},
+		triggerSQL: "drop table testundefinedtable",
+		expectedErrorPacket: expected,
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+/*
+	Skipped Testing handleTableNoColumn since this is not a error in postgresql as pgsql allows table with no column
+ */
+
+
+// testErrorConversion does the actual comparison, will be called by the various tests
 func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
 	store, err := mockstore.NewMockTikvStore()
 	c.Assert(err, IsNil)
@@ -78,12 +102,12 @@ func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
 	_, err = se.Execute(context.Background(), inputCase.triggerSQL)
 
 	isSameError, compareError := sameError(inputCase.triggerSQL, err, inputCase.expectedErrorPacket)
-	c.Assert(compareError, nil) // error during comparison must be nil
+	c.Assert(compareError, IsNil) // error during comparison must be nil
 
 	c.Assert(isSameError, IsTrue)
 }
 
-// compare if the tidb error converts to the expected errorPacket captured from pgsql
+// sameError compare if the tidb error converts to the expected errorPacket captured from pgsql
 func sameError(sql string, tidbError error, expectedErrorPacket []byte) (bool, error) {
 	m, te := unpackError(tidbError)
 	convertedPGError, err := convertMysqlErrorToPgError(m, te, sql)
@@ -100,7 +124,7 @@ func sameError(sql string, tidbError error, expectedErrorPacket []byte) (bool, e
 	return samePGError(convertedPGError, expectedPGError), nil
 }
 
-// unpack a wrapped error into a mysql error and a terror.error
+// unpackError unpack a wrapped error into a mysql error and a terror.error
 func unpackError(e error) (*mysql.SQLError, *terror.Error) {
 	var (
 		m  *mysql.SQLError
@@ -126,23 +150,22 @@ func unpackError(e error) (*mysql.SQLError, *terror.Error) {
 // samePGError will check if two pgproto3 Error response are functionally the same
 // Note that this will not compare every field as TiDB and PG server implement differently, it will compare:
 // Severity
-// SeverityUnlocalized
 // Code
 // Message
 // Detail
 // Hint
 func samePGError(e1, e2 *pgproto3.ErrorResponse) bool {
 	sameSeverity := sameString(e1.Severity, e2.Severity)
-	sameSeverityUnlocalized := sameString(e1.SeverityUnlocalized, e2.SeverityUnlocalized)
 	sameCode := sameString(e1.Code, e2.Code)
 	sameMessage := sameString(e1.Message, e2.Message)
 	sameDetail := sameString(e1.Detail, e2.Detail)
 	sameHint := sameString(e1.Hint, e2.Hint)
 	samePosition := e1.Position == e2.Position
 
-	return sameSeverity && sameSeverityUnlocalized && sameCode && sameMessage && sameDetail && sameHint && samePosition
+	return sameSeverity && sameCode && sameMessage && sameDetail && sameHint && samePosition
 }
 
+// sameString check if two string are lexically the same, return true if the same, false otherwise
 func sameString(s1, s2 string) bool {
 	if strings.Compare(s1, s2) == 0 {
 		return true
@@ -151,31 +174,3 @@ func sameString(s1, s2 string) bool {
 	}
 }
 
-// TODO: handleTooBigPrecision
-// TODO: handleInvalidUseOfNull
-// TODO: handleTableNoColumn
-// TODO: handleInvalidGroupFuncUse
-// TODO: handleFiledSpecifiedTwice
-// TODO: handleUnknownTableInDelete
-// TODO: handleCantDropFieldOrKey
-// TODO: handleMultiplePKDefined
-// TODO: handleParseError
-// TODO: handleDuplicateKey
-// TODO: handleUnknownColumn
-// TODO: handleTableExists
-// TODO: handleUndefinedTable
-// TODO: handleUnknownDB
-// TODO: handleAccessDenied
-// TODO: handleDropDBFail
-// TODO: handleCreateDBFail
-// TODO: handleDataOutOfRange
-// TODO: handleDataTooLong
-// TODO: handleWrongNumberOfColsInSelect
-// TODO: handleDerivedMustHaveAlias
-// TODO: handleSubqueryNo1Row
-// TODO: handleNoPermissionToCreateUser
-// TODO: handleTableAccessDenied
-// TODO: handleNoDefaultValue
-// TODO: handleColumnMisMatch
-// TODO: handleRelationNotExists
-// TODO: handleTypeError
