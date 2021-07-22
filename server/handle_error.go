@@ -146,7 +146,7 @@ func handleFiledSpecifiedTwice(m *mysql.SQLError, te *terror.Error, sql string) 
 		//duplicate_column
 		Code: "42701",
 		Message: pgMsg,
-		Position: int32(twice + 3),
+		Position: int32(twice + 1),
 		Detail: "",
 		Hint: "",
 	}

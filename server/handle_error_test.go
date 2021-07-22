@@ -82,20 +82,22 @@ func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
 	ts.testErrorConversion(c, testcase)
 }
 
+func (ts *HandleErrorTestSuite) TestHandleFiledSpecifiedTwice(c *C) {
+	c.Parallel()
+	expected, _ := hex.DecodeString("450000006d534552524f5200564552524f5200433432373031004d636f6c756d6e2022612220737065636966696564206d6f7265207468616e206f6e636500503430004670617273655f7461726765742e63004c313035340052636865636b496e73657274546172676574730000")
+	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
+	expected = expected[5:]
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists testfieldspecifiedtwice;",
+			"create table testfieldspecifiedtwice(a int);",
+		},
+		triggerSQL: "insert into testfieldspecifiedtwice(a, a) values(10, 10);",
+		expectedErrorPacket: expected,
+	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+	ts.testErrorConversion(c, testcase)
+}
 
 
 // testErrorConversion does the actual comparison, will be called by the various tests
