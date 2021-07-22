@@ -117,7 +117,7 @@ func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) 
 		//grouping_error
 		Code: "42803",
 		Message: pgMsg,
-		Position: int32(firstIndex + 3),
+		Position: int32(firstIndex + 1), // Add one because the first character in query string has index of 1 according to document: https://www.postgresql.org/docs/13/protocol-error-fields.html
 		Detail: "",
 		Hint: "",
 	}

@@ -51,9 +51,9 @@ func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 	expected = expected[5:]
 	testcase := testCase{
 		setupSQLs: []string{
-			"drop table if exists testundefinedtable",
+			"drop table if exists testundefinedtable;",
 		},
-		triggerSQL: "drop table testundefinedtable",
+		triggerSQL: "drop table testundefinedtable;",
 		expectedErrorPacket: expected,
 	}
 
@@ -63,6 +63,39 @@ func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 /*
 	Skipped Testing handleTableNoColumn since this is not a error in postgresql as pgsql allows table with no column
  */
+
+
+func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
+	c.Parallel()
+	expected, _ := hex.DecodeString("450000007f534552524f5200564552524f5200433432383033004d6167677265676174652066756e6374696f6e7320617265206e6f7420616c6c6f77656420696e20574845524500503531004670617273655f6167672e63004c3537360052636865636b5f6167676c6576656c735f616e645f636f6e73747261696e74730000")
+	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
+	expected = expected[5:]
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists testhandleinvalidgroupfuncuse;",
+			"create table testhandleinvalidgroupfuncuse(a int);",
+		},
+		triggerSQL: "select * from testhandleinvalidgroupfuncuse where sum(a) > 1000;",
+		expectedErrorPacket: expected,
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // testErrorConversion does the actual comparison, will be called by the various tests
