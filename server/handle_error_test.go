@@ -40,21 +40,20 @@ var _ = Suite(&HandleErrorTestSuite{})
 type testCase struct {
 	setupSQLs           []string // a list of sql to execute to setup the error
 	triggerSQL          string   // the sql that should trigger the error
-	expectedErrorPacket []byte   // the error packet captured using pgsql
+	expectedErrorPacket string   // the hex stream dump error packet captured using pgsql
 }
 
 
 func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 	c.Parallel()
-	expected, _ := hex.DecodeString("4500000071534552524f5200564552524f5200433432503031004d7461626c65202274657374756e646566696e65647461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c31323136005244726f704572726f724d73674e6f6e4578697374656e740000")
-	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
-	expected = expected[5:]
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists testundefinedtable;",
 		},
-		triggerSQL: "drop table testundefinedtable;",
-		expectedErrorPacket: expected,
+		triggerSQL:
+			"drop table testundefinedtable;",
+		expectedErrorPacket:
+			"4500000071534552524f5200564552524f5200433432503031004d7461626c65202274657374756e646566696e65647461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c31323136005244726f704572726f724d73674e6f6e4578697374656e740000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -67,16 +66,15 @@ func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 
 func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
 	c.Parallel()
-	expected, _ := hex.DecodeString("450000007f534552524f5200564552524f5200433432383033004d6167677265676174652066756e6374696f6e7320617265206e6f7420616c6c6f77656420696e20574845524500503531004670617273655f6167672e63004c3537360052636865636b5f6167676c6576656c735f616e645f636f6e73747261696e74730000")
-	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
-	expected = expected[5:]
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists testhandleinvalidgroupfuncuse;",
 			"create table testhandleinvalidgroupfuncuse(a int);",
 		},
-		triggerSQL: "select * from testhandleinvalidgroupfuncuse where sum(a) > 1000;",
-		expectedErrorPacket: expected,
+		triggerSQL:
+			"select * from testhandleinvalidgroupfuncuse where sum(a) > 1000;",
+		expectedErrorPacket:
+			"450000007f534552524f5200564552524f5200433432383033004d6167677265676174652066756e6374696f6e7320617265206e6f7420616c6c6f77656420696e20574845524500503531004670617273655f6167672e63004c3537360052636865636b5f6167676c6576656c735f616e645f636f6e73747261696e74730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -84,16 +82,15 @@ func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
 
 func (ts *HandleErrorTestSuite) TestHandleFiledSpecifiedTwice(c *C) {
 	c.Parallel()
-	expected, _ := hex.DecodeString("450000006d534552524f5200564552524f5200433432373031004d636f6c756d6e2022612220737065636966696564206d6f7265207468616e206f6e636500503430004670617273655f7461726765742e63004c313035340052636865636b496e73657274546172676574730000")
-	// remove the first 5 bytes, 4bytes for error, 1 bytes for length
-	expected = expected[5:]
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists testfieldspecifiedtwice;",
 			"create table testfieldspecifiedtwice(a int);",
 		},
-		triggerSQL: "insert into testfieldspecifiedtwice(a, a) values(10, 10);",
-		expectedErrorPacket: expected,
+		triggerSQL:
+			"insert into testfieldspecifiedtwice(a, a) values(10, 10);",
+		expectedErrorPacket:
+			"450000006d534552524f5200564552524f5200433432373031004d636f6c756d6e2022612220737065636966696564206d6f7265207468616e206f6e636500503430004670617273655f7461726765742e63004c313035340052636865636b496e73657274546172676574730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -112,10 +109,6 @@ func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
 	se, err := session.CreateSession4Test(store)
 	c.Assert(err, IsNil)
 	_, err = se.Execute(context.Background(), "use test")
-	c.Assert(err, IsNil)
-	_, err = se.Execute(context.Background(), "create table t(a int)")
-	c.Assert(err, IsNil)
-	_, err = se.Execute(context.Background(), "insert into t values (1)")
 	c.Assert(err, IsNil)
 
 	tidbdrv := NewTiDBDriver(ts.store)
@@ -143,7 +136,7 @@ func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
 }
 
 // sameError compare if the tidb error converts to the expected errorPacket captured from pgsql
-func sameError(sql string, tidbError error, expectedErrorPacket []byte) (bool, error) {
+func sameError(sql string, tidbError error, expectedErrorPacket string) (bool, error) {
 	m, te := unpackError(tidbError)
 	convertedPGError, err := convertMysqlErrorToPgError(m, te, sql)
 	if err != nil {
@@ -151,11 +144,14 @@ func sameError(sql string, tidbError error, expectedErrorPacket []byte) (bool, e
 	}
 
 	expectedPGError := &pgproto3.ErrorResponse{}
-	err = expectedPGError.Decode(expectedErrorPacket)
+	// convert the hex stream to byte stream
+	expected, _ := hex.DecodeString(expectedErrorPacket)
+	// remove the first 5 bytes: 4bytes for error, 1 bytes for length
+	expected = expected[5:]
+	err = expectedPGError.Decode(expected)
 	if err != nil {
 		return false, err
 	}
-
 	return samePGError(convertedPGError, expectedPGError), nil
 }
 
