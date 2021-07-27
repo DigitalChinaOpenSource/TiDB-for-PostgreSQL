@@ -206,7 +206,7 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 
 	tableStart := strings.Index(strings.Trim(strings.ToUpper(sql), empty), beforeTable) + len(beforeTable)
 	cutSql := strings.Trim(sql[tableStart : ], empty)
-	tableLen := strings.Index(cutSql, empty) + 1
+	tableLen := strings.Index(cutSql, empty)
 	table := cutSql[:tableLen]
 
 	pgMsg := fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist",column, table)
@@ -214,8 +214,7 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		//internal_error
-		Code: "XX000",
+		Code: "42703",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
