@@ -43,6 +43,15 @@ type testCase struct {
 	expectedErrorPacket string   // the hex stream dump error packet captured using pgsql
 }
 
+/*
+	Skipped tests:
+	handleNoPermissionToCreateUser:		Permission module related
+	handleTableAccessDenied: 			Permission module related
+	handleColumnAccessDenied:			Permission module related
+	handleAccessDenied: 				Permission module related
+
+	handleTableNoColumn: 				Postgres allows table with no column
+*/
 
 func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 	c.Parallel()
@@ -51,18 +60,13 @@ func (ts *HandleErrorTestSuite) TestHandleUndefinedTable(c *C) {
 			"drop table if exists testundefinedtable;",
 		},
 		triggerSQL:
-			"drop table testundefinedtable;",
+		"drop table testundefinedtable;",
 		expectedErrorPacket:
-			"4500000071534552524f5200564552524f5200433432503031004d7461626c65202274657374756e646566696e65647461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c31323136005244726f704572726f724d73674e6f6e4578697374656e740000",
+		"4500000071534552524f5200564552524f5200433432503031004d7461626c65202274657374756e646566696e65647461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c31323136005244726f704572726f724d73674e6f6e4578697374656e740000",
 	}
 
 	ts.testErrorConversion(c, testcase)
 }
-
-/*
-	Skipped Testing handleTableNoColumn since this is not a error in postgresql as pgsql allows table with no column
- */
-
 
 func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
 	c.Parallel()
@@ -72,9 +76,9 @@ func (ts *HandleErrorTestSuite) TestHandleInvalidGroupFuncUse(c *C) {
 			"create table testhandleinvalidgroupfuncuse(a int);",
 		},
 		triggerSQL:
-			"select * from testhandleinvalidgroupfuncuse where sum(a) > 1000;",
+		"select * from testhandleinvalidgroupfuncuse where sum(a) > 1000;",
 		expectedErrorPacket:
-			"450000007f534552524f5200564552524f5200433432383033004d6167677265676174652066756e6374696f6e7320617265206e6f7420616c6c6f77656420696e20574845524500503531004670617273655f6167672e63004c3537360052636865636b5f6167676c6576656c735f616e645f636f6e73747261696e74730000",
+		"450000007f534552524f5200564552524f5200433432383033004d6167677265676174652066756e6374696f6e7320617265206e6f7420616c6c6f77656420696e20574845524500503531004670617273655f6167672e63004c3537360052636865636b5f6167676c6576656c735f616e645f636f6e73747261696e74730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -88,14 +92,290 @@ func (ts *HandleErrorTestSuite) TestHandleFiledSpecifiedTwice(c *C) {
 			"create table testfieldspecifiedtwice(a int);",
 		},
 		triggerSQL:
-			"insert into testfieldspecifiedtwice(a, a) values(10, 10);",
+		"insert into testfieldspecifiedtwice(a, a) values(10, 10);",
 		expectedErrorPacket:
-			"450000006d534552524f5200564552524f5200433432373031004d636f6c756d6e2022612220737065636966696564206d6f7265207468616e206f6e636500503430004670617273655f7461726765742e63004c313035340052636865636b496e73657274546172676574730000",
+		"450000006d534552524f5200564552524f5200433432373031004d636f6c756d6e2022612220737065636966696564206d6f7265207468616e206f6e636500503430004670617273655f7461726765742e63004c313035340052636865636b496e73657274546172676574730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
 }
 
+func (ts *HandleErrorTestSuite) TestHandleUnknownTableInDelete(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+		},
+		triggerSQL:
+		"delete from test_table;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleCantDropFieldOrKey(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int);",
+		},
+		triggerSQL:
+		"alter table test_table drop column b;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleMultiplePKDefined(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+		},
+		triggerSQL:
+		"create table test_table(a int primary key, b int primary key);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleParseError(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+		},
+		triggerSQL:
+		"creat table test_table(a int);", //create spelled wrong intentionally
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+		},
+		triggerSQL:
+		"create table test_table(a int, a int);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleUnknownColumn(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int);",
+		},
+		triggerSQL:
+		"insert into test_table(b) values(1);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleTableExists(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int);",
+		},
+		triggerSQL:
+		"create table test_table(a int);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleUnknownDB(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop database if exists test_db;",
+		},
+		triggerSQL:
+		"use test_db;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleDropDBFail(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop database if exists test_db;",
+		},
+		triggerSQL:
+		"drop database test_db;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleCreateDBFail(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop database if exists test_db;",
+			"create database test_db;",
+		},
+		triggerSQL:
+		"create database test_db;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int)",
+		},
+		triggerSQL:
+		"insert into test_table values(2147483647 + 1);", //max for signed INT + 1
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a varchar(1));",
+		},
+		triggerSQL:
+		"insert into test_table values('this is too long');",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"drop table if exists test_table2;",
+			"create table test_table(a int);",
+			"create table test_table2(a int, b int);",
+		},
+		triggerSQL:
+		"select * from test_table UNION select * from test_table2;",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleDerivedMustHaveAlias(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int);",
+		},
+		triggerSQL:
+		"select * from (select * from test_table);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleSubqueryNo1Row(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int);",
+			"insert into test_table values(1);",
+			"insert into test_table values(2);",
+		},
+		triggerSQL:
+		"select * from test table where a = (select a from test_table);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int, b varchar(1));",
+		},
+		triggerSQL:
+		"insert into test_table(a) values (1);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+func (ts *HandleErrorTestSuite) TestHandleColumnMisMatch(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+			"create table test_table(a int)",
+		},
+		triggerSQL:
+		"insert into test_table values (1,2);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
+
+func (ts *HandleErrorTestSuite) TestHandleRelationNotExists(c *C) {
+	c.Parallel()
+	testcase := testCase{
+		setupSQLs: []string{
+			"drop table if exists test_table;",
+		},
+		triggerSQL:
+		"insert into test_table values(1);",
+		expectedErrorPacket:
+		"",
+	}
+
+	ts.testErrorConversion(c, testcase)
+}
 
 // testErrorConversion does the actual comparison, will be called by the various tests
 func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
@@ -204,4 +484,3 @@ func sameString(s1, s2 string) bool {
 		return false
 	}
 }
-
