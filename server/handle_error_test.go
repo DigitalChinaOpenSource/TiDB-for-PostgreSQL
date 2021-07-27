@@ -107,9 +107,9 @@ func (ts *HandleErrorTestSuite) TestHandleUnknownTableInDelete(c *C) {
 			"drop table if exists test_table;",
 		},
 		triggerSQL:
-		"delete from test_table;",
+		"delete a from test_table;",
 		expectedErrorPacket:
-		"",
+		"4500000059534552524f5200564552524f5200433432363031004d73796e746178206572726f72206174206f72206e6561722022612200503800467363616e2e6c004c3131383000527363616e6e65725f79796572726f720000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -125,7 +125,7 @@ func (ts *HandleErrorTestSuite) TestHandleCantDropFieldOrKey(c *C) {
 		triggerSQL:
 		"alter table test_table drop column b;",
 		expectedErrorPacket:
-		"",
+		"4500000073534552524f5200564552524f5200433432373033004d636f6c756d6e20226222206f662072656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400467461626c65636d64732e63004c37373930005241544578656344726f70436f6c756d6e0000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -140,7 +140,7 @@ func (ts *HandleErrorTestSuite) TestHandleMultiplePKDefined(c *C) {
 		triggerSQL:
 		"create table test_table(a int primary key, b int primary key);",
 		expectedErrorPacket:
-		"",
+		"450000008d534552524f5200564552524f5200433432503136004d6d756c7469706c65207072696d617279206b65797320666f72207461626c652022746573745f7461626c652220617265206e6f7420616c6c6f77656400503530004670617273655f7574696c636d642e63004c3231333300527472616e73666f726d496e646578436f6e73747261696e740000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -155,7 +155,7 @@ func (ts *HandleErrorTestSuite) TestHandleParseError(c *C) {
 		triggerSQL:
 		"creat table test_table(a int);", //create spelled wrong intentionally
 		expectedErrorPacket:
-		"",
+		"450000005d534552524f5200564552524f5200433432363031004d73796e746178206572726f72206174206f72206e656172202263726561742200503100467363616e2e6c004c3131383000527363616e6e65725f79796572726f720000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -166,11 +166,13 @@ func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
+			"create table test_table(a int primary key);",
+			"insert into test_table values(1);",
 		},
 		triggerSQL:
-		"create table test_table(a int, a int);",
+		"insert into test_table values(1);",
 		expectedErrorPacket:
-		"",
+		"45000000c2534552524f5200564552524f5200433233353035004d6475706c6963617465206b65792076616c75652076696f6c6174657320756e6971756520636f6e73747261696e742022746573745f7461626c655f706b65792200444b6579202861293d28312920616c7265616479206578697374732e00737075626c69630074746573745f7461626c65006e746573745f7461626c655f706b657900466e6274696e736572742e63004c36353600525f62745f636865636b5f756e697175650000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -186,7 +188,7 @@ func (ts *HandleErrorTestSuite) TestHandleUnknownColumn(c *C) {
 		triggerSQL:
 		"insert into test_table(b) values(1);",
 		expectedErrorPacket:
-		"",
+		"450000007c534552524f5200564552524f5200433432373033004d636f6c756d6e20226222206f662072656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503234004670617273655f7461726765742e63004c313033390052636865636b496e73657274546172676574730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -202,7 +204,7 @@ func (ts *HandleErrorTestSuite) TestHandleTableExists(c *C) {
 		triggerSQL:
 		"create table test_table(a int);",
 		expectedErrorPacket:
-		"",
+		"4500000068534552524f5200564552524f5200433432503037004d72656c6174696f6e2022746573745f7461626c652220616c7265616479206578697374730046686561702e63004c313136340052686561705f6372656174655f776974685f636174616c6f670000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -216,7 +218,7 @@ func (ts *HandleErrorTestSuite) TestHandleUnknownDB(c *C) {
 		triggerSQL:
 		"use test_db;",
 		expectedErrorPacket:
-		"",
+		"450000005c53464154414c0056464154414c00433344303030004d64617461626173652022746573745f64622220646f6573206e6f742065786973740046706f7374696e69742e63004c3837370052496e6974506f7374677265730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -231,7 +233,7 @@ func (ts *HandleErrorTestSuite) TestHandleDropDBFail(c *C) {
 		triggerSQL:
 		"drop database test_db;",
 		expectedErrorPacket:
-		"",
+		"4500000058534552524f5200564552524f5200433344303030004d64617461626173652022746573745f64622220646f6573206e6f7420657869737400466462636f6d6d616e64732e63004c383431005264726f7064620000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -246,7 +248,7 @@ func (ts *HandleErrorTestSuite) TestHandleCreateDBFail(c *C) {
 		triggerSQL:
 		"create database test_db;",
 		expectedErrorPacket:
-		"",
+		"450000005a534552524f5200564552524f5200433432503034004d64617461626173652022746573745f64622220616c72656164792065786973747300466462636f6d6d616e64732e63004c353132005263726561746564620000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -256,12 +258,12 @@ func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
-			"create table test_table(a int)",
+			"create table test_table(a int);",
 		},
 		triggerSQL:
 		"insert into test_table values(2147483647 + 1);", //max for signed INT + 1
 		expectedErrorPacket:
-		"",
+		"4500000044534552524f5200564552524f5200433232303033004d696e7465676572206f7574206f662072616e67650046696e742e63004c3738310052696e7434706c0000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -276,7 +278,7 @@ func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
 		triggerSQL:
 		"insert into test_table values('this is too long');",
 		expectedErrorPacket:
-		"",
+		"4500000061534552524f5200564552524f5200433232303031004d76616c756520746f6f206c6f6e6720666f722074797065206368617261637465722076617279696e672831290046766172636861722e63004c3633350052766172636861720000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -293,7 +295,7 @@ func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
 		triggerSQL:
 		"select * from test_table UNION select * from test_table2;",
 		expectedErrorPacket:
-		"",
+		"4500000081534552524f5200564552524f5200433432363031004d6561636820554e494f4e207175657279206d7573742068617665207468652073616d65206e756d626572206f6620636f6c756d6e73005033390046616e616c797a652e63004c3230303700527472616e73666f726d5365744f7065726174696f6e547265650000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -308,7 +310,7 @@ func (ts *HandleErrorTestSuite) TestHandleDerivedMustHaveAlias(c *C) {
 		triggerSQL:
 		"select * from (select * from test_table);",
 		expectedErrorPacket:
-		"",
+		"450000008a534552524f5200564552524f5200433432363031004d737562717565727920696e2046524f4d206d757374206861766520616e20616c6961730048466f72206578616d706c652c2046524f4d202853454c454354202e2e2e29205b41535d20666f6f2e0050313500466772616d2e79004c31323131350052626173655f797970617273650000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -323,9 +325,9 @@ func (ts *HandleErrorTestSuite) TestHandleSubqueryNo1Row(c *C) {
 			"insert into test_table values(2);",
 		},
 		triggerSQL:
-		"select * from test table where a = (select a from test_table);",
+		"select * from test_table where a = (select a from test_table);",
 		expectedErrorPacket:
-		"",
+		"4500000081534552524f5200564552524f5200433231303030004d6d6f7265207468616e206f6e6520726f772072657475726e65642062792061207375627175657279207573656420617320616e2065787072657373696f6e00466e6f6465537562706c616e2e63004c31313539005245786563536574506172616d506c616e0000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -336,12 +338,12 @@ func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
-			"create table test_table(a int, b varchar(1));",
+			"create table test_table(a int, b varchar(1) not null);",
 		},
 		triggerSQL:
 		"insert into test_table(a) values (1);",
 		expectedErrorPacket:
-		"",
+		"45000000c5534552524f5200564552524f5200433233353032004d6e756c6c2076616c756520696e20636f6c756d6e20226222206f662072656c6174696f6e2022746573745f7461626c65222076696f6c61746573206e6f742d6e756c6c20636f6e73747261696e7400444661696c696e6720726f7720636f6e7461696e732028312c206e756c6c292e00737075626c69630074746573745f7461626c650063620046657865634d61696e2e63004c31393533005245786563436f6e73747261696e74730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -351,12 +353,12 @@ func (ts *HandleErrorTestSuite) TestHandleColumnMisMatch(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
-			"create table test_table(a int)",
+			"create table test_table(a int);",
 		},
 		triggerSQL:
 		"insert into test_table values (1,2);",
 		expectedErrorPacket:
-		"",
+		"4500000073534552524f5200564552524f5200433432363031004d494e5345525420686173206d6f72652065787072657373696f6e73207468616e2074617267657420636f6c756d6e73005033340046616e616c797a652e63004c39303700527472616e73666f726d496e73657274526f770000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -371,7 +373,7 @@ func (ts *HandleErrorTestSuite) TestHandleRelationNotExists(c *C) {
 		triggerSQL:
 		"insert into test_table values(1);",
 		expectedErrorPacket:
-		"",
+		"1e000000600f0300008e064000000000000000000000000000000001000000000000000000000000000000011538cd45b312f2c48358a7d6801818b9009600000101080a6c47ee7baf3ac16a450000006d534552524f5200564552524f5200433432503031004d72656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503133004670617273655f72656c6174696f6e2e63004c3133373600527061727365724f70656e5461626c650000",
 	}
 
 	ts.testErrorConversion(c, testcase)
