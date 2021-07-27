@@ -2493,8 +2493,6 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleMultiplePKDefined(m, te, sql)
 	case 1091:
 		return handleCantDropFieldOrKey(m, te, sql)
-	case 1105:
-		return handleTypeError(m, te, sql)
 	case 1109:
 		return handleUnknownTableInDelete(m, te, sql)
 	case 1110:

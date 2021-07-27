@@ -777,32 +777,6 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 
 	return errorResp,nil
 }
-// handleTypeError 处理类型转换错误信息
-func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, quotes, beforeInput := m.Message, "\"", "parsing "
-	inputStart := strings.Index(msg, beforeInput) + len(beforeInput)
-	inputLen := strings.Index(msg[inputStart + 1 : ], quotes) + 1
-	input := msg[inputStart : inputStart + inputLen]
-	if !strings.HasSuffix(input, quotes) {
-		input += quotes
-	}
-	pgMsg := fmt.Sprintf("invalid input syntax for : %s", input)
-	position := strings.Index(sql, input)
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		//datatype_mismatch
-		Code: "42804",
-		Message: pgMsg,
-		Position: int32(position),
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-
-	return errorResp,nil
-}
 
 //setFilePathAndLine 通过terror.Error对象获取出错文件和行位置
 func setFilePathAndLine(te *terror.Error, errorResponse *pgproto3.ErrorResponse){
