@@ -422,7 +422,6 @@ func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 	ts.testErrorConversion(c, testcase, noDetail)
 }
 
-// TODO: Change this so it doesn't compare position
 func (ts *HandleErrorTestSuite) TestHandleColumnMisMatch(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -436,7 +435,16 @@ func (ts *HandleErrorTestSuite) TestHandleColumnMisMatch(c *C) {
 		"4500000073534552524f5200564552524f5200433432363031004d494e5345525420686173206d6f72652065787072657373696f6e73207468616e2074617267657420636f6c756d6e73005033340046616e616c797a652e63004c39303700527472616e73666f726d496e73657274526f770000",
 	}
 
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+	// We won't be able to get info about which column mismatched from mysql error, so we will skip comparing position
+	noPosition := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  true,
+		compareDetail:   true,
+		compareHint:     true,
+		comparePosition: false,
+	}
+	ts.testErrorConversion(c, testcase, noPosition)
 }
 
 func (ts *HandleErrorTestSuite) TestHandleRelationNotExists(c *C) {
