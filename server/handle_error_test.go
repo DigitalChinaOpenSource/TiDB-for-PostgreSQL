@@ -161,6 +161,7 @@ func (ts *HandleErrorTestSuite) TestHandleParseError(c *C) {
 	ts.testErrorConversion(c, testcase)
 }
 
+// TODO: Change the test method so it doesn't compare message
 func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -174,7 +175,6 @@ func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 		expectedErrorPacket:
 		"45000000c2534552524f5200564552524f5200433233353035004d6475706c6963617465206b65792076616c75652076696f6c6174657320756e6971756520636f6e73747261696e742022746573745f7461626c655f706b65792200444b6579202861293d28312920616c7265616479206578697374732e00737075626c69630074746573745f7461626c65006e746573745f7461626c655f706b657900466e6274696e736572742e63004c36353600525f62745f636865636b5f756e697175650000",
 	}
-	// TODO: Add special test
 	ts.testErrorConversion(c, testcase)
 }
 
@@ -186,9 +186,9 @@ func (ts *HandleErrorTestSuite) TestHandleUnknownColumn(c *C) {
 			"create table test_table(a int);",
 		},
 		triggerSQL:
-		"insert into test_table(b) values(1);",
+		"insert into test_table(bbb) values(1);",
 		expectedErrorPacket:
-		"450000007c534552524f5200564552524f5200433432373033004d636f6c756d6e20226222206f662072656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503234004670617273655f7461726765742e63004c313033390052636865636b496e73657274546172676574730000",
+		"450000007e534552524f5200564552524f5200433432373033004d636f6c756d6e202262626222206f662072656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503234004670617273655f7461726765742e63004c313033390052636865636b496e73657274546172676574730000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -272,21 +272,25 @@ func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 
 	ts.testErrorConversion(c, testcase)
 }
+
+// TODO: Change test function so it doen't compare message
 func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
 	c.Parallel()
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
-			"create table test_table(a varchar(1));",
+			"create table test_table(a bit(3));", // don't use char type to test this, it will result in stirng right truncation error, error code 22001
 		},
 		triggerSQL:
-		"insert into test_table values('this is too long');",
+		"insert into test_table values('1000000');",
 		expectedErrorPacket:
-		"4500000061534552524f5200564552524f5200433232303031004d76616c756520746f6f206c6f6e6720666f722074797065206368617261637465722076617279696e672831290046766172636861722e63004c3633350052766172636861720000",
+		"450000005e534552524f5200564552524f5200433232303236004d62697420737472696e67206c656e677468203720646f6573206e6f74206d6174636820747970652062697428332900467661726269742e63004c34303600526269740000",
 	}
 
 	ts.testErrorConversion(c, testcase)
 }
+
+// TODO: Change this so it doesn't compare position
 func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -319,6 +323,7 @@ func (ts *HandleErrorTestSuite) TestHandleDerivedMustHaveAlias(c *C) {
 
 	ts.testErrorConversion(c, testcase)
 }
+
 func (ts *HandleErrorTestSuite) TestHandleSubqueryNo1Row(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -337,6 +342,7 @@ func (ts *HandleErrorTestSuite) TestHandleSubqueryNo1Row(c *C) {
 	ts.testErrorConversion(c, testcase)
 }
 
+// TODO: Change test method so this one doesnt compare detail information
 func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 	c.Parallel()
 	testcase := testCase{

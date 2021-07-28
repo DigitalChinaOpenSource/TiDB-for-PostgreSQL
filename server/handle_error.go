@@ -228,13 +228,13 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 // eg. Multiple primary key defined
 func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 
-	msg, beforeTable, brackets, pk := m.Message, "TABLE ", "(", "PRIMARY KEY"
+	beforeTable, brackets, pk := "TABLE ", "(", "PRIMARY KEY"
 	tableStart := strings.Index(strings.ToUpper(sql), beforeTable) + len(beforeTable)
-	tableLen := strings.Index(sql, brackets)
-	table := msg[tableStart : tableStart + tableLen]
+	tableEnd := strings.Index(sql, brackets)
+	table := sql[tableStart :  tableEnd]
 
 	firstPKSpec := strings.Index(strings.ToUpper(sql), pk) + len(pk)
-	position := firstPKSpec + strings.Index(strings.ToUpper(sql[firstPKSpec : ]), pk)
+	position := firstPKSpec + strings.Index(strings.ToUpper(sql[firstPKSpec : ]), pk) + 1
 	pgMsg := fmt.Sprintf("multiple primary keys for table \"%s\" are not allowed", table)
 
 	errorResp := &pgproto3.ErrorResponse{
@@ -713,13 +713,14 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 	}else {
 		relation = sql[relationStart : relationStart + relationLen]
 	}
-	//原版pg对应错误还有一行错误信息，eg.描述:  Failing row contains (null, xxx    , null).，但是MySQL的错误信息不足以凑出第二行的信息。
+	//Can't get the second row detail message from mysql error message
+	// aka: DETAIL:  Failing row contains (1, null).
 	pgMsg := fmt.Sprintf("null value in column \"%s\" of relation \"%s\" violates not-null constraint", column, relation)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "42601",
+		Code: "23502",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
