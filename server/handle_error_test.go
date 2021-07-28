@@ -253,6 +253,10 @@ func (ts *HandleErrorTestSuite) TestHandleCreateDBFail(c *C) {
 
 	ts.testErrorConversion(c, testcase)
 }
+
+// TODO: Change this so it doesn't compare string
+//... obtained string = "column 'a' value out of range"
+//... expected string = "integer out of range"
 func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -348,6 +352,8 @@ func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 
 	ts.testErrorConversion(c, testcase)
 }
+
+// TODO: Change this so it doesn't compare position
 func (ts *HandleErrorTestSuite) TestHandleColumnMisMatch(c *C) {
 	c.Parallel()
 	testcase := testCase{

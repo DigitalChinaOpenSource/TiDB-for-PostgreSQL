@@ -603,7 +603,7 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
-		Hint: "",
+		Hint: "For example, FROM (SELECT ...) [AS] foo.",
 	}
 	setFilePathAndLine(te, errorResp)
 
