@@ -386,7 +386,6 @@ func (ts *HandleErrorTestSuite) TestHandleSubqueryNo1Row(c *C) {
 	ts.testErrorConversion(c, testcase, defaultTestOption)
 }
 
-// TODO: Change test method so this one doesnt compare detail information
 func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -399,8 +398,18 @@ func (ts *HandleErrorTestSuite) TestHandleNoDefaultValue(c *C) {
 		expectedErrorPacket:
 		"45000000c5534552524f5200564552524f5200433233353032004d6e756c6c2076616c756520696e20636f6c756d6e20226222206f662072656c6174696f6e2022746573745f7461626c65222076696f6c61746573206e6f742d6e756c6c20636f6e73747261696e7400444661696c696e6720726f7720636f6e7461696e732028312c206e756c6c292e00737075626c69630074746573745f7461626c650063620046657865634d61696e2e63004c31393533005245786563436f6e73747261696e74730000",
 	}
-
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+	// Can't get the second row detail message from mysql error message
+	// aka: DETAIL:  Failing row contains (1, null).
+	// So we wont compare detail
+	noDetail := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  true,
+		compareDetail:   false,
+		compareHint:     true,
+		comparePosition: true,
+	}
+	ts.testErrorConversion(c, testcase, noDetail)
 }
 
 // TODO: Change this so it doesn't compare position
