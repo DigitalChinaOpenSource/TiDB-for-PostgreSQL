@@ -293,7 +293,6 @@ func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 	ts.testErrorConversion(c, testcase, defaultTestOption)
 }
 
-// TODO: Change test function so it doen't compare message
 func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -307,7 +306,15 @@ func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
 		"450000005e534552524f5200564552524f5200433232303236004d62697420737472696e67206c656e677468203720646f6573206e6f74206d6174636820747970652062697428332900467661726269742e63004c34303600526269740000",
 	}
 
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+	noMessage := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  false,
+		compareDetail:   true,
+		compareHint:     true,
+		comparePosition: true,
+	}
+	ts.testErrorConversion(c, testcase, noMessage)
 }
 
 func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
