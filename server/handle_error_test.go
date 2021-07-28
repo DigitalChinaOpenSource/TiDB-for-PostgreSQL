@@ -181,7 +181,6 @@ func (ts *HandleErrorTestSuite) TestHandleParseError(c *C) {
 	ts.testErrorConversion(c, testcase, defaultTestOption)
 }
 
-// TODO: Change the test method so it doesn't compare message
 func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -195,7 +194,17 @@ func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 		expectedErrorPacket:
 		"45000000c2534552524f5200564552524f5200433233353035004d6475706c6963617465206b65792076616c75652076696f6c6174657320756e6971756520636f6e73747261696e742022746573745f7461626c655f706b65792200444b6579202861293d28312920616c7265616479206578697374732e00737075626c69630074746573745f7461626c65006e746573745f7461626c655f706b657900466e6274696e736572742e63004c36353600525f62745f636865636b5f756e697175650000",
 	}
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+
+	noMessageDetail := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  false,
+		compareDetail:   false,
+		compareHint:     true,
+		comparePosition: true,
+	}
+
+	ts.testErrorConversion(c, testcase, noMessageDetail)
 }
 
 func (ts *HandleErrorTestSuite) TestHandleUnknownColumn(c *C) {
