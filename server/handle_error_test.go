@@ -310,7 +310,6 @@ func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
 	ts.testErrorConversion(c, testcase, defaultTestOption)
 }
 
-// TODO: Change this so it doesn't compare position
 func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -326,7 +325,16 @@ func (ts *HandleErrorTestSuite) TestHandleWrongNumberOfColsInSelect(c *C) {
 		"4500000081534552524f5200564552524f5200433432363031004d6561636820554e494f4e207175657279206d7573742068617665207468652073616d65206e756d626572206f6620636f6c756d6e73005033390046616e616c797a652e63004c3230303700527472616e73666f726d5365744f7065726174696f6e547265650000",
 	}
 
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+	noPosition := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  true,
+		compareDetail:   true,
+		compareHint:     true,
+		comparePosition: false,
+	}
+
+	ts.testErrorConversion(c, testcase, noPosition)
 }
 func (ts *HandleErrorTestSuite) TestHandleDerivedMustHaveAlias(c *C) {
 	c.Parallel()
