@@ -179,7 +179,7 @@ func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string)
 	column := cutSql[ : finalLen]
 	pgMsg := fmt.Sprintf("syntax error at or near \"%s\"", column)
 
-	position := strings.Index(sql, column) + 3
+	position := strings.Index(sql, column) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -281,7 +281,7 @@ func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 	pgMsg := fmt.Sprintf("syntax error at or near %s",behindNear)
 
 	// 为什么加3? 在提示信息第二行开头回提示是第几行sql的错误，他也会占偏移量，所以要将其加上。
-	position := strings.Index(sql,strings.Trim(behindNear, quotes)) + 3
+	position := strings.Index(sql,strings.Trim(behindNear, quotes)) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -308,7 +308,8 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	valueStart := strings.Index(msg, entry) + len(entry)
 	valueLen := strings.Index(msg[valueStart : ], empty)
 	value := msg[valueStart : valueStart + valueLen]
-	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"\nDescription:  Key value %v already exists.", keyName, value)
+	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"", keyName)
+	detailMsg := fmt.Sprintf("Key value %s already exists.", value)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -316,7 +317,7 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 		//unique_violation
 		Code: "23505",
 		Message: pgMsg,
-		Detail: "",
+		Detail: detailMsg,
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
@@ -358,7 +359,7 @@ func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 	} else {
 		pgMsg = m.Message
 	}
-	position := strings.Index(sql, columnName) + 3
+	position := strings.Index(sql, columnName) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -430,7 +431,9 @@ func handleUnknownDB(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3
 	msg, beforeDB, apostrophe,empty := m.Message, "database ", "'"," "
 	dbStart := strings.Index(msg, beforeDB) + len(beforeDB)
 	db := strings.Trim(strings.Trim(msg[dbStart : ], empty), apostrophe)
-	pgMsg := fmt.Sprintf("database \"%s\" does not exist\nkeep last connection",db)
+	// pgsql will have another line saying "Previous connection kept" since using switch db is the same as new connection in pg
+	// We won't handle it here since its not considered part of the error message but fallback behavior of a unsuccessful new connection
+	pgMsg := fmt.Sprintf("database \"%s\" does not exist",db)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Code: "3D000",
@@ -590,7 +593,7 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 	brackets := "("
 
 	pgMsg := "subquery in FROM must have an alias"
-	position := strings.Index(sql, brackets) + 3
+	position := strings.Index(sql, brackets) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -734,7 +737,7 @@ func handleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 
 	valueStart := strings.Index(sql, values) + len(values)
 	//这里的游标只能指到values后面的括号，mysql的错误信息里拿不到哪些 value 是多出来的。
-	position := valueStart + 3
+	position := valueStart + 1
 	pgMsg := fmt.Sprintf("INSERT has more expressions than target columns")
 
 	errorResp := &pgproto3.ErrorResponse{
@@ -761,7 +764,7 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 	nameLen := strings.Index(msg[tableNameStart : ], apostrophe)
 	tableName := msg[tableNameStart : tableNameStart + nameLen]
 	pgMsg := fmt.Sprintf("relation \"%s\" does not exist", tableName)
-	position := strings.Index(sql, tableName) + 3
+	position := strings.Index(sql, tableName) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",

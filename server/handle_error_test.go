@@ -26,7 +26,6 @@ import (
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/store/mockstore"
-	"strings"
 )
 
 type HandleErrorTestSuite struct {
@@ -105,6 +104,7 @@ func (ts *HandleErrorTestSuite) TestHandleUnknownTableInDelete(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
+			"create table test_table(a int);",
 		},
 		triggerSQL:
 		"delete a from test_table;",
@@ -166,7 +166,7 @@ func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 	testcase := testCase{
 		setupSQLs: []string{
 			"drop table if exists test_table;",
-			"create table test_table(a int primary key);",
+			"create table test_table(a int, primary key (a));",
 			"insert into test_table values(1);",
 		},
 		triggerSQL:
@@ -174,7 +174,7 @@ func (ts *HandleErrorTestSuite) TestHandleDuplicateKey(c *C) {
 		expectedErrorPacket:
 		"45000000c2534552524f5200564552524f5200433233353035004d6475706c6963617465206b65792076616c75652076696f6c6174657320756e6971756520636f6e73747261696e742022746573745f7461626c655f706b65792200444b6579202861293d28312920616c7265616479206578697374732e00737075626c69630074746573745f7461626c65006e746573745f7461626c655f706b657900466e6274696e736572742e63004c36353600525f62745f636865636b5f756e697175650000",
 	}
-
+	// TODO: Add special test
 	ts.testErrorConversion(c, testcase)
 }
 
@@ -373,7 +373,7 @@ func (ts *HandleErrorTestSuite) TestHandleRelationNotExists(c *C) {
 		triggerSQL:
 		"insert into test_table values(1);",
 		expectedErrorPacket:
-		"1e000000600f0300008e064000000000000000000000000000000001000000000000000000000000000000011538cd45b312f2c48358a7d6801818b9009600000101080a6c47ee7baf3ac16a450000006d534552524f5200564552524f5200433432503031004d72656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503133004670617273655f72656c6174696f6e2e63004c3133373600527061727365724f70656e5461626c650000",
+		"450000006d534552524f5200564552524f5200433432503031004d72656c6174696f6e2022746573745f7461626c652220646f6573206e6f7420657869737400503133004670617273655f72656c6174696f6e2e63004c3133373600527061727365724f70656e5461626c650000",
 	}
 
 	ts.testErrorConversion(c, testcase)
@@ -411,18 +411,16 @@ func (ts *HandleErrorTestSuite) testErrorConversion(c *C, inputCase testCase) {
 	// execute the trigger SQL
 	_, err = se.Execute(context.Background(), inputCase.triggerSQL)
 
-	isSameError, compareError := sameError(inputCase.triggerSQL, err, inputCase.expectedErrorPacket)
+	compareError := sameError(inputCase.triggerSQL, err, inputCase.expectedErrorPacket, c)
 	c.Assert(compareError, IsNil) // error during comparison must be nil
-
-	c.Assert(isSameError, IsTrue)
 }
 
 // sameError compare if the tidb error converts to the expected errorPacket captured from pgsql
-func sameError(sql string, tidbError error, expectedErrorPacket string) (bool, error) {
+func sameError(sql string, tidbError error, expectedErrorPacket string, c *C) error {
 	m, te := unpackError(tidbError)
 	convertedPGError, err := convertMysqlErrorToPgError(m, te, sql)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	expectedPGError := &pgproto3.ErrorResponse{}
@@ -432,9 +430,10 @@ func sameError(sql string, tidbError error, expectedErrorPacket string) (bool, e
 	expected = expected[5:]
 	err = expectedPGError.Decode(expected)
 	if err != nil {
-		return false, err
+		return err
 	}
-	return samePGError(convertedPGError, expectedPGError), nil
+	samePGError(convertedPGError, expectedPGError, c)
+	return nil
 }
 
 // unpackError unpack a wrapped error into a mysql error and a terror.error
@@ -467,22 +466,20 @@ func unpackError(e error) (*mysql.SQLError, *terror.Error) {
 // Message
 // Detail
 // Hint
-func samePGError(e1, e2 *pgproto3.ErrorResponse) bool {
-	sameSeverity := sameString(e1.Severity, e2.Severity)
-	sameCode := sameString(e1.Code, e2.Code)
-	sameMessage := sameString(e1.Message, e2.Message)
-	sameDetail := sameString(e1.Detail, e2.Detail)
-	sameHint := sameString(e1.Hint, e2.Hint)
-	samePosition := e1.Position == e2.Position
-
-	return sameSeverity && sameCode && sameMessage && sameDetail && sameHint && samePosition
+func samePGError(e1, e2 *pgproto3.ErrorResponse, c *C) {
+	c.Assert(e1.Severity, DeepEquals, e2.Severity)
+	c.Assert(e1.Code, DeepEquals, e2.Code)
+	c.Assert(e1.Message, DeepEquals, e2.Message)
+	c.Assert(e1.Detail, DeepEquals, e2.Detail)
+	c.Assert(e1.Hint, DeepEquals, e2.Hint)
+	c.Assert(e1.Position, Equals, e2.Position)
 }
 
-// sameString check if two string are lexically the same, return true if the same, false otherwise
-func sameString(s1, s2 string) bool {
-	if strings.Compare(s1, s2) == 0 {
-		return true
-	} else {
-		return false
-	}
-}
+//// sameString check if two string are lexically the same, return true if the same, false otherwise
+//func sameString(s1, s2 string) bool {
+//	if strings.Compare(s1, s2) == 0 {
+//		return true
+//	} else {
+//		return false
+//	}
+//}
