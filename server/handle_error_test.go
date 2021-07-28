@@ -283,9 +283,7 @@ func (ts *HandleErrorTestSuite) TestHandleCreateDBFail(c *C) {
 	ts.testErrorConversion(c, testcase, defaultTestOption)
 }
 
-// TODO: Change this so it doesn't compare string
-//... obtained string = "column 'a' value out of range"
-//... expected string = "integer out of range"
+
 func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 	c.Parallel()
 	testcase := testCase{
@@ -299,7 +297,19 @@ func (ts *HandleErrorTestSuite) TestHandleDataOutOfRange(c *C) {
 		"4500000044534552524f5200564552524f5200433232303033004d696e7465676572206f7574206f662072616e67650046696e742e63004c3738310052696e7434706c0000",
 	}
 
-	ts.testErrorConversion(c, testcase, defaultTestOption)
+	// We won't be able to get detailed column information from mysql error message, so we won't compare them
+	//... obtained string = "column 'a' value out of range"
+	//... expected string = "integer out of range"
+
+	noMessage := testOption{
+		compareSeverity: true,
+		compareCode:     true,
+		compareMessage:  false,
+		compareDetail:   true,
+		compareHint:     true,
+		comparePosition: true,
+	}
+	ts.testErrorConversion(c, testcase, noMessage)
 }
 
 func (ts *HandleErrorTestSuite) TestHandleDataTooLong(c *C) {
