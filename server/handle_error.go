@@ -117,7 +117,7 @@ func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) 
 		//grouping_error
 		Code: "42803",
 		Message: pgMsg,
-		Position: int32(firstIndex + 3),
+		Position: int32(firstIndex + 1), // Add one because the first character in query string has index of 1 according to document: https://www.postgresql.org/docs/13/protocol-error-fields.html
 		Detail: "",
 		Hint: "",
 	}
@@ -146,7 +146,7 @@ func handleFiledSpecifiedTwice(m *mysql.SQLError, te *terror.Error, sql string) 
 		//duplicate_column
 		Code: "42701",
 		Message: pgMsg,
-		Position: int32(twice + 3),
+		Position: int32(twice + 1),
 		Detail: "",
 		Hint: "",
 	}
@@ -179,7 +179,7 @@ func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string)
 	column := cutSql[ : finalLen]
 	pgMsg := fmt.Sprintf("syntax error at or near \"%s\"", column)
 
-	position := strings.Index(sql, column) + 3
+	position := strings.Index(sql, column) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -206,7 +206,7 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 
 	tableStart := strings.Index(strings.Trim(strings.ToUpper(sql), empty), beforeTable) + len(beforeTable)
 	cutSql := strings.Trim(sql[tableStart : ], empty)
-	tableLen := strings.Index(cutSql, empty) + 1
+	tableLen := strings.Index(cutSql, empty)
 	table := cutSql[:tableLen]
 
 	pgMsg := fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist",column, table)
@@ -214,8 +214,7 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		//internal_error
-		Code: "XX000",
+		Code: "42703",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -229,13 +228,13 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 // eg. Multiple primary key defined
 func handleMultiplePKDefined(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 
-	msg, beforeTable, brackets, pk := m.Message, "TABLE ", "(", "PRIMARY KEY"
+	beforeTable, brackets, pk := "TABLE ", "(", "PRIMARY KEY"
 	tableStart := strings.Index(strings.ToUpper(sql), beforeTable) + len(beforeTable)
-	tableLen := strings.Index(sql, brackets)
-	table := msg[tableStart : tableStart + tableLen]
+	tableEnd := strings.Index(sql, brackets)
+	table := sql[tableStart :  tableEnd]
 
 	firstPKSpec := strings.Index(strings.ToUpper(sql), pk) + len(pk)
-	position := firstPKSpec + strings.Index(strings.ToUpper(sql[firstPKSpec : ]), pk)
+	position := firstPKSpec + strings.Index(strings.ToUpper(sql[firstPKSpec : ]), pk) + 1
 	pgMsg := fmt.Sprintf("multiple primary keys for table \"%s\" are not allowed", table)
 
 	errorResp := &pgproto3.ErrorResponse{
@@ -282,7 +281,7 @@ func handleParseError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto
 	pgMsg := fmt.Sprintf("syntax error at or near %s",behindNear)
 
 	// 为什么加3? 在提示信息第二行开头回提示是第几行sql的错误，他也会占偏移量，所以要将其加上。
-	position := strings.Index(sql,strings.Trim(behindNear, quotes)) + 3
+	position := strings.Index(sql,strings.Trim(behindNear, quotes)) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -309,7 +308,8 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 	valueStart := strings.Index(msg, entry) + len(entry)
 	valueLen := strings.Index(msg[valueStart : ], empty)
 	value := msg[valueStart : valueStart + valueLen]
-	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"\nDescription:  Key value %v already exists.", keyName, value)
+	pgMsg := fmt.Sprintf("duplicate key value violates unique constraint \"%s\"", keyName)
+	detailMsg := fmt.Sprintf("Key value %s already exists.", value)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -317,7 +317,7 @@ func handleDuplicateKey(m *mysql.SQLError, te *terror.Error, sql string) (*pgpro
 		//unique_violation
 		Code: "23505",
 		Message: pgMsg,
-		Detail: "",
+		Detail: detailMsg,
 		Hint: "",
 	}
 	setFilePathAndLine(te, errorResp)
@@ -359,7 +359,7 @@ func handleUnknownColumn(m *mysql.SQLError, te *terror.Error, sql string) (*pgpr
 	} else {
 		pgMsg = m.Message
 	}
-	position := strings.Index(sql, columnName) + 3
+	position := strings.Index(sql, columnName) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -431,7 +431,9 @@ func handleUnknownDB(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3
 	msg, beforeDB, apostrophe,empty := m.Message, "database ", "'"," "
 	dbStart := strings.Index(msg, beforeDB) + len(beforeDB)
 	db := strings.Trim(strings.Trim(msg[dbStart : ], empty), apostrophe)
-	pgMsg := fmt.Sprintf("database \"%s\" does not exist\nkeep last connection",db)
+	// pgsql will have another line saying "Previous connection kept" since using switch db is the same as new connection in pg
+	// We won't handle it here since its not considered part of the error message but fallback behavior of a unsuccessful new connection
+	pgMsg := fmt.Sprintf("database \"%s\" does not exist",db)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Code: "3D000",
@@ -591,7 +593,7 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 	brackets := "("
 
 	pgMsg := "subquery in FROM must have an alias"
-	position := strings.Index(sql, brackets) + 3
+	position := strings.Index(sql, brackets) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
@@ -601,7 +603,7 @@ func handleDerivedMustHaveAlias(m *mysql.SQLError, te *terror.Error, sql string)
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",
-		Hint: "",
+		Hint: "For example, FROM (SELECT ...) [AS] foo.",
 	}
 	setFilePathAndLine(te, errorResp)
 
@@ -711,13 +713,14 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 	}else {
 		relation = sql[relationStart : relationStart + relationLen]
 	}
-	//原版pg对应错误还有一行错误信息，eg.描述:  Failing row contains (null, xxx    , null).，但是MySQL的错误信息不足以凑出第二行的信息。
+	//Can't get the second row detail message from mysql error message
+	// aka: DETAIL:  Failing row contains (1, null).
 	pgMsg := fmt.Sprintf("null value in column \"%s\" of relation \"%s\" violates not-null constraint", column, relation)
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
-		Code: "42601",
+		Code: "23502",
 		Message: pgMsg,
 		Detail: "",
 		Hint: "",
@@ -729,13 +732,13 @@ func handleNoDefaultValue(m *mysql.SQLError, te *terror.Error, sql string) (*pgp
 
 
 
-//handeleColumnMisMatch 处理字段与值的数量匹配不上的情况
-func handeleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
+//handleColumnMisMatch 处理字段与值的数量匹配不上的情况
+func handleColumnMisMatch(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	values := "values"
 
 	valueStart := strings.Index(sql, values) + len(values)
 	//这里的游标只能指到values后面的括号，mysql的错误信息里拿不到哪些 value 是多出来的。
-	position := valueStart + 3
+	position := valueStart + 1
 	pgMsg := fmt.Sprintf("INSERT has more expressions than target columns")
 
 	errorResp := &pgproto3.ErrorResponse{
@@ -762,38 +765,12 @@ func handleRelationNotExists(m *mysql.SQLError, te *terror.Error, sql string) (*
 	nameLen := strings.Index(msg[tableNameStart : ], apostrophe)
 	tableName := msg[tableNameStart : tableNameStart + nameLen]
 	pgMsg := fmt.Sprintf("relation \"%s\" does not exist", tableName)
-	position := strings.Index(sql, tableName) + 3
+	position := strings.Index(sql, tableName) + 1
 
 	errorResp := &pgproto3.ErrorResponse{
 		Severity: "ERROR",
 		SeverityUnlocalized: "",
 		Code: "42P01",
-		Message: pgMsg,
-		Position: int32(position),
-		Detail: "",
-		Hint: "",
-	}
-	setFilePathAndLine(te, errorResp)
-
-	return errorResp,nil
-}
-// handleTypeError 处理类型转换错误信息
-func handleTypeError(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	msg, quotes, beforeInput := m.Message, "\"", "parsing "
-	inputStart := strings.Index(msg, beforeInput) + len(beforeInput)
-	inputLen := strings.Index(msg[inputStart + 1 : ], quotes) + 1
-	input := msg[inputStart : inputStart + inputLen]
-	if !strings.HasSuffix(input, quotes) {
-		input += quotes
-	}
-	pgMsg := fmt.Sprintf("invalid input syntax for : %s", input)
-	position := strings.Index(sql, input)
-
-	errorResp := &pgproto3.ErrorResponse{
-		Severity: "ERROR",
-		SeverityUnlocalized: "",
-		//datatype_mismatch
-		Code: "42804",
 		Message: pgMsg,
 		Position: int32(position),
 		Detail: "",

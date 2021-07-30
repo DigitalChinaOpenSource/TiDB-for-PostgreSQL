@@ -2493,8 +2493,6 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleMultiplePKDefined(m, te, sql)
 	case 1091:
 		return handleCantDropFieldOrKey(m, te, sql)
-	case 1105:
-		return handleTypeError(m, te, sql)
 	case 1109:
 		return handleUnknownTableInDelete(m, te, sql)
 	case 1110:
@@ -2504,7 +2502,7 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1113:
 		return handleTableNoColumn(m, te, sql)
 	case 1136:
-		return handeleColumnMisMatch(m, te,sql)
+		return handleColumnMisMatch(m, te,sql)
 	case 1138:
 		return handleInvalidUseOfNull(m, te,sql)
 	case 1142:
