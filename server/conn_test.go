@@ -18,12 +18,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
-	"io"
-
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/jackc/pgproto3/v2"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/executor"
@@ -34,6 +34,7 @@ import (
 	"github.com/pingcap/tidb/util/arena"
 	"github.com/pingcap/tidb/util/testkit"
 	"github.com/pingcap/tidb/util/testleak"
+	"io"
 )
 
 type ConnTestSuite struct {
@@ -63,6 +64,19 @@ func (ts *ConnTestSuite) TestMalformHandshakeHeader(c *C) {
 	data := []byte{0x00}
 	var p handshakeResponse41
 	_, err := parseHandshakeResponseHeader(context.Background(), &p, data)
+	c.Assert(err, NotNil)
+}
+
+// Test a malformed handshake packet from pg client, must error
+func (ts *ConnTestSuite) TestMalformHandshakeHeaderPG (c *C) {
+	c.Parallel()
+	data := []byte{0x00}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	_, err := cc.ReceiveStartupMessage()
 	c.Assert(err, NotNil)
 }
 
@@ -133,6 +147,78 @@ func (ts *ConnTestSuite) TestParseHandshakeResponse(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(p.User, Equals, "root")
 }
+// Test that tidb for pg is capable of converting the start up message to the correct pgproto3 object
+func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
+	c.Parallel()
+	// here are packet got from running psql via command[psql "sslmode=disable host=localhost"]
+	data := []byte{
+		0x00, 0x00, 0x00, 0x4e, // Length = 78
+		0x00, 0x03, 0x00, 0x00, // Protocol Version: major = 3, minor = 0
+		0x75, 0x73, 0x65, 0x72, 0x00, // user
+		0x64, 0x61, 0x76, 0x69, 0x64, 0x00, // david
+		0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x00,//database
+		0x64, 0x61, 0x76, 0x69, 0x64, 0x00,//david
+		0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x00,// application name
+		0x70, 0x73, 0x71, 0x6c, 0x00,//psql
+		0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x65, 0x6e, 0x63, 0x6f, 0x64, 0x69, 0x6e, 0x67, 0x00,// client encoding
+		0x55, 0x54, 0x46, 0x38, 0x00, //UTF8
+		0x00,
+	}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	response, err := cc.ReceiveStartupMessage()
+	c.Assert(err, IsNil)
+	_, ok := response.(*pgproto3.StartupMessage)
+	c.Assert(ok,IsTrue)
+}
+
+// Test that tidb for pg can correctly construct corresponding pgproto3 response
+func (ts *ConnTestSuite) TestReceiveSSLRequestPG (c *C) {
+	c.Parallel()
+	// here are packet got from running psql via command[psql "host=localhost"]
+	data := []byte{
+		0x00, 0x00, 0x00, 0x08, // Length = 8
+		0x04, 0xd2, 0x16, 0x2f, // Protocol: SSL Request (80877103)
+	}
+	cc := &clientConn{
+		bufReadConn: &bufferedReadConn{
+			rb: bufio.NewReader(bytes.NewReader(data)),
+		},
+	}
+	response, err := cc.ReceiveStartupMessage()
+	c.Assert(err, IsNil)
+	_, ok := response.(*pgproto3.SSLRequest)
+	c.Assert(ok,IsTrue)
+}
+
+// TiDB for PG should write back correct authentication ok message when called
+func (ts *ConnTestSuite) TestAuthenticationOKPG (c *C) {
+	c.Parallel()
+	var outBuffer bytes.Buffer
+	cc := &clientConn{
+		connectionID: 1,
+		server: &Server{
+			capability: defaultCapability,
+		},
+		pkt: &packetIO{
+			bufWriter: bufio.NewWriter(&outBuffer),
+		},
+	}
+	err := cc.writeAuthenticationOK(context.TODO())
+	c.Assert(err, IsNil)
+	expected := new(bytes.Buffer)
+	expected.Write([]byte{
+		0x52, //Message code
+		0x00, 0x00, 0x00, 0x08, // Length = 8
+		0x00, 0x00, 0x00, 0x00, // Authentication ok
+	})
+
+	c.Assert(outBuffer.Bytes(), DeepEquals, expected.Bytes())
+}
+
 
 func (ts *ConnTestSuite) TestIssue1768(c *C) {
 	c.Parallel()
@@ -228,7 +314,7 @@ type dispatchInput struct {
 	out []byte
 }
 
-func (ts *ConnTestSuite) TestDispatch(c *C) {
+/*func (ts *ConnTestSuite) TestDispatch(c *C) {
 	userData := append([]byte("root"), 0x0, 0x0)
 	userData = append(userData, []byte("test")...)
 	userData = append(userData, 0x0)
@@ -327,9 +413,9 @@ func (ts *ConnTestSuite) TestDispatch(c *C) {
 	}
 
 	ts.testDispatch(c, inputs, 0)
-}
+}*/
 
-func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
+/*func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
 	userData := append([]byte("root"), 0x0, 0x0)
 	userData = append(userData, []byte("test")...)
 	userData = append(userData, 0x0)
@@ -430,6 +516,27 @@ func (ts *ConnTestSuite) TestDispatchClientProtocol41(c *C) {
 	}
 
 	ts.testDispatch(c, inputs, mysql.ClientProtocol41)
+}*/
+
+func (ts *ConnTestSuite) TestDispatchSimpleQueryPG(c *C) {
+	do1Response, _ := hex.DecodeString("540000001a00016100000040410001000000170004ffffffff0000440000000b00010000000131430000000d53454c4543542031005a0000000549")
+	inputs := []dispatchInput{
+		{
+			com: 'X', // quit command
+			in:  nil,
+			err: io.EOF, // when client quit, there should be a eof error
+			out: nil,
+		},
+		{
+			com: 'Q',
+			in:  []byte("select * from t;"),
+			err: nil,
+			out: do1Response,
+		},
+
+	}
+
+	ts.testDispatch(c, inputs, mysql.ClientProtocol41)
 }
 
 func (ts *ConnTestSuite) testDispatch(c *C, inputs []dispatchInput, capability uint32) {
@@ -446,9 +553,11 @@ func (ts *ConnTestSuite) testDispatch(c *C, inputs []dispatchInput, capability u
 		session: se,
 		stmts:   make(map[int]*TiDBStatement),
 	}
-	_, err = se.Execute(context.Background(), "create table test.t(a int)")
+	_, err = se.Execute(context.Background(), "use test")
 	c.Assert(err, IsNil)
-	_, err = se.Execute(context.Background(), "insert into test.t values (1)")
+	_, err = se.Execute(context.Background(), "create table t(a int)")
+	c.Assert(err, IsNil)
+	_, err = se.Execute(context.Background(), "insert into t values (1)")
 	c.Assert(err, IsNil)
 
 	var outBuffer bytes.Buffer
@@ -535,10 +644,15 @@ func (ts *ConnTestSuite) TestConnExecutionTimeout(c *C) {
 		session: se,
 		stmts:   make(map[int]*TiDBStatement),
 	}
+
+	var outBuffer bytes.Buffer
 	cc := &clientConn{
 		connectionID: uint32(connID),
 		server: &Server{
 			capability: defaultCapability,
+		},
+		pkt: &packetIO{
+			bufWriter: bufio.NewWriter(&outBuffer),
 		},
 		ctx:   tc,
 		alloc: arena.NewAllocator(32 * 1024),

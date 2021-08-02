@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/auth"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/gorilla/mux"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/fn"
-	"github.com/DigitalChinaOpenSource/DCParser/auth"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/domain/infosync"
@@ -158,8 +158,8 @@ func (s *testInfoschemaTableSuite) TestProfiling(c *C) {
 func (s *testInfoschemaTableSuite) TestSchemataTables(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
 
-	tk.MustQuery("select * from information_schema.SCHEMATA where schema_name='mysql';").Check(
-		testkit.Rows("def mysql utf8mb4 utf8mb4_bin <nil>"))
+	tk.MustQuery("select * from information_schema.SCHEMATA where schema_name='postgres';").Check(
+		testkit.Rows("postgres postgres root <nil> <nil> utf8mb4 <nil> utf8mb4_bin"))
 
 	// Test the privilege of new user for information_schema.schemata.
 	tk.MustExec("create user schemata_tester")
@@ -173,7 +173,7 @@ func (s *testInfoschemaTableSuite) TestSchemataTables(c *C) {
 	schemataTester.MustQuery("select * from information_schema.SCHEMATA where schema_name='mysql';").Check(
 		[][]interface{}{})
 	schemataTester.MustQuery("select * from information_schema.SCHEMATA where schema_name='INFORMATION_SCHEMA';").Check(
-		testkit.Rows("def INFORMATION_SCHEMA utf8mb4 utf8mb4_bin <nil>"))
+		testkit.Rows("postgres INFORMATION_SCHEMA root <nil> <nil> utf8mb4 <nil> utf8mb4_bin"))
 
 	// Test the privilege of user with privilege of mysql for information_schema.schemata.
 	tk.MustExec("CREATE ROLE r_mysql_priv;")
@@ -182,7 +182,7 @@ func (s *testInfoschemaTableSuite) TestSchemataTables(c *C) {
 	schemataTester.MustExec("set role r_mysql_priv")
 	schemataTester.MustQuery("select count(*) from information_schema.SCHEMATA;").Check(testkit.Rows("2"))
 	schemataTester.MustQuery("select * from information_schema.SCHEMATA;").Check(
-		testkit.Rows("def INFORMATION_SCHEMA utf8mb4 utf8mb4_bin <nil>", "def mysql utf8mb4 utf8mb4_bin <nil>"))
+		testkit.Rows("postgres INFORMATION_SCHEMA root <nil> <nil> utf8mb4 <nil> utf8mb4_bin", "postgres mysql root <nil> <nil> utf8mb4 <nil> utf8mb4_bin"))
 }
 
 func (s *testInfoschemaTableSuite) TestTableIDAndIndexID(c *C) {
@@ -206,8 +206,8 @@ func (s *testInfoschemaTableSuite) TestSchemataCharacterSet(c *C) {
 func (s *testInfoschemaTableSuite) TestViews(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
 	tk.MustExec("CREATE DEFINER='root'@'localhost' VIEW test.v1 AS SELECT 1")
-	tk.MustQuery("SELECT * FROM information_schema.views WHERE table_schema='test' AND table_name='v1'").Check(testkit.Rows("def test v1 SELECT 1 CASCADED NO root@localhost DEFINER utf8mb4 utf8mb4_bin"))
-	tk.MustQuery("SELECT table_catalog, table_schema, table_name, table_type, engine, version, row_format, table_rows, avg_row_length, data_length, max_data_length, index_length, data_free, auto_increment, update_time, check_time, table_collation, checksum, create_options, table_comment FROM information_schema.tables WHERE table_schema='test' AND table_name='v1'").Check(testkit.Rows("def test v1 VIEW <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> VIEW"))
+	tk.MustQuery("SELECT * FROM information_schema.views WHERE table_schema='test' AND table_name='v1'").Check(testkit.Rows("postgres test v1 SELECT 1 CASCADED NO <nil> <nil> <nil> <nil> root@localhost DEFINER utf8mb4 utf8mb4_bin"))
+	tk.MustQuery("SELECT table_catalog, table_schema, table_name, table_type, engine, version, row_format, table_rows, avg_row_length, data_length, max_data_length, index_length, data_free, auto_increment, update_time, check_time, table_collation, checksum, create_options, table_comment FROM information_schema.tables WHERE table_schema='test' AND table_name='v1'").Check(testkit.Rows("postgres test v1 VIEW <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> <nil> VIEW"))
 }
 
 func (s *testInfoschemaTableSuite) TestEngines(c *C) {
@@ -227,7 +227,7 @@ func (s *testInfoschemaTableSuite) TestCharacterSetCollations(c *C) {
 	tk.MustQuery("SELECT character_set_name, id, sortlen FROM information_schema.collations ORDER BY collation_name").Check(
 		testkit.Rows("ascii 65 1", "binary 63 1", "latin1 47 1", "utf8 83 1", "utf8mb4 46 1"))
 
-	tk.MustQuery("select * from information_schema.COLLATION_CHARACTER_SET_APPLICABILITY where COLLATION_NAME='utf8mb4_bin';").Check(
+	tk.MustQuery("select collation_name, character_set_name from information_schema.COLLATION_CHARACTER_SET_APPLICABILITY where COLLATION_NAME='utf8mb4_bin';").Check(
 		testkit.Rows("utf8mb4_bin utf8mb4"))
 }
 
@@ -470,7 +470,7 @@ func (s *testInfoschemaTableSuite) TestMetricTables(c *C) {
 
 func (s *testInfoschemaTableSuite) TestTableConstraintsTable(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
-	tk.MustQuery("select * from information_schema.TABLE_CONSTRAINTS where TABLE_NAME='gc_delete_range';").Check(testkit.Rows("def mysql delete_range_index mysql gc_delete_range UNIQUE"))
+	tk.MustQuery("select * from information_schema.TABLE_CONSTRAINTS where TABLE_NAME='gc_delete_range';").Check(testkit.Rows("postgres mysql delete_range_index postgres mysql gc_delete_range UNIQUE <nil> <nil> <nil>"))
 }
 
 func (s *testInfoschemaTableSuite) TestTableSessionVar(c *C) {
@@ -808,12 +808,12 @@ func (s *testInfoschemaClusterTableSuite) TestTableStorageStats(c *C) {
 func (s *testInfoschemaTableSuite) TestSequences(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
 	tk.MustExec("CREATE SEQUENCE test.seq maxvalue 10000000")
-	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq'").Check(testkit.Rows("def test seq 1 1000 0 1 10000000 1 1 "))
+	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq'").Check(testkit.Rows("postgres test seq <nil> <nil> <nil> <nil> <nil> <nil> <nil> 1 <nil> postgres 1 1000 0 10000000 1 1 "))
 	tk.MustExec("DROP SEQUENCE test.seq")
 	tk.MustExec("CREATE SEQUENCE test.seq start = -1 minvalue -1 maxvalue 10 increment 1 cache 10")
-	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq'").Check(testkit.Rows("def test seq 1 10 0 1 10 -1 -1 "))
+	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq'").Check(testkit.Rows("postgres test seq <nil> <nil> <nil> <nil> <nil> <nil> <nil> 1 <nil> postgres 1 10 0 10 -1 -1 "))
 	tk.MustExec("CREATE SEQUENCE test.seq2 start = -9 minvalue -10 maxvalue 10 increment -1 cache 15")
-	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq2'").Check(testkit.Rows("def test seq2 1 15 0 -1 10 -10 -9 "))
+	tk.MustQuery("SELECT * FROM information_schema.sequences WHERE sequence_schema='test' AND sequence_name='seq2'").Check(testkit.Rows("postgres test seq2 <nil> <nil> <nil> <nil> <nil> <nil> <nil> -1 <nil> postgres 1 15 0 10 -10 -9 "))
 }
 
 func (s *testInfoschemaTableSuite) TestTiFlashSystemTables(c *C) {

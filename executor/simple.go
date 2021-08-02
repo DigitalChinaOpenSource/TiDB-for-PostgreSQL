@@ -1051,12 +1051,16 @@ func userExists(ctx sessionctx.Context, name string, host string) (bool, error) 
 
 func (e *SimpleExec) executeSetPwd(s *ast.SetPwdStmt) error {
 	var u, h string
+	// The name of the user whose password has been changed
+	var userName string
 	if s.User == nil {
 		if e.ctx.GetSessionVars().User == nil {
 			return errors.New("Session error is empty")
 		}
 		u = e.ctx.GetSessionVars().User.AuthUsername
 		h = e.ctx.GetSessionVars().User.AuthHostname
+
+		userName = u
 	} else {
 		checker := privilege.GetPrivilegeManager(e.ctx)
 		activeRoles := e.ctx.GetSessionVars().ActiveRoles
@@ -1065,6 +1069,8 @@ func (e *SimpleExec) executeSetPwd(s *ast.SetPwdStmt) error {
 		}
 		u = s.User.Username
 		h = s.User.Hostname
+
+		userName = s.User.Username
 	}
 	exists, err := userExists(e.ctx, u, h)
 	if err != nil {
@@ -1075,7 +1081,7 @@ func (e *SimpleExec) executeSetPwd(s *ast.SetPwdStmt) error {
 	}
 
 	// update mysql.user
-	sql := fmt.Sprintf(`UPDATE %s.%s SET authentication_string='%s' WHERE User='%s' AND Host='%s';`, mysql.SystemDB, mysql.UserTable, auth.EncodePasswordByMD5(s.User.Username, s.Password), u, h)
+	sql := fmt.Sprintf(`UPDATE %s.%s SET authentication_string='%s' WHERE User='%s' AND Host='%s';`, mysql.SystemDB, mysql.UserTable, auth.EncodePasswordByMD5(userName, s.Password), u, h)
 	_, _, err = e.ctx.(sqlexec.RestrictedSQLExecutor).ExecRestrictedSQL(sql)
 	domain.GetDomain(e.ctx).NotifyUpdatePrivilege(e.ctx)
 	return err
