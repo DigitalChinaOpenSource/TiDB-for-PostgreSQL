@@ -168,7 +168,11 @@ type PreparedStatement interface {
 	// GetArgs 获取Args的具体值
 	GetArgs() []types.Datum
 
+	// GetResultFormat 获取结果返回的格式 0 为 Text, 1 为 Binary
+	GetResultFormat() []int16
 
+	// SetResultFormat 设置结果返回的格式 0 为 Text, 1 为 Binary
+	SetResultFormat(rf []int16)
 }
 
 // ResultSet is the result set of an query.

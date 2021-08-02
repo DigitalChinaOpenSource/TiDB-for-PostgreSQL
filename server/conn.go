@@ -71,14 +71,14 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/opentracing/opentracing-go"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/opentracing/opentracing-go"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/executor"
 	"github.com/pingcap/tidb/kv"
@@ -1027,9 +1027,9 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return cc.handleStmtDescription(ctx, desc)
 	case 'H':            /* flush */
 	case 'S':            /* sync */
-		return cc.writeReadForQuery(ctx,cc.ctx.Status())
+		return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 	case 'X':
-		return nil
+		return io.EOF
 	case 'd':            /* copy data */
 	case 'c':            /* copy done */
 	case 'f':            /* copy fail */
@@ -1066,13 +1066,13 @@ func (cc *clientConn) flush(ctx context.Context) error {
 	return cc.pkt.flush()
 }
 
-// writeOK 这个暂且先这么写,后面是否选择使用,待定
+// writeOK You can choose this method when you need to return complete and readyforquery directly to the client
 func (cc *clientConn) writeOK(ctx context.Context) error {
 	//msg := cc.ctx.LastMessage()
 	if err := cc.writeCommandComplete(); err != nil {
 		return err
 	}
-	return cc.writeReadForQuery(ctx,cc.ctx.Status())
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 }
 
 // writeOkWith 这个方法没什么用,后面可以考虑删除
@@ -1131,8 +1131,8 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	// 发送错误后需要发送 ReadyForQuery 通知客户端可以继续执行命令
 	// 所以这里需要获取到事务状态是否处于空闲阶段
 	// todo 获取事务状态
-	cc.writeReadForQuery(ctx, cc.ctx.Status())
-	return cc.flush(ctx)
+
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 }
 
 // writeEOF writes an EOF packet.
@@ -1390,7 +1390,7 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 		return err
 	}
 	if len(stmts) == 0 {
-		return cc.writeCommandComplete()
+		return cc.writeOK(ctx)
 	}
 
 	var appendMultiStmtWarning bool
@@ -1452,7 +1452,7 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 			return executor.ErrQueryInterrupted
 		}
 
-		err = cc.writeResultset(ctx, rs, false, status, 0)
+		err = cc.writeResultset(ctx, rs, nil, status, 0)
 		if err != nil {
 			return err
 		}
@@ -1483,7 +1483,7 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 
 	// 如果是最后一个查询,则需要返回ReadyForQuery
 	if lastStmt{
-		if err:= cc.writeReadForQuery(ctx,status);err!=nil {
+		if err:= cc.writeReadyForQuery(ctx,status);err!=nil {
 			return err
 		}
 	}
@@ -1567,10 +1567,12 @@ func (cc *clientConn) handleFieldList(ctx context.Context, sql string) (err erro
 }
 
 // writeResultset writes data into a resultset and uses rs.Next to get row data back.
-// If binary is true, the data would be encoded in BINARY format.
+// If resultFormat is nil, the data would be encoded in Text format.
+// If resultFormat just one value, the data would be encoded in Text(0) or Binary(1) format
+// If resultFormat have many values, each column would be encoded in Text(0) or Binary(1) format.
 // serverStatus, a flag bit represents server information.
 // fetchSize, the desired number of rows to be fetched each time when client uses cursor.
-func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16, fetchSize int) (runErr error) {
+func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFormat []int16, serverStatus uint16, fetchSize int) (runErr error) {
 	defer func() {
 		// close ResultSet when cursor doesn't exist
 		r := recover()
@@ -1593,7 +1595,7 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary b
 		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
 		return nil
 	} else {
-		err = cc.writeChunks(ctx, rs, binary, serverStatus)
+		err = cc.writeChunks(ctx, rs,  serverStatus, resultFormat)
 	}
 
 	return err
@@ -1616,11 +1618,10 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 }
 
 // writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
-// binary specifies the way to dump data. It throws any error while dumping data.
 // serverStatus, a flag bit represents server information
 // PostgreSQL Modified
 // 判断是否为预处理查询,决定是否返回readyQuery,不在这儿做
-func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) error {
+func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, serverStatus uint16, rf []int16) error {
 	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
@@ -1642,7 +1643,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 			// We need to call Next before we get columns.
 			// Otherwise, we will get incorrect columns info.
 			columns := rs.Columns()
-			//err = cc.writeColumnInfo(columns, serverStatus)
+			// err = cc.writeColumnInfo(columns, serverStatus)
 			err = cc.WriteRowDescription(columns)
 			if err != nil {
 				return err
@@ -1661,8 +1662,8 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool
 		data = pgio.AppendInt32(data, -1)
  		for i := 0; i < rowCount; i++ {
 			data = data[0:5]
-			if binary {
-				data, err = dumpBinaryRowData(data, rs.Columns(), req.GetRow(i))
+			if len(rf) > 0 {
+				data, err = dumpRowData(data, rs.Columns(), req.GetRow(i), rf)
 			} else {
 				data, err = dumpTextRowData(data, rs.Columns(), req.GetRow(i))
 			}
@@ -1760,7 +1761,7 @@ func (cc *clientConn) writeChunksWithFetchSize(ctx context.Context, rs ResultSet
 	return cc.writeEOF(serverStatus)
 }
 
-func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, binary bool) error {
+func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, resultFormat []int16) error {
 	for i, rs := range rss {
 		lastRs := i == len(rss)-1
 		if r, ok := rs.(*tidbResultSet).recordSet.(sqlexec.MultiQueryNoDelayResult); ok {
@@ -1777,7 +1778,7 @@ func (cc *clientConn) writeMultiResultset(ctx context.Context, rss []ResultSet, 
 		if !lastRs {
 			status |= mysql.ServerMoreResultsExists
 		}
-		if err := cc.writeResultset(ctx, rs, binary, status, 0); err != nil {
+		if err := cc.writeResultset(ctx, rs, resultFormat, status, 0); err != nil {
 			return err
 		}
 	}
@@ -1984,7 +1985,7 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 		return err
 	}
 
-	msg, ok := m.(*pgproto3.StartupMessage);
+	msg, ok := m.(*pgproto3.StartupMessage)
 
 	// 如果接收到的包不为启动包则报错
 	if !ok {
@@ -2058,7 +2059,7 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 	}
 
 	// 发送 ReadyForQuery 表示一切准备就绪。"I"表示空闲(没有在事务中)
-	if err := cc.writeReadForQuery(ctx, mysql.ServerStatusAutocommit); err != nil{
+	if err := cc.writeReadyForQuery(ctx, mysql.ServerStatusAutocommit); err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2109,7 +2110,7 @@ func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) 
 		}
 		return gssEncRequest, nil
 	default:
-		return nil, errors.New("unknown startup message code: " + string(code))
+		return nil, errors.New("unknown startup message code: " + fmt.Sprint(code))
 	}
 }
 
@@ -2268,7 +2269,7 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 }
 
 // writeCommandComplete 向客户端写回 CommandComplete 表示一次查询已经完成
-// 在 writeCommandComplete 之后需要向客户端写回 writeReadForQuery 发送服务端状态
+// 在 writeCommandComplete 之后需要向客户端写回 writeReadyForQuery 发送服务端状态
 // 这里只写向缓存，并不发送
 func (cc *clientConn) writeCommandComplete() error {
 	stmtType := strings.ToUpper(cc.ctx.GetSessionVars().StmtCtx.StmtType)
@@ -2321,19 +2322,20 @@ func (cc *clientConn) writeCloseComplete() error {
 	return cc.WriteData(closeComplete.Encode(nil))
 }
 
-// writeReadForQuery 向客户端写回 ReadyForQuery
+// writeReadyForQuery 向客户端写回 ReadyForQuery
 // status 为当前后端事务状态码。"I"表示空闲(没有在事务中)、"T"表示在事务中；"E"表示在失败的事务中(事务块结束前查询都回被驳回)
 // 调用该方法后会清空缓存，发送缓存中的所有报文
-func (cc *clientConn) writeReadForQuery(ctx context.Context, status uint16) error {
+func (cc *clientConn) writeReadyForQuery(ctx context.Context, status uint16) error {
 	pgStatus, err := convertMySQLServerStatusToPgSQLServerStatus(status)
 	if err != nil {
 		return err
 	}
 
-	readForReady := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
-	if err := cc.WriteData(readForReady.Encode(nil)); err != nil{
+	readyForQuery := &pgproto3.ReadyForQuery{TxStatus: pgStatus}
+	if err := cc.WriteData(readyForQuery.Encode(nil)); err != nil {
 		return err
 	}
+
 	return cc.flush(ctx)
 }
 
@@ -2382,11 +2384,9 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	switch mysqlType {
 	case mysql.TypeUnspecified:
 		return pgtype.UnknownOID
-	case mysql.TypeTiny:
+	case mysql.TypeTiny, mysql.TypeShort:
 		return pgtype.Int2OID
-	case mysql.TypeShort:
-		return pgtype.Int2OID
-	case mysql.TypeLong:
+	case mysql.TypeLong, mysql.TypeInt24:
 		return pgtype.Int4OID
 	case mysql.TypeFloat:
 		return pgtype.Float4OID
@@ -2398,12 +2398,10 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 		return pgtype.TimestampOID
 	case mysql.TypeLonglong:
 		return pgtype.Int8OID
-	case mysql.TypeInt24:  //未找到对应类型
-		return pgtype.UnknownOID
 	case mysql.TypeDate:
 		return pgtype.DateOID
 	case mysql.TypeDuration:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.TimeOID  //与Time并不完全想对应
 	case mysql.TypeDatetime:
 		return pgtype.TimestampOID
 	case mysql.TypeYear:
@@ -2417,22 +2415,14 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	case mysql.TypeJSON:
 		return pgtype.JSONOID
 	case mysql.TypeNewDecimal:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.NumericOID
 	case mysql.TypeEnum:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.UnknownOID  //未找到对应类型dumpLengthEncodedStringByEndian
 	case mysql.TypeSet:
 		return pgtype.UnknownOID  //未找到对应类型
-	case mysql.TypeTinyBlob:
+	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob,mysql.TypeBlob:
 		return pgtype.ByteaOID
-	case mysql.TypeMediumBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeLongBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeBlob:
-		return pgtype.ByteaOID
-	case mysql.TypeVarString:
-		return pgtype.TextOID
-	case mysql.TypeString:
+	case mysql.TypeVarString, mysql.TypeString:
 		return pgtype.TextOID
 	case mysql.TypeGeometry:
 		return pgtype.UnknownOID  //未找到对应类型
@@ -2491,6 +2481,8 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleUnknownDB(m,te,sql)
 	case 1050:
 		return handleTableExists(m,te,sql)
+	case 1051:
+		return handleUndefinedTable(m, te, sql)
 	case 1054:
 		return handleUnknownColumn(m,te, sql)
 	case 1062:
@@ -2501,8 +2493,6 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 		return handleMultiplePKDefined(m, te, sql)
 	case 1091:
 		return handleCantDropFieldOrKey(m, te, sql)
-	case 1105:
-		return handleTypeError(m, te, sql)
 	case 1109:
 		return handleUnknownTableInDelete(m, te, sql)
 	case 1110:
@@ -2512,7 +2502,7 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1113:
 		return handleTableNoColumn(m, te, sql)
 	case 1136:
-		return handeleColumnMisMatch(m, te,sql)
+		return handleColumnMisMatch(m, te,sql)
 	case 1138:
 		return handleInvalidUseOfNull(m, te,sql)
 	case 1142:

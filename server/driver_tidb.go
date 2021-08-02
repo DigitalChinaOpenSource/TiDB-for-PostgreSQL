@@ -81,6 +81,7 @@ type TiDBStatement struct {
 	sql         string
 	columnInfo []*ColumnInfo
 	args       []types.Datum
+	resultFormat []int16
 }
 
 // ID implements PreparedStatement ID method.
@@ -218,6 +219,16 @@ func (ts *TiDBStatement) GetArgs() []types.Datum {
 // SetArgs 进行参数绑定值
 func (ts *TiDBStatement) SetArgs(args []types.Datum) {
 	ts.args = args
+}
+
+// GetResultFormat 获取结果返回的格式 0 为 Text, 1 为 Binary
+func (ts *TiDBStatement) GetResultFormat() []int16 {
+	return ts.resultFormat
+}
+
+// SetResultFormat 设置结果返回的格式 0 为 Text, 1 为 Binary
+func (ts *TiDBStatement) SetResultFormat(rf []int16){
+	ts.resultFormat = rf
 }
 
 // OpenCtx implements IDriver.
