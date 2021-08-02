@@ -714,7 +714,8 @@ func (s *testPrivilegeSuite) TestCheckAuthenticate(c *C) {
 	c.Assert(se.Auth(&auth.UserIdentity{Username: "u1", Hostname: "localhost"}, nil, nil), IsTrue)
 	c.Assert(se.Auth(&auth.UserIdentity{Username: "u2", Hostname: "localhost"}, nil, nil), IsFalse)
 	salt := []byte{85, 92, 45, 22, 58, 79, 107, 6, 122, 125, 58, 80, 12, 90, 103, 32, 90, 10, 74, 82}
-	authentication := []byte{24, 180, 183, 225, 166, 6, 81, 102, 70, 248, 199, 143, 91, 204, 169, 9, 161, 171, 203, 33}
+	// authentication := []byte{24, 180, 183, 225, 166, 6, 81, 102, 70, 248, 199, 143, 91, 204, 169, 9, 161, 171, 203, 33}
+	authentication := []byte{109, 100, 53, 48, 48, 49, 50, 51, 49, 99, 54, 99, 101, 55, 53, 57, 100, 98, 101, 54, 98, 100, 100, 51, 54, 52, 49, 55, 56, 98, 50, 97, 51, 97, 101}
 	c.Assert(se.Auth(&auth.UserIdentity{Username: "u2", Hostname: "localhost"}, authentication, salt), IsTrue)
 	c.Assert(se.Auth(&auth.UserIdentity{Username: "u3@example.com", Hostname: "localhost"}, nil, nil), IsTrue)
 	c.Assert(se.Auth(&auth.UserIdentity{Username: "u4", Hostname: "localhost"}, nil, nil), IsTrue)
@@ -1013,7 +1014,7 @@ func (s *testPrivilegeSuite) TestGetEncodedPassword(c *C) {
 	se := newSession(c, s.store, s.dbName)
 	mustExec(c, se, `CREATE USER 'test_encode_u'@'localhost' identified by 'root';`)
 	pc := privilege.GetPrivilegeManager(se)
-	c.Assert(pc.GetEncodedPassword("test_encode_u", "localhost"), Equals, "*81F5E21E35407D884A6CD4A731AEBFB6AF209E1B")
+	c.Assert(pc.GetEncodedPassword("test_encode_u", "localhost"), Equals, "md507773e32c0c7b37702276a846efc0682")
 }
 
 func (s *testPrivilegeSuite) TestAuthHost(c *C) {
