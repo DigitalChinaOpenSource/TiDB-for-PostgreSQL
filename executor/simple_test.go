@@ -177,7 +177,7 @@ func (s *testSuite6) TestRole(c *C) {
 	tk.MustExec(createRoleSQL)
 	// Make sure user test in mysql.User.
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test", "")))
 	// Insert relation into mysql.role_edges
 	tk.MustExec("insert into mysql.role_edges (FROM_HOST,FROM_USER,TO_HOST,TO_USER) values ('localhost','test','%','root')")
 	tk.MustExec("insert into mysql.role_edges (FROM_HOST,FROM_USER,TO_HOST,TO_USER) values ('localhost','test1','localhost','test1')")
@@ -360,7 +360,7 @@ func (s *testSuite7) TestUser(c *C) {
 	tk.MustExec(createUserSQL)
 	// Make sure user test in mysql.User.
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("123")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test", "123")))
 	// Create duplicate user with IfNotExists will be success.
 	createUserSQL = `CREATE USER IF NOT EXISTS 'test'@'localhost' IDENTIFIED BY '123';`
 	tk.MustExec(createUserSQL)
@@ -378,7 +378,7 @@ func (s *testSuite7) TestUser(c *C) {
 	tk.MustExec(createUserSQL)
 	// Make sure user test in mysql.User.
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test1" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test1", "")))
 	dropUserSQL = `DROP USER IF EXISTS 'test1'@'localhost' ;`
 	tk.MustExec(dropUserSQL)
 
@@ -388,24 +388,24 @@ func (s *testSuite7) TestUser(c *C) {
 	alterUserSQL := `ALTER USER 'test1'@'localhost' IDENTIFIED BY '111';`
 	tk.MustExec(alterUserSQL)
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test1" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("111")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test1", "111")))
 	alterUserSQL = `ALTER USER 'test_not_exist'@'localhost' IDENTIFIED BY '111';`
 	tk.MustGetErrCode(alterUserSQL, mysql.ErrCannotUser)
 	alterUserSQL = `ALTER USER 'test1'@'localhost' IDENTIFIED BY '222', 'test_not_exist'@'localhost' IDENTIFIED BY '111';`
 	tk.MustGetErrCode(alterUserSQL, mysql.ErrCannotUser)
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test1" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("222")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test1", "222")))
 
 	alterUserSQL = `ALTER USER IF EXISTS 'test2'@'localhost' IDENTIFIED BY '222', 'test_not_exist'@'localhost' IDENTIFIED BY '1';`
 	tk.MustExec(alterUserSQL)
 	tk.MustQuery("show warnings").Check(testutil.RowsWithSep("|", "Note|3162|User 'test_not_exist'@'localhost' does not exist."))
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test2" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("222")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test2", "222")))
 	alterUserSQL = `ALTER USER IF EXISTS'test_not_exist'@'localhost' IDENTIFIED BY '1', 'test3'@'localhost' IDENTIFIED BY '333';`
 	tk.MustExec(alterUserSQL)
 	tk.MustQuery("show warnings").Check(testutil.RowsWithSep("|", "Note|3162|User 'test_not_exist'@'localhost' does not exist."))
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test3" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("333")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test3", "333")))
 
 	// Test alter user user().
 	alterUserSQL = `ALTER USER USER() IDENTIFIED BY '1';`
@@ -417,7 +417,7 @@ func (s *testSuite7) TestUser(c *C) {
 	ctx.GetSessionVars().User = &auth.UserIdentity{Username: "test1", Hostname: "localhost", AuthHostname: "localhost"}
 	tk.MustExec(alterUserSQL)
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="test1" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("1")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("test1", "1")))
 	dropUserSQL = `DROP USER 'test1'@'localhost', 'test2'@'localhost', 'test3'@'localhost';`
 	tk.MustExec(dropUserSQL)
 
@@ -447,7 +447,8 @@ func (s *testSuite7) TestUser(c *C) {
 	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password 'xxx';`
 	_, err = tk.Exec(createUserSQL)
 	c.Assert(terror.ErrorEqual(executor.ErrPasswordFormat, err), IsTrue, Commentf("err %v", err))
-	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password '*3D56A309CD04FA2EEF181462E59011F075C89548';`
+//	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password '*3D56A309CD04FA2EEF181462E59011F075C89548';`
+	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password 'md5f87360da467d468620ddb9d4370942ae';`
 	tk.MustExec(createUserSQL)
 	dropUserSQL = `DROP USER 'test1'@'localhost';`
 	tk.MustExec(dropUserSQL)
@@ -468,13 +469,14 @@ func (s *testSuite7) TestUser(c *C) {
 	// Close issue #17639
 	dropUserSQL = `DROP USER if exists test3@'%'`
 	tk.MustExec(dropUserSQL)
-	createUserSQL = `create user test3@'%' IDENTIFIED WITH 'mysql_native_password' AS '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9';`
+	//createUserSQL = `create user test3@'%' IDENTIFIED WITH 'mysql_native_password' AS '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9';`
+	createUserSQL = `create user test3@'%' IDENTIFIED WITH 'mysql_native_password' AS 'md535404143db0edb6a31b06d7d73b4d409';`
 	tk.MustExec(createUserSQL)
-	querySQL := `select authentication_string from mysql.user where user="test3" ;`
-	tk.MustQuery(querySQL).Check(testkit.Rows("*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9"))
-	alterUserSQL = `alter user test3@'%' IDENTIFIED WITH 'mysql_native_password' AS '*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9';`
+	querySQL := `select authentication_string from mysql.user where user="test3";`
+	tk.MustQuery(querySQL).Check(testkit.Rows("md535404143db0edb6a31b06d7d73b4d409"))
+	alterUserSQL = `alter user test3@'%' IDENTIFIED WITH 'mysql_native_password' AS 'md535404143db0edb6a31b06d7d73b4d409';`
 	tk.MustExec(alterUserSQL)
-	tk.MustQuery(querySQL).Check(testkit.Rows("*6BB4837EB74329105EE4568DDA7DC67ED2CA2AD9"))
+	tk.MustQuery(querySQL).Check(testkit.Rows("md535404143db0edb6a31b06d7d73b4d409"))
 }
 
 func (s *testSuite3) TestSetPwd(c *C) {
@@ -488,7 +490,7 @@ func (s *testSuite3) TestSetPwd(c *C) {
 	// set password for
 	tk.MustExec(`SET PASSWORD FOR 'testpwd'@'localhost' = 'password';`)
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="testpwd" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("password")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("testpwd", "password")))
 
 	// set password
 	setPwdSQL := `SET PASSWORD = 'pwd'`
@@ -506,7 +508,7 @@ func (s *testSuite3) TestSetPwd(c *C) {
 	ctx.GetSessionVars().User = &auth.UserIdentity{Username: "testpwd", Hostname: "localhost", AuthUsername: "testpwd", AuthHostname: "localhost"}
 	tk.MustExec(setPwdSQL)
 	result = tk.MustQuery(`SELECT authentication_string FROM mysql.User WHERE User="testpwd" and Host="localhost"`)
-	result.Check(testkit.Rows(auth.EncodePassword("pwd")))
+	result.Check(testkit.Rows(auth.EncodePasswordByMD5("testpwd", "pwd")))
 
 }
 
@@ -746,8 +748,8 @@ func (s *testSuite3) TestIssue17247(c *C) {
 	tk1.MustExec("ALTER USER CURRENT_USER() IDENTIFIED BY 'yyy'")
 	tk1.MustExec("ALTER USER CURRENT_USER IDENTIFIED BY 'zzz'")
 	tk.MustExec("ALTER USER 'issue17247'@'%' IDENTIFIED BY 'kkk'")
-	tk.MustExec("ALTER USER 'issue17247'@'%' IDENTIFIED BY PASSWORD '*B50FBDB37F1256824274912F2A1CE648082C3F1F'")
+	tk.MustExec("ALTER USER 'issue17247'@'%' IDENTIFIED BY PASSWORD 'md5f87360da467d468620ddb9d4370942ae'")
 	// Wrong grammar
-	_, err := tk1.Exec("ALTER USER USER() IDENTIFIED BY PASSWORD '*B50FBDB37F1256824274912F2A1CE648082C3F1F'")
+	_, err := tk1.Exec("ALTER USER USER() IDENTIFIED BY PASSWORD 'md5f87360da467d468620ddb9d4370942ae'")
 	c.Assert(err, NotNil)
 }

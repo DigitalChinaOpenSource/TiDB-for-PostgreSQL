@@ -171,10 +171,12 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		return ErrPsManyParam
 	}
 
+	//Pgsql extend query has its own order
 	//sort according to its own order
 	ParamMakerSortor(extractor.markers)
 
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
+
 	if err != nil {
 		return err
 	}
@@ -248,23 +250,37 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // we choose insert sort here.
 // todo: According to different parameters situations, choose the most suitable sorting method
 func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
-	if len(markers) > 1 {
-		var val ast.ParamMarkerExpr
-		var index int
-		for i := 1; i < len(markers); i++ {
-			val, index = markers[i], i -1
-			for {
-				if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order {
-					markers[index + 1] = markers[index]
-				} else {
-					break
-				}
-				index--
-				if index < 0 {
-					break
-				}
+	if len(markers) <=  1 {
+		return
+	}
+
+	var val ast.ParamMarkerExpr
+	var index int
+	for i := 1; i < len(markers); i++ {
+		val, index = markers[i], i -1
+		for {
+			if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order ||
+				(val.(*driver.ParamMarkerExpr).Order == markers[index].(*driver.ParamMarkerExpr).Order &&
+					val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset){
+				markers[index + 1] = markers[index]
+			} else {
+				break
 			}
-			markers[index + 1] = val
+			index--
+			if index < 0 {
+				break
+			}
+		}
+		markers[index + 1] = val
+	}
+
+	//todo Eliminate compatibility with "?"
+
+	// If more than two ParamMarkerExpr.Order are zero, it means that the placeholder is "?".
+	// So we need reassign order.
+	if markers[1].(*driver.ParamMarkerExpr).Order == 0 {
+		for i := 0; i < len(markers); i++ {
+			markers[i].SetOrder(i)
 		}
 	}
 }

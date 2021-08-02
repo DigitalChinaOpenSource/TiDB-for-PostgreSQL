@@ -43,14 +43,14 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/pingcap/check"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
-	pb "github.com/pingcap/kvproto/pkg/kvrpcpb"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
+	pb "github.com/pingcap/kvproto/pkg/kvrpcpb"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	ddltestutil "github.com/pingcap/tidb/ddl/testutil"
@@ -1245,6 +1245,17 @@ func (s *seqTestSuite) TestShowForNewCollations(c *C) {
 
 	tk := testkit.NewTestKit(c, s.store)
 	expectRows := testkit.Rows(
+		"postgres pg_catalog ascii_bin NO PAD ascii 65 Yes Yes 1",
+		"postgres pg_catalog binary NO PAD binary 63 Yes Yes 1",
+		"postgres pg_catalog latin1_bin NO PAD latin1 47 Yes Yes 1",
+		"postgres pg_catalog utf8_bin NO PAD utf8 83 Yes Yes 1",
+		"postgres pg_catalog utf8_general_ci NO PAD utf8 33  Yes 1",
+		"postgres pg_catalog utf8_unicode_ci NO PAD utf8 192  Yes 1",
+		"postgres pg_catalog utf8mb4_bin NO PAD utf8mb4 46 Yes Yes 1",
+		"postgres pg_catalog utf8mb4_general_ci NO PAD utf8mb4 45  Yes 1",
+		"postgres pg_catalog utf8mb4_unicode_ci NO PAD utf8mb4 224  Yes 1",
+	)
+	expectRowsTiDB := testkit.Rows(
 		"ascii_bin ascii 65 Yes Yes 1",
 		"binary binary 63 Yes Yes 1",
 		"latin1_bin latin1 47 Yes Yes 1",
@@ -1255,7 +1266,7 @@ func (s *seqTestSuite) TestShowForNewCollations(c *C) {
 		"utf8mb4_general_ci utf8mb4 45  Yes 1",
 		"utf8mb4_unicode_ci utf8mb4 224  Yes 1",
 	)
-	tk.MustQuery("show collation").Check(expectRows)
+	tk.MustQuery("show collation").Check(expectRowsTiDB)
 	tk.MustQuery("select * from information_schema.COLLATIONS").Check(expectRows)
 }
 
