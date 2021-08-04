@@ -36,6 +36,8 @@ var SkipWithGrant = false
 
 var _ privilege.Manager = (*UserPrivileges)(nil)
 
+const md5EncryptedLength = 35
+
 // UserPrivileges implements privilege.Manager interface.
 // This is used to check privilege for the current user.
 type UserPrivileges struct {
@@ -114,8 +116,8 @@ func (p *UserPrivileges) GetEncodedPassword(user, host string) string {
 	pwd := record.AuthenticationString
 
 	// The length of the password encrypted by MD5 is 35
-	if len(pwd) != 0 && len(pwd) != 35 {
-		logutil.BgLogger().Error("user password from system DB not like md5", zap.String("user", user))
+	if len(pwd) != 0 && len(pwd) != md5EncryptedLength {
+		logutil.BgLogger().Error("user password from system DB not like md5 ciphertext", zap.String("user", user))
 		return ""
 	}
 	return pwd
@@ -188,8 +190,8 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	pwd := record.AuthenticationString
 
 	// The length of the password encrypted by MD5 is 35
-	if len(pwd) != 0 && len(pwd) != 35 {
-		logutil.BgLogger().Error("user password from system DB not like md5", zap.String("user", user))
+	if len(pwd) != 0 && len(pwd) != md5EncryptedLength {
+		logutil.BgLogger().Error("user password from system DB not like md5 ciphertext", zap.String("user", user))
 		return
 	}
 
