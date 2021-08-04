@@ -112,8 +112,10 @@ func (p *UserPrivileges) GetEncodedPassword(user, host string) string {
 		return ""
 	}
 	pwd := record.AuthenticationString
-	if len(pwd) != 0 && len(pwd) != mysql.PWDHashLen+1 {
-		logutil.BgLogger().Error("user password from system DB not like sha1sum", zap.String("user", user))
+
+	// The length of the password encrypted by MD5 is 35
+	if len(pwd) != 0 && len(pwd) != 35 {
+		logutil.BgLogger().Error("user password from system DB not like md5", zap.String("user", user))
 		return ""
 	}
 	return pwd
@@ -184,10 +186,12 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	}
 
 	pwd := record.AuthenticationString
-	//if len(pwd) != 0 && len(pwd) != mysql.PWDHashLen+1 {
-	//	logutil.BgLogger().Error("user password from system DB not like sha1sum", zap.String("user", user))
-	//	return
-	//}
+
+	// The length of the password encrypted by MD5 is 35
+	if len(pwd) != 0 && len(pwd) != 35 {
+		logutil.BgLogger().Error("user password from system DB not like md5", zap.String("user", user))
+		return
+	}
 
 	// empty password
 	if len(pwd) == 0 && len(authentication) == 0 {
