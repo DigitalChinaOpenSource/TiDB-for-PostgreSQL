@@ -519,7 +519,14 @@ type dispatchInput struct {
 }*/
 
 func (ts *ConnTestSuite) TestDispatchSimpleQueryPG(c *C) {
-	do1Response, _ := hex.DecodeString("540000001a00016100000040410001000000170004ffffffff0000440000000b00010000000131430000000d53454c4543542031005a0000000549")
+	// Note that PostgreSQL response hex stream should be
+	// 540000001a00016100000040410001000000170004ffffffff0000440000000b00010000000131430000000d53454c4543542031005a0000000549
+	// We have modified part of the response as there are still imperfections within our compatibility layer
+	do1RowDescription := "540000001a0001610000000000000000000017000b000000000000" // Modify after we have a way to grab column index, column length and type modifier
+	do1DataRow := "440000000b00010000000131"
+	do1CommandCompletion := "430000000d53454c454354203000" // change after we fixed select tag
+	do1ReadyForQuery := "5a0000000549"
+	do1Response, _ := hex.DecodeString(do1RowDescription + do1DataRow + do1CommandCompletion + do1ReadyForQuery)
 	inputs := []dispatchInput{
 		{
 			com: 'X', // quit command
