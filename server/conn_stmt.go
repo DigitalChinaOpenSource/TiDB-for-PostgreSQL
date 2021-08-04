@@ -137,6 +137,16 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		stmt.SetArgs(args)
 	}
 
+	// 当ResultFormatCode长度为1时，表示一次设定整行数据格式，如果长度大于1小于column，代表客户端传参存在问题
+	if len(bind.ResultFormatCodes) > 1 && len(bind.ResultFormatCodes) < len(stmt.GetColumnInfo()) {
+		return errors.New("the result format code parameter in the bind message is wrong")
+	}
+
+	// 对返回数据的格式进行设置, 由Bind信息中获取
+	// 当resultFormat 为空代表默认为Text
+	// 当resultFormat 只有一个值代表指定一整行的格式
+	stmt.SetResultFormat(bind.ResultFormatCodes)
+
 	// Bind 完成后创建 Portal，Portal Name 由客户端传送过来
 	// 果如 Portal Name 为空则表示为临时门户，用"0"作为默认 Name
 	// 这个位置没有进行真正的 Portal 生成，只是绑定 StmtID 在后面的阶段可以通过 Portal Name 找到 Statement ID
@@ -145,8 +155,6 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	}else {
 		vars.Portal["0"] = stmtID
 	}
-
-	// todo 对返回数据的格式进行设置
 
 	err = cc.writeBindComplete()
 	if err != nil {
@@ -246,7 +254,7 @@ func (cc *clientConn) handleStmtExecute(ctx context.Context, execute pgproto3.Ex
 	if rs == nil {
 		return cc.writeCommandComplete()
 	}
-	err = cc.writeResultset(ctx, rs, true, 0, 0)
+	err = cc.writeResultset(ctx, rs, stmt.GetResultFormat(), 0, 0)
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
@@ -302,7 +310,7 @@ func (cc *clientConn) handleStmtFetch(ctx context.Context, data []byte) (err err
 			strconv.FormatUint(uint64(stmtID), 10), "stmt_fetch_rs"), cc.preparedStmt2String(stmtID))
 	}
 
-	err = cc.writeResultset(ctx, rs, true, mysql.ServerStatusCursorExists, int(fetchSize))
+	err = cc.writeResultset(ctx, rs, []int16{1}, mysql.ServerStatusCursorExists, int(fetchSize))
 	if err != nil {
 		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
 	}
