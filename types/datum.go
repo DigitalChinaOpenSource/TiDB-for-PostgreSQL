@@ -23,11 +23,11 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/DigitalChinaOpenSource/DCParser/types"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types/json"
 	"github.com/pingcap/tidb/util/hack"
@@ -2337,7 +2337,9 @@ func EstimatedMemUsage(array []Datum, numOfRows int) int64 {
 	return int64(bytesConsumed * numOfRows)
 }
 
-// SetInterfaceType 只设置datum的成员k，不要管x
-func (d * Datum) SetInterfaceType() {
-	d.k = KindInterface
+// SetNullType sets the type of the datum to null
+// This is useful when setting the type of value expression, aka '?'
+// PG Modified
+func (d * Datum) SetNullType() {
+	d.k = KindNull
 }
