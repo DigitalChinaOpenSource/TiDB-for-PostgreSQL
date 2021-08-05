@@ -1947,6 +1947,8 @@ func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Cont
 			e.setDataForPgTableConstraints(sctx,dbs)
 		case infoschema.TablePgCharacterSets:
 			e.setDataForPgCharacterSets()
+		case infoschema.TablePgKeyColumnUsage:
+			e.setDataForPgKeyColumnUsage(sctx, dbs)
 		case infoschema.TablePgCollationCharacterSetApplicability:
 			e.SetDataForCollationCharacterSetApplicability()
 			// todo set data for tables
@@ -2558,4 +2560,104 @@ func (e *pgMemTableRetriever) SetDataForCollationCharacterSetApplicability() {
 		)
 	}
 	e.rows = rows
+}
+
+//setDataForPgKeyColumnUsage set data for pgTable KEY_COLUMN_USAGE
+func (e *pgMemTableRetriever) setDataForPgKeyColumnUsage(ctx sessionctx.Context, schemas []*model.DBInfo) {
+	checker := privilege.GetPrivilegeManager(ctx)
+	rows := make([][]types.Datum, 0, len(schemas)) // The capacity is not accurate, but it is not a big problem.
+	for _, schema := range schemas {
+		for _, table := range schema.Tables {
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+				continue
+			}
+			rs := pgKeyColumnUsageInTable(schema, table)
+			rows = append(rows, rs...)
+		}
+	}
+	e.rows = rows
+}
+
+func pgKeyColumnUsageInTable(schema *model.DBInfo, table *model.TableInfo) [][]types.Datum {
+	var rows [][]types.Datum
+	if table.PKIsHandle {
+		for _, col := range table.Columns {
+			if mysql.HasPriKeyFlag(col.Flag) {
+				record := types.MakeDatums(
+					"postgres",        // CONSTRAINT_CATALOG
+					schema.Name.O,                // CONSTRAINT_SCHEMA
+					infoschema.PrimaryConstraint, // CONSTRAINT_NAME
+					"postgres",        			  // TABLE_CATALOG
+					schema.Name.O,                // TABLE_SCHEMA
+					table.Name.O,                 // TABLE_NAME
+					col.Name.O,                   // COLUMN_NAME
+					1,                            // ORDINAL_POSITION
+					1,                            // POSITION_IN_UNIQUE_CONSTRAINT
+					nil,                          // REFERENCED_TABLE_SCHEMA
+					nil,                          // REFERENCED_TABLE_NAME
+					nil,                          // REFERENCED_COLUMN_NAME
+				)
+				rows = append(rows, record)
+				break
+			}
+		}
+	}
+	nameToCol := make(map[string]*model.ColumnInfo, len(table.Columns))
+	for _, c := range table.Columns {
+		nameToCol[c.Name.L] = c
+	}
+	for _, index := range table.Indices {
+		var idxName string
+		if index.Primary {
+			idxName = infoschema.PrimaryConstraint
+		} else if index.Unique {
+			idxName = index.Name.O
+		} else {
+			// Only handle unique/primary key
+			continue
+		}
+		for i, key := range index.Columns {
+			col := nameToCol[key.Name.L]
+			record := types.MakeDatums(
+				"postgres", // CONSTRAINT_CATALOG
+				schema.Name.O,         // CONSTRAINT_SCHEMA
+				idxName,               // CONSTRAINT_NAME
+				"postgres", // TABLE_CATALOG
+				schema.Name.O,         // TABLE_SCHEMA
+				table.Name.O,          // TABLE_NAME
+				col.Name.O,            // COLUMN_NAME
+				i+1,                   // ORDINAL_POSITION,
+				nil,                   // POSITION_IN_UNIQUE_CONSTRAINT
+				nil,                   // REFERENCED_TABLE_SCHEMA
+				nil,                   // REFERENCED_TABLE_NAME
+				nil,                   // REFERENCED_COLUMN_NAME
+			)
+			rows = append(rows, record)
+		}
+	}
+	for _, fk := range table.ForeignKeys {
+		fkRefCol := ""
+		if len(fk.RefCols) > 0 {
+			fkRefCol = fk.RefCols[0].O
+		}
+		for i, key := range fk.Cols {
+			col := nameToCol[key.L]
+			record := types.MakeDatums(
+				"postgres", // CONSTRAINT_CATALOG
+				schema.Name.O,         // CONSTRAINT_SCHEMA
+				fk.Name.O,             // CONSTRAINT_NAME
+				"postgres", // TABLE_CATALOG
+				schema.Name.O,         // TABLE_SCHEMA
+				table.Name.O,          // TABLE_NAME
+				col.Name.O,            // COLUMN_NAME
+				i+1,                   // ORDINAL_POSITION,
+				1,                     // POSITION_IN_UNIQUE_CONSTRAINT
+				schema.Name.O,         // REFERENCED_TABLE_SCHEMA
+				fk.RefTable.O,         // REFERENCED_TABLE_NAME
+				fkRefCol,              // REFERENCED_COLUMN_NAME
+			)
+			rows = append(rows, record)
+		}
+	}
+	return rows
 }
