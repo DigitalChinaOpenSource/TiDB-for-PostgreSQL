@@ -2048,7 +2048,7 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 		"integer_datetimes": "on",
 		"is_superuser": "on",
 		"server_encoding": "UTF8",
-		"server_version": "8.3.11",
+		"server_version": "version: TiDB-v4.0.11 TiDB Server (Apache License 2.0) Community Edition, PostgreSQL 12 compatible",
 		"TimeZone": "PRC",
 	}
 
