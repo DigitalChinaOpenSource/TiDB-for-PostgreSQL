@@ -81,8 +81,8 @@ const (
 	TableProfiling = "PROFILING"
 	// TablePartitions is the string constant of infoschema table.
 	TablePartitions = "PARTITIONS"
-	// TableKeyColumn is the string constant of KEY_COLUMN_USAGE.
-	TableKeyColumn  = "KEY_COLUMN_USAGE"
+	// TableKeyColumn is the string constant of TiDB_KEY_COLUMN_USAGE.
+	TableKeyColumn  = "TiDB_KEY_COLUMN_USAGE"
 	tableReferConst = "REFERENTIAL_CONSTRAINTS"
 	// TableSessionVar is the string constant of SESSION_VARIABLES.
 	TableSessionVar = "SESSION_VARIABLES"
@@ -1699,15 +1699,18 @@ var pgTableForeignTablesCols = []columnInfo{
 // pgTableKeyColumnUsageCols is table key_column_usage columns
 // https://www.postgresql.org/docs/13/infoschema-key-column-usage.html
 var pgTableKeyColumnUsageCols = []columnInfo{
-	{name: "constraint_catalog", tp: mysql.TypeVarchar, size: 64},
-	{name: "constraint_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "constraint_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "table_catalog", tp: mysql.TypeVarchar, size: 64},
-	{name: "table_schema", tp: mysql.TypeVarchar, size: 64},
-	{name: "table_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "column_name", tp: mysql.TypeVarchar, size: 64},
-	{name: "ordinal_position", tp: mysql.TypeInt24, size: 64},
-	{name: "position_in_unique_constraint", tp: mysql.TypeInt24, size: 64},
+	{name: "constraint_catalog", tp: mysql.TypeVarchar, size: 512,flag: mysql.NotNullFlag},
+	{name: "constraint_schema", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "constraint_name", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "table_catalog", tp: mysql.TypeVarchar, size: 512,flag: mysql.NotNullFlag},
+	{name: "table_schema", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "table_name", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "column_name", tp: mysql.TypeVarchar, size: 64,flag: mysql.NotNullFlag},
+	{name: "ordinal_position", tp: mysql.TypeLonglong, size: 10,flag: mysql.NotNullFlag},
+	{name: "position_in_unique_constraint", tp: mysql.TypeLonglong, size: 10},
+	{name: "REFERENCED_TABLE_SCHEMA", tp: mysql.TypeVarchar, size: 64},
+	{name: "REFERENCED_TABLE_NAME", tp: mysql.TypeVarchar, size: 64},
+	{name: "REFERENCED_COLUMN_NAME", tp: mysql.TypeVarchar, size: 64},
 }
 // pgTableParametersCols is table parameters columns
 // https://www.postgresql.org/docs/13/infoschema-parameters.html
