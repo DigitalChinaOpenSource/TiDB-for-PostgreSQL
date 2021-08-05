@@ -28,10 +28,10 @@ package executor
 
 import (
 	"context"
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/planner"
@@ -197,7 +197,7 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	for i := range prepared.Params {
 		param := prepared.Params[i].(*driver.ParamMarkerExpr)
 		//set every paramType to interface. It keeps every param in the plan tree whatever the param is Primary key index
-		param.Datum.SetInterfaceType()
+		param.Datum.SetNullType()
 		param.InExecute = false
 	}
 	var p plannercore.Plan
