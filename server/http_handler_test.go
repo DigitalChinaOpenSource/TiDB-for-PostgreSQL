@@ -11,6 +11,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2021 Digital China Group Co.,Ltd
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package server
 
 import (
@@ -33,11 +46,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
 	zaplog "github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/domain"
@@ -212,7 +225,7 @@ func (ts *HTTPHandlerTestSuite) TestRegionsAPI(c *C) {
 func (ts *HTTPHandlerTestSuite) TestRangesAPI(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	resp, err := ts.fetchStatus("/tables/information_schema/SCHEMATA/ranges")
 	c.Assert(err, IsNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusOK)
@@ -222,7 +235,7 @@ func (ts *HTTPHandlerTestSuite) TestRangesAPI(c *C) {
 	var data TableRanges
 	err = decoder.Decode(&data)
 	c.Assert(err, IsNil)
-	c.Assert(data.TableName, Equals, "SCHEMATA")
+	c.Assert(data.TableName, Equals, "schemata") //in postgres, unquoted table name are stored in lower case
 }
 
 func (ts *HTTPHandlerTestSuite) regionContainsTable(c *C, regionID uint64, tableID int64) bool {
@@ -463,6 +476,39 @@ partition by range (a)
 	txn2.Exec("insert into tidb.pt values (256, 'b')")
 	txn2.Exec("insert into tidb.pt values (666, 'def')")
 	err = txn2.Commit()
+	c.Assert(err, IsNil)
+}
+
+func (ts *basicHTTPHandlerTestSuite) prepareDataPG(c *C) {
+	db, err := sql.Open("postgres", ts.getDSNPG())
+	c.Assert(err, IsNil, Commentf("Error connecting"))
+	defer db.Close()
+	dbt := &DBTest{c, db}
+
+	dbt.mustExec("create database tidb;")
+	dbt.mustExec("use tidb;")
+	dbt.mustExec("create table tidb.test (a int auto_increment primary key, b varchar(20));")
+	dbt.mustExec("insert tidb.test values (1, 1);")
+	dbt.mustExec("START TRANSACTION;")
+	dbt.mustExec("update tidb.test set b = b + 1 where a = 1;")
+	dbt.mustExec("insert tidb.test values (2, 2);")
+	dbt.mustExec("insert tidb.test (a) values (3);")
+	dbt.mustExec("insert tidb.test values (4, '');")
+	dbt.mustExec("COMMIT;")
+	dbt.mustExec("alter table tidb.test add index idx1 (a, b);")
+	dbt.mustExec("alter table tidb.test add unique index idx2 (a, b);")
+
+	dbt.mustExec(`create table tidb.pt (a int primary key, b varchar(20), key idx(a, b))
+partition by range (a)
+(partition p0 values less than (256),
+ partition p1 values less than (512),
+ partition p2 values less than (1024))`)
+
+	dbt.mustExec("START TRANSACTION;")
+	dbt.mustExec("insert into tidb.pt values (42, '123')")
+	dbt.mustExec("insert into tidb.pt values (256, 'b')")
+	dbt.mustExec("insert into tidb.pt values (666, 'def')")
+	dbt.mustExec("COMMIT;")
 	c.Assert(err, IsNil)
 }
 
