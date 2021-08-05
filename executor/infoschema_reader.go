@@ -286,6 +286,7 @@ func getAutoIncrementID(ctx sessionctx.Context, schema *model.DBInfo, tblInfo *m
 	return tbl.Allocators(ctx).Get(autoid.RowIDAllocType).Base() + 1, nil
 }
 
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromSchemata(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	rows := make([][]types.Datum, 0, len(schemas))
@@ -413,7 +414,7 @@ func (e *memtableRetriever) setDataForStatisticsInTable(schema *model.DBInfo, ta
 	}
 	e.rows = append(e.rows, rows...)
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromTables(ctx sessionctx.Context, schemas []*model.DBInfo) error {
 	tableRowsMap, colLengthMap, err := tableStatsCache.get(ctx)
 	if err != nil {
@@ -540,6 +541,7 @@ func (e *memtableRetriever) setDataFromTables(ctx sessionctx.Context, schemas []
 	return nil
 }
 
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *hugeMemTableRetriever) setDataForColumns(ctx sessionctx.Context) error {
 	checker := privilege.GetPrivilegeManager(ctx)
 	e.rows = e.rows[:0]
@@ -749,7 +751,7 @@ func (e *memtableRetriever) setDataFromPartitions(ctx sessionctx.Context, schema
 	e.rows = rows
 	return nil
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromIndexes(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -820,7 +822,7 @@ func (e *memtableRetriever) setDataFromIndexes(ctx sessionctx.Context, schemas [
 	}
 	e.rows = rows
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromViews(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -932,7 +934,7 @@ func (e *memtableRetriever) setDataFromEngines() {
 	)
 	e.rows = rows
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromCharacterSets() {
 	var rows [][]types.Datum
 	charsets := charset.GetSupportedCharsets()
@@ -943,7 +945,7 @@ func (e *memtableRetriever) setDataFromCharacterSets() {
 	}
 	e.rows = rows
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromCollations() {
 	var rows [][]types.Datum
 	collations := collate.GetSupportedCollations()
@@ -958,7 +960,7 @@ func (e *memtableRetriever) setDataFromCollations() {
 	}
 	e.rows = rows
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) dataForCollationCharacterSetApplicability() {
 	var rows [][]types.Datum
 	collations := collate.GetSupportedCollations()
@@ -999,7 +1001,7 @@ func (e *memtableRetriever) dataForTiDBClusterInfo(ctx sessionctx.Context) error
 	e.rows = rows
 	return nil
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromKeyColumnUsage(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	rows := make([][]types.Datum, 0, len(schemas)) // The capacity is not accurate, but it is not a big problem.
@@ -1282,6 +1284,7 @@ func (e *memtableRetriever) setDataForHotRegionByMetrics(metrics []helper.HotTab
 }
 
 // setDataFromTableConstraints constructs data for table information_schema.constraints.See https://dev.mysql.com/doc/refman/5.7/en/table-constraints-table.html
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromTableConstraints(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -1559,7 +1562,7 @@ func (e *memtableRetriever) setDataForServersInfo() error {
 	e.rows = rows
 	return nil
 }
-
+// todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromSequences(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -2235,6 +2238,7 @@ func (e *hugeMemTableRetriever) setDataForPgColumns(ctx sessionctx.Context) erro
 	return nil
 }
 
+// dataForPgColumnsInTable get pgTable pg_columns data from system
 func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tbl *model.TableInfo) {
 	for i, col := range tbl.Columns {
 		if col.Hidden {
@@ -2443,6 +2447,7 @@ func (e *pgMemTableRetriever) setDataForPgSequences(ctx sessionctx.Context, sche
 	e.rows = rows
 }
 
+// setDataForPgViews set data for pgTable pg_views
 func (e *pgMemTableRetriever) setDataForPgViews(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -2484,6 +2489,7 @@ func (e *pgMemTableRetriever) setDataForPgViews(ctx sessionctx.Context, schemas 
 	e.rows = rows
 }
 
+// setDataForPgTableConstraints set data for pgTable table_constraints
 func (e *pgMemTableRetriever) setDataForPgTableConstraints(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
@@ -2540,6 +2546,7 @@ func (e *pgMemTableRetriever) setDataForPgTableConstraints(ctx sessionctx.Contex
 	e.rows = rows
 }
 
+// setDataForPgCharacterSets set data for pgTable character_sets
 func (e *pgMemTableRetriever) setDataForPgCharacterSets() {
 	var rows [][]types.Datum
 	charsets := charset.GetSupportedCharsets()
@@ -2551,6 +2558,7 @@ func (e *pgMemTableRetriever) setDataForPgCharacterSets() {
 	e.rows = rows
 }
 
+// SetDataForCollationCharacterSetApplicability set data for pgTable collation_character_set_applicability
 func (e *pgMemTableRetriever) SetDataForCollationCharacterSetApplicability() {
 	var rows [][]types.Datum
 	collations := collate.GetSupportedCollations()
@@ -2562,7 +2570,7 @@ func (e *pgMemTableRetriever) SetDataForCollationCharacterSetApplicability() {
 	e.rows = rows
 }
 
-//setDataForPgKeyColumnUsage set data for pgTable KEY_COLUMN_USAGE
+// setDataForPgKeyColumnUsage set data for pgTable KEY_COLUMN_USAGE
 func (e *pgMemTableRetriever) setDataForPgKeyColumnUsage(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
 	rows := make([][]types.Datum, 0, len(schemas)) // The capacity is not accurate, but it is not a big problem.
@@ -2578,6 +2586,7 @@ func (e *pgMemTableRetriever) setDataForPgKeyColumnUsage(ctx sessionctx.Context,
 	e.rows = rows
 }
 
+// pgKeyColumnUsageInTable get table KEY_COLUMN_USAGE data from system
 func pgKeyColumnUsageInTable(schema *model.DBInfo, table *model.TableInfo) [][]types.Datum {
 	var rows [][]types.Datum
 	if table.PKIsHandle {
