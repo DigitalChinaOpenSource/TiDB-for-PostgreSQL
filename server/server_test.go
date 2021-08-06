@@ -11,6 +11,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2021 Digital China Group Co.,Ltd
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package server
 
 import (
@@ -31,12 +44,13 @@ import (
 	"testing"
 	"time"
 
+	tmysql "github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/log"
-	tmysql "github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/util/logutil"
@@ -56,6 +70,8 @@ func TestT(t *testing.T) {
 }
 
 type configOverrider func(*mysql.Config)
+
+type configOverriderPG func(*ConfigPG)
 
 // testServerClient config server connect parameters and provider several
 // method to communicate with server and run tests
@@ -111,6 +127,23 @@ func (cli *testServerClient) getDSN(overriders ...configOverrider) string {
 		}
 	}
 	return config.FormatDSN()
+}
+
+// getDSNPG generates a DSN string for PostgreSQL connection
+func (cli *testServerClient) getDSNPG(overriders ...configOverriderPG) string {
+	config := NewConfigPG()
+	config.user = "root"
+	config.dbname = "test"
+	config.sslmode = "disable"
+	config.host = "localhost"
+	config.port = fmt.Sprint(cli.port)
+
+	for _, overrider := range overriders {
+		if overrider != nil {
+			overrider(config)
+		}
+	}
+	return config.FormatDSNPG()
 }
 
 // runTests runs tests using the default database `test`.
