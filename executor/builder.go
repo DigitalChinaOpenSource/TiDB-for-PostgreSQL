@@ -1524,6 +1524,7 @@ func (b *executorBuilder) buildMemTable(v *plannercore.PhysicalMemTable) Executo
 			strings.ToLower(infoschema.TablePgSequences),
 			strings.ToLower(infoschema.TablePgTableConstraints),
 			strings.ToLower(infoschema.TablePgCharacterSets),
+			strings.ToLower(infoschema.TablePgKeyColumnUsage),
 			strings.ToLower(infoschema.TablePgCollationCharacterSetApplicability):
 			return &MemTableReaderExec{
 				baseExecutor: newBaseExecutor(b.ctx, v.Schema(), v.ID()),
