@@ -439,46 +439,6 @@ func (ts *basicHTTPHandlerTestSuite) stopServer(c *C) {
 	}
 }
 
-func (ts *basicHTTPHandlerTestSuite) prepareData(c *C) {
-	db, err := sql.Open("mysql", ts.getDSN())
-	c.Assert(err, IsNil, Commentf("Error connecting"))
-	defer db.Close()
-	dbt := &DBTest{c, db}
-
-	dbt.mustExec("create database tidb;")
-	dbt.mustExec("use tidb;")
-	dbt.mustExec("create table tidb.test (a int auto_increment primary key, b varchar(20));")
-	dbt.mustExec("insert tidb.test values (1, 1);")
-	txn1, err := dbt.db.Begin()
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("update tidb.test set b = b + 1 where a = 1;")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test values (2, 2);")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test (a) values (3);")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test values (4, '');")
-	c.Assert(err, IsNil)
-	err = txn1.Commit()
-	c.Assert(err, IsNil)
-	dbt.mustExec("alter table tidb.test add index idx1 (a, b);")
-	dbt.mustExec("alter table tidb.test add unique index idx2 (a, b);")
-
-	dbt.mustExec(`create table tidb.pt (a int primary key, b varchar(20), key idx(a, b))
-partition by range (a)
-(partition p0 values less than (256),
- partition p1 values less than (512),
- partition p2 values less than (1024))`)
-
-	txn2, err := dbt.db.Begin()
-	c.Assert(err, IsNil)
-	txn2.Exec("insert into tidb.pt values (42, '123')")
-	txn2.Exec("insert into tidb.pt values (256, 'b')")
-	txn2.Exec("insert into tidb.pt values (666, 'def')")
-	err = txn2.Commit()
-	c.Assert(err, IsNil)
-}
-
 func (ts *basicHTTPHandlerTestSuite) prepareDataPG(c *C) {
 	db, err := sql.Open("postgres", ts.getDSNPG())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
