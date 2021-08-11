@@ -11,6 +11,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2021 Digital China Group Co.,Ltd
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package graceshutdown
 
 import (
@@ -23,8 +36,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/juju/errors"
+	_ "github.com/lib/pq"
 	. "github.com/pingcap/check"
 	log "github.com/sirupsen/logrus"
 )
@@ -81,11 +94,11 @@ func (s *TestGracefulShutdownSuite) stopService(name string, cmd *exec.Cmd) (err
 
 func (s *TestGracefulShutdownSuite) connectTiDB(port int) (db *sql.DB, err error) {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	dsn := fmt.Sprintf("root@(%s)/test", addr)
+	dsn := fmt.Sprintf("postgresql://root@%s/test?sslmode=disable", addr)
 	sleepTime := 250 * time.Millisecond
 	startTime := time.Now()
 	for i := 0; i < 5; i++ {
-		db, err = sql.Open("mysql", dsn)
+		db, err = sql.Open("postgres", dsn)
 		if err != nil {
 			log.Warnf("open addr %v failed, retry count %d err %v", addr, i, err)
 			continue
