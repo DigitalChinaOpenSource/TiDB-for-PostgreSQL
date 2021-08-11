@@ -66,7 +66,7 @@ func TestT(t *testing.T) {
 	TestingT(t)
 }
 
-type configOverriderPG func(*ConfigPG)
+type configOverrider func(*Config)
 
 // testServerClient config server connect parameters and provider several
 // method to communicate with server and run tests
@@ -109,9 +109,9 @@ func (cli *testServerClient) formStatus(path string, data url.Values) (*http.Res
 	return http.PostForm(cli.statusURL(path), data)
 }
 
-// getDSNPG generates a DSN string for PostgreSQL connection
-func (cli *testServerClient) getDSNPG(overriders ...configOverriderPG) string {
-	config := NewConfigPG()
+// getDSN generates a DSN string for PostgreSQL connection
+func (cli *testServerClient) getDSN(overriders ...configOverrider) string {
+	config := NewConfig()
 	config.user = "root"
 	config.dbname = "test"
 	config.sslmode = "disable"
@@ -123,12 +123,12 @@ func (cli *testServerClient) getDSNPG(overriders ...configOverriderPG) string {
 			overrider(config)
 		}
 	}
-	return config.FormatDSNPG()
+	return config.FormatDSN()
 }
 
 // runTests runs tests using the default database `test`.
-func (cli *testServerClient) runTests(c *C, overrider configOverriderPG, tests ...func(dbt *DBTest)) {
-	db, err := sql.Open("postgres", cli.getDSNPG(overrider))
+func (cli *testServerClient) runTests(c *C, overrider configOverrider, tests ...func(dbt *DBTest)) {
+	db, err := sql.Open("postgres", cli.getDSN(overrider))
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 
@@ -143,11 +143,8 @@ func (cli *testServerClient) runTests(c *C, overrider configOverriderPG, tests .
 
 // runTestsOnNewDB runs tests using a specified database which will be created before the test and destroyed after the test.
 // PG Modified
-func (cli *testServerClient) runTestsOnNewDB(c *C, overrider configOverriderPG, dbName string, tests ...func(dbt *DBTest)) {
-	//dsn := cli.getDSNPG(overrider, func(config *ConfigPG) {
-	//	config.dbname = ""
-	//})
-	dsn := cli.getDSNPG(overrider)
+func (cli *testServerClient) runTestsOnNewDB(c *C, overrider configOverrider, dbName string, tests ...func(dbt *DBTest)) {
+	dsn := cli.getDSN(overrider)
 	db, err := sql.Open("postgres", dsn)
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
@@ -225,7 +222,7 @@ func (dbt *DBTest) mustQueryRows(query string, args ...interface{}) {
 }
 
 
-func (cli *testServerClient) runTestRegression(c *C, overrider configOverriderPG, dbName string) {
+func (cli *testServerClient) runTestRegression(c *C, overrider configOverrider, dbName string) {
 	cli.runTestsOnNewDB(c, overrider, dbName, func(dbt *DBTest) {
 		// Show the user
 		dbt.mustExec("select user()")
@@ -922,14 +919,14 @@ func (cli *testServerClient) runTestAuth(c *C) {
 		dbt.mustExec(`SET DEFAULT ROLE authtest_r1 TO authtest`)
 		dbt.mustExec(`FLUSH PRIVILEGES;`)
 	})
-	cli.runTests(c, func(config *ConfigPG) {
+	cli.runTests(c, func(config *Config) {
 		config.user = "authtest"
 		config.password = "123"
 	}, func(dbt *DBTest) {
 		dbt.mustExec(`USE information_schema;`)
 	})
 
-	db, err := sql.Open("postgres", cli.getDSNPG(func(config *ConfigPG) {
+	db, err := sql.Open("postgres", cli.getDSN(func(config *Config) {
 		config.user = "authtest"
 		config.password = "456"
 	}))
@@ -939,7 +936,7 @@ func (cli *testServerClient) runTestAuth(c *C) {
 	db.Close()
 
 	// Test for loading active roles.
-	db, err = sql.Open("postgres", cli.getDSNPG(func(config *ConfigPG) {
+	db, err = sql.Open("postgres", cli.getDSN(func(config *Config) {
 		config.user = "authtest"
 		config.password = "123"
 	}))
@@ -960,7 +957,7 @@ func (cli *testServerClient) runTestAuth(c *C) {
 	//	dbt.mustExec(`GRANT ALL on test.* to 'authtest2'@'localhost'`)
 	//	dbt.mustExec(`FLUSH PRIVILEGES;`)
 	//})
-	//cli.runTests(c, func(config *ConfigPG) {
+	//cli.runTests(c, func(config *Config) {
 	//	config.user = "authtest2"
 	//	config.password = "123"
 	//	config.host = "127.0.0.1"
@@ -970,7 +967,7 @@ func (cli *testServerClient) runTestAuth(c *C) {
 }
 
 func (cli *testServerClient) runTestIssue3662(c *C) {
-	db, err := sql.Open("postgres", cli.getDSNPG(func(config *ConfigPG) {
+	db, err := sql.Open("postgres", cli.getDSN(func(config *Config) {
 		config.dbname = "non_existing_schema"
 	}))
 	c.Assert(err, IsNil)
@@ -985,7 +982,7 @@ func (cli *testServerClient) runTestIssue3662(c *C) {
 }
 
 func (cli *testServerClient) runTestIssue3680(c *C) {
-	db, err := sql.Open("postgres", cli.getDSNPG(func(config *ConfigPG) {
+	db, err := sql.Open("postgres", cli.getDSN(func(config *Config) {
 		config.user = "non_existing_user"
 	}))
 	c.Assert(err, IsNil)
@@ -1022,13 +1019,13 @@ func (cli *testServerClient) runTestIssue3682(c *C) {
 		dbt.mustExec(`GRANT ALL on mysql.* to 'issue3682'`)
 		dbt.mustExec(`FLUSH PRIVILEGES`)
 	})
-	cli.runTests(c, func(config *ConfigPG) {
+	cli.runTests(c, func(config *Config) {
 		config.user = "issue3682"
 		config.password = "123"
 	}, func(dbt *DBTest) {
 		dbt.mustExec(`USE mysql;`)
 	})
-	db, err := sql.Open("postgres", cli.getDSNPG(func(config *ConfigPG) {
+	db, err := sql.Open("postgres", cli.getDSN(func(config *Config) {
 		config.user = "issue3682"
 		config.password = "wrong_password"
 		config.dbname = "non_existing_schema"
@@ -1044,7 +1041,7 @@ func (cli *testServerClient) runTestDBNameEscape(c *C) {
 	cli.runTests(c, nil, func(dbt *DBTest) {
 		dbt.mustExec("CREATE DATABASE `aa-a`;")
 	})
-	cli.runTests(c, func(config *ConfigPG) {
+	cli.runTests(c, func(config *Config) {
 		config.dbname = "aa-a"
 	}, func(dbt *DBTest) {
 		dbt.mustExec(`USE mysql;`)
@@ -1107,8 +1104,8 @@ func (cli *testServerClient) runTestStmtCount(t *C) {
 	})
 }
 
-func (cli *testServerClient) runTestTLSConnection(t *C, overrider configOverriderPG) error {
-	dsn := cli.getDSNPG(overrider)
+func (cli *testServerClient) runTestTLSConnection(t *C, overrider configOverrider) error {
+	dsn := cli.getDSN(overrider)
 	db, err := sql.Open("postgres", dsn)
 	t.Assert(err, IsNil)
 	defer db.Close()
@@ -1119,8 +1116,8 @@ func (cli *testServerClient) runTestTLSConnection(t *C, overrider configOverride
 	return err
 }
 
-func (cli *testServerClient) runReloadTLS(t *C, overrider configOverriderPG, errorNoRollback bool) error {
-	db, err := sql.Open("postgres", cli.getDSNPG(overrider))
+func (cli *testServerClient) runReloadTLS(t *C, overrider configOverrider, errorNoRollback bool) error {
+	db, err := sql.Open("postgres", cli.getDSN(overrider))
 	t.Assert(err, IsNil)
 	defer db.Close()
 	sql := "alter instance reload tls"
@@ -1180,7 +1177,7 @@ func (cli *testServerClient) waitUntilServerOnline() {
 	retry := 0
 	for ; retry < retryTime; retry++ {
 		time.Sleep(time.Millisecond * 10)
-		db, err := sql.Open("postgres", cli.getDSNPG())
+		db, err := sql.Open("postgres", cli.getDSN())
 		if err == nil {
 			db.Close()
 			break

@@ -440,7 +440,7 @@ func (ts *basicHTTPHandlerTestSuite) stopServer(c *C) {
 }
 
 func (ts *basicHTTPHandlerTestSuite) prepareDataPG(c *C) {
-	db, err := sql.Open("postgres", ts.getDSNPG())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -569,7 +569,7 @@ func (ts *HTTPHandlerTestSuite) TestTiFlashReplica(c *C) {
 	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 
-	db, err := sql.Open("postgres", ts.getDSNPG())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -942,7 +942,7 @@ func (ts *HTTPHandlerTestSuite) TestGetSchema(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(dbtbl.SchemaVersion, Equals, domain.GetDomain(se.(sessionctx.Context)).InfoSchema().SchemaMetaVersion())
 
-	db, err := sql.Open("postgres", ts.getDSNPG())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -1035,7 +1035,7 @@ func (ts *HTTPHandlerTestSuite) TestPostSettings(c *C) {
 	c.Assert(atomic.LoadUint32(&variable.DDLSlowOprThreshold), Equals, uint32(200))
 
 	// test check_mb4_value_in_utf8
-	db, err := sql.Open("postgres", ts.getDSNPG())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -1179,7 +1179,7 @@ func (ts *HTTPHandlerTestSuite) TestZipInfoForSQL(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
 
-	db, err := sql.Open("postgres", ts.getDSNPG())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
