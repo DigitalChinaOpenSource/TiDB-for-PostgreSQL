@@ -44,6 +44,10 @@ type mockLogicalJoin struct {
 	statsMap        map[int]*property.StatsInfo
 }
 
+func (mj mockLogicalJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return nil
+}
+
 func (mj mockLogicalJoin) init(ctx sessionctx.Context) *mockLogicalJoin {
 	mj.baseLogicalPlan = newBaseLogicalPlan(ctx, "MockLogicalJoin", &mj, 0)
 	return &mj
