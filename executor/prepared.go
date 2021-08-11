@@ -286,43 +286,67 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 }
 
 
-// SetInsertParamTypeArray 当计划为insert时，将其参数设置到prepared.Param的Type成员中去
-//	insertPlan：计划结构体
-//	paramExprs：prepared结构体中的Param成员，其中有Type信息，默认都是空的，我们就是要设置这些Type信息
+//SetInsertParamType when the plan is insert, set the type of parameter expression
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
+	// if insertPlan already have a select plan,we could use that to set parameter expressions' type
 	if insertPlan.SelectPlan != nil {
 		insertPlan.SelectPlan.SetParamType(paramExprs)
-	} else {
-		paramIndex := 0
-		//当前计划的tableSchema，也就是表结构。
-		cols := insertPlan.GetTableSchema().Columns
-		// 这里有参数传进来的顺序。
-		orderedColumns := insertPlan.Columns
+		return
+	}
 
-		//lists是参数列表，需要考虑一次性insert多行的情况，在这种情况下，lists数组将有多个元素，只需要将它们依次放入数组中返回即可。
-		for _, list := range insertPlan.Lists {
-			for j := range list {
-				if orderedColumns != nil {
-					if cst := list[j].(*expression.Constant); cst.Offset != 0 {
-						if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
-							for _, col := range cols {
-								nameSplit := strings.Split(col.OrigName,".")
-								shortName := nameSplit[len(nameSplit) - 1]
-								if shortName == orderedColumns[cst.Order - 1].Name.O {
-									paramMakerExpr.TexprNode.Type = *col.RetType
-									paramIndex++
-								}
-							}
-						}
-					}
-				} else {
-					if paramMakerExpr, ok := (*paramExprs)[paramIndex].(*driver.ParamMarkerExpr); ok {
-						paramMakerExpr.TexprNode.Type = *cols[j].RetType
-					}
+	// do nothing if no param to set
+	if *paramExprs == nil {
+		return
+	}
+
+	// columns of the table according to the schema, note the order of the columns is set during table definition
+	// aka, a table defined as 'test(a, b)' have schema columns [a, b]
+	// It holds the correct type information we want
+	schemaColumns := insertPlan.GetTableSchema().Columns
+
+	// queryColumn is the column that we are inserting into, note the order here is the same as the sql statment
+	// aka, for sql:  "...insert into table(b, a) ... " have query columns [b, a]
+	// It holds the order in which we insert
+	queryColumns := insertPlan.Columns
+
+	// insertLists is a list of insert values list, it's a list of list for bulk insert
+	// aka, sql 'insert into .... values (1, 2), (3, ?) have insert lists [[1, 2], [3, ?]]'
+	// It holds the information about which element is a value expression, so we loop through this one
+	insertLists := insertPlan.Lists
+
+	for _, insertList := range insertLists{
+		for queryOrder := range insertList {
+			exprConst := insertList[queryOrder].(*expression.Constant)
+			exprOrder := exprConst.Order // the order of the value expression as they appear on paramExpr
+			exprOffset := exprConst.Offset // the offset of the value expression
+			// the if the query doesn't specify order, aka 'insert into test values ...', we simply set according to insert order
+			if queryColumns == nil {
+				setParam(paramExprs, exprOrder, schemaColumns[queryOrder])
+			} else {
+				if exprOffset != 0 { // a non-zero offset indicates a value expression, aka ?
+					constShortName := queryColumns[queryOrder].Name.O
+					setParamByColName(schemaColumns, constShortName, paramExprs, exprOrder)
 				}
-
 			}
 		}
+	}
+}
+
+// a helper function that set the specific parameter expression's type to the type of given column's name
+func setParamByColName(schemaColumns []*expression.Column, targetName string, target *[]ast.ParamMarkerExpr, targetOrder int) {
+	for _, schemaColumn := range schemaColumns { //loop through schema column to find matching name
+		schemaNameSplit := strings.Split(schemaColumn.OrigName, ".")
+		schemaShortName := schemaNameSplit[len(schemaNameSplit)-1]
+		if schemaShortName == targetName {
+			setParam(target, targetOrder, schemaColumn)
+		}
+	}
+}
+
+// a helper function that set the specific parameter expression to the type of given column
+func setParam(paramExprs *[]ast.ParamMarkerExpr, targetOrder int, givenColumn *expression.Column) {
+	if targetParamExpression, ok := (*paramExprs)[targetOrder].(*driver.ParamMarkerExpr); ok {
+		targetParamExpression.TexprNode.Type = *givenColumn.RetType
 	}
 }
 

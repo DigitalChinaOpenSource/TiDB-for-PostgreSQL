@@ -273,7 +273,7 @@ func (s *testInfoschemaTableSuite) TestKeyColumnUsage(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
 
 	tk.MustQuery("select * from information_schema.KEY_COLUMN_USAGE where TABLE_NAME='stats_meta' and COLUMN_NAME='table_id';").Check(
-		testkit.Rows("def mysql tbl def mysql stats_meta table_id 1 <nil> <nil> <nil> <nil>"))
+		testkit.Rows("postgres mysql tbl postgres mysql stats_meta table_id 1 <nil> <nil> <nil> <nil>"))
 
 	//test the privilege of new user for information_schema.table_constraints
 	tk.MustExec("create user key_column_tester")
