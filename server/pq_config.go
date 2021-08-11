@@ -45,6 +45,12 @@ func (cfg *ConfigPG) FormatDSNPG() string {
 	var buf bytes.Buffer
 	//user = ...
 	buf.WriteString("user=" + cfg.user + " ")
+
+	//password = ...
+	if len(cfg.password) > 0 {
+		buf.WriteString("password=" + cfg.password +" ")
+	}
+
 	//host = ...
 	buf.WriteString("host=" + cfg.host + " ")
 
