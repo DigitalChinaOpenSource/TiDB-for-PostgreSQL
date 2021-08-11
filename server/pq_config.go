@@ -15,10 +15,10 @@ package server
 
 import "bytes"
 
-// ConfigPG is a config wrapper for postgres dsn string passed to database/sql module
+// Config is a config wrapper for postgres dsn string passed to database/sql module
 // Supports options according to the pq documentation:
 // https://pkg.go.dev/github.com/lib/pq#hdr-Connection_String_Parameters
-type ConfigPG struct {
+type Config struct {
 	dbname                    string // The name of the database to connect to
 	user                      string // The user to sign in as
 	password                  string // The user's password
@@ -32,19 +32,25 @@ type ConfigPG struct {
 	sslrootcert               string // The location of the root certificate file. The file must contain PEM encoded data.
 }
 
-// NewConfigPG creates a new ConfigPG and sets default values.
-func NewConfigPG() *ConfigPG {
-	return &ConfigPG{
+// NewConfig creates a new Config and sets default values.
+func NewConfig() *Config {
+	return &Config{
 	}
 }
 
-// FormatDSNPG formats the configPG into a dsn string which can be used in sql.Open
+// FormatDSN formats the config into a dsn string which can be used in sql.Open
 // For more detail about connection string format:
 // https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
-func (cfg *ConfigPG) FormatDSNPG() string {
+func (cfg *Config) FormatDSN() string {
 	var buf bytes.Buffer
 	//user = ...
 	buf.WriteString("user=" + cfg.user + " ")
+
+	//password = ...
+	if len(cfg.password) > 0 {
+		buf.WriteString("password=" + cfg.password +" ")
+	}
+
 	//host = ...
 	buf.WriteString("host=" + cfg.host + " ")
 

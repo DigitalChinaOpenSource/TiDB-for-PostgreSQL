@@ -98,11 +98,12 @@ func (ds *testDumpStatsSuite) stopServer(c *C) {
 }
 
 // We have temporarily disabled checking dumped data for compatibility issues related to LOAD STATS
+// TODO: Add Check data back
 // Test for stats dump function
 // for reference: https://docs.pingcap.com/zh/tidb/stable/statistics
 func (ds *testDumpStatsSuite) TestDumpStatsAPI(c *C) {
 	ds.startServer(c)
-	ds.prepareDataPG(c)
+	ds.prepareData(c)
 	defer ds.server.Close()
 
 	router := mux.NewRouter()
@@ -124,14 +125,14 @@ func (ds *testDumpStatsSuite) TestDumpStatsAPI(c *C) {
 	js, err := ioutil.ReadAll(resp.Body)
 	c.Assert(err, IsNil)
 	fp.Write(js)
-	//ds.checkDataPG(c, path)
-	ds.checkCorrelationPG(c)
+	//ds.checkData(c, path)
+	ds.checkCorrelation(c)
 
 	// sleep for 1 seconds to ensure the existence of tidb.test
 	time.Sleep(time.Second)
 	timeBeforeDropStats := time.Now()
 	snapshot := timeBeforeDropStats.Format("20060102150405")
-	ds.prepare4DumpHistoryStatsPG(c)
+	ds.prepare4DumpHistoryStats(c)
 
 	// test dump history stats
 	resp1, err := ds.fetchStatus("/stats/dump/tidb/test")
@@ -156,11 +157,11 @@ func (ds *testDumpStatsSuite) TestDumpStatsAPI(c *C) {
 	js, err = ioutil.ReadAll(resp1.Body)
 	c.Assert(err, IsNil)
 	fp1.Write(js)
-	//ds.checkDataPG(c, path1)
+	//ds.checkData(c, path1)
 }
 
-func (ds *testDumpStatsSuite) prepareDataPG(c *C) {
-	db, err := sql.Open("postgres", ds.getDSNPG())
+func (ds *testDumpStatsSuite) prepareData(c *C) {
+	db, err := sql.Open("postgres", ds.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -180,8 +181,8 @@ func (ds *testDumpStatsSuite) prepareDataPG(c *C) {
 	c.Assert(h.Update(is), IsNil)
 }
 
-func (ds *testDumpStatsSuite) prepare4DumpHistoryStatsPG(c *C) {
-	db, err := sql.Open("postgres", ds.getDSNPG())
+func (ds *testDumpStatsSuite) prepare4DumpHistoryStats(c *C) {
+	db, err := sql.Open("postgres", ds.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 
@@ -199,8 +200,8 @@ func (ds *testDumpStatsSuite) prepare4DumpHistoryStatsPG(c *C) {
 	dbt.mustExec("create table tidb.test (a int, b varchar(20))")
 }
 
-func (ds *testDumpStatsSuite) checkCorrelationPG(c *C) {
-	db, err := sql.Open("postgres", ds.getDSNPG())
+func (ds *testDumpStatsSuite) checkCorrelation(c *C) {
+	db, err := sql.Open("postgres", ds.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	dbt := &DBTest{c, db}
 	defer db.Close()
@@ -227,8 +228,8 @@ func (ds *testDumpStatsSuite) checkCorrelationPG(c *C) {
 	rows.Close()
 }
 
-func (ds *testDumpStatsSuite) checkDataPG(c *C, path string) {
-	db, err := sql.Open("postgres", ds.getDSNPG())
+func (ds *testDumpStatsSuite) checkData(c *C, path string) {
+	db, err := sql.Open("postgres", ds.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	dbt := &DBTest{c, db}
 	defer db.Close()
@@ -249,16 +250,4 @@ func (ds *testDumpStatsSuite) checkDataPG(c *C, path string) {
 	dbt.Check(tableName, Equals, "test")
 	dbt.Check(modifyCount, Equals, int64(3))
 	dbt.Check(count, Equals, int64(4))
-}
-
-func (ds *testDumpStatsSuite) clearDataPG(c *C, path string) {
-	db, err := sql.Open("postgres", ds.getDSNPG())
-	c.Assert(err, IsNil, Commentf("Error connecting"))
-	defer db.Close()
-
-	dbt := &DBTest{c, db}
-	dbt.mustExec("drop database tidb")
-	dbt.mustExec("truncate table mysql.stats_meta")
-	dbt.mustExec("truncate table mysql.stats_histograms")
-	dbt.mustExec("truncate table mysql.stats_buckets")
 }
