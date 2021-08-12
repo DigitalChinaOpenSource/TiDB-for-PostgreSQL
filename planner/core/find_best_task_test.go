@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/planner/property"
@@ -35,6 +36,10 @@ func (s *testFindBestTaskSuite) SetUpSuite(c *C) {
 
 type mockDataSource struct {
 	baseLogicalPlan
+}
+
+func (ds mockDataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return nil
 }
 
 func (ds mockDataSource) Init(ctx sessionctx.Context) *mockDataSource {
@@ -72,6 +77,10 @@ type mockLogicalPlan4Test struct {
 	canGeneratePlan2 bool
 	// costOverflow indicates whether this plan will generate physical plan whose cost is overflowed.
 	costOverflow bool
+}
+
+func (p mockLogicalPlan4Test) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return nil
 }
 
 func (p mockLogicalPlan4Test) Init(ctx sessionctx.Context) *mockLogicalPlan4Test {
@@ -125,6 +134,10 @@ type mockPhysicalPlan4Test struct {
 	// See the comment of mockLogicalPlan4Test.
 	planType     int
 	costOverflow bool
+}
+
+func (p mockPhysicalPlan4Test) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return nil
 }
 
 func (p mockPhysicalPlan4Test) Init(ctx sessionctx.Context) *mockPhysicalPlan4Test {

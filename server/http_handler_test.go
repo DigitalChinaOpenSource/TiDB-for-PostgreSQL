@@ -11,6 +11,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Copyright 2021 Digital China Group Co.,Ltd
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package server
 
 import (
@@ -33,11 +46,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
 	zaplog "github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/domain"
@@ -212,7 +225,7 @@ func (ts *HTTPHandlerTestSuite) TestRegionsAPI(c *C) {
 func (ts *HTTPHandlerTestSuite) TestRangesAPI(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	resp, err := ts.fetchStatus("/tables/information_schema/SCHEMATA/ranges")
 	c.Assert(err, IsNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusOK)
@@ -222,7 +235,7 @@ func (ts *HTTPHandlerTestSuite) TestRangesAPI(c *C) {
 	var data TableRanges
 	err = decoder.Decode(&data)
 	c.Assert(err, IsNil)
-	c.Assert(data.TableName, Equals, "SCHEMATA")
+	c.Assert(data.TableName, Equals, "schemata") //in postgres, unquoted table name are stored in lower case
 }
 
 func (ts *HTTPHandlerTestSuite) regionContainsTable(c *C, regionID uint64, tableID int64) bool {
@@ -245,7 +258,7 @@ func (ts *HTTPHandlerTestSuite) regionContainsTable(c *C, regionID uint64, table
 func (ts *HTTPHandlerTestSuite) TestListTableRegions(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	// Test list table regions with error
 	resp, err := ts.fetchStatus("/tables/fdsfds/aaa/regions")
 	c.Assert(err, IsNil)
@@ -269,7 +282,7 @@ func (ts *HTTPHandlerTestSuite) TestListTableRegions(c *C) {
 func (ts *HTTPHandlerTestSuite) TestListTableRanges(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	// Test list table regions with error
 	resp, err := ts.fetchStatus("/tables/fdsfds/aaa/ranges")
 	c.Assert(err, IsNil)
@@ -426,8 +439,8 @@ func (ts *basicHTTPHandlerTestSuite) stopServer(c *C) {
 	}
 }
 
-func (ts *basicHTTPHandlerTestSuite) prepareData(c *C) {
-	db, err := sql.Open("mysql", ts.getDSN())
+func (ts *basicHTTPHandlerTestSuite) prepareDataPG(c *C) {
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -436,18 +449,12 @@ func (ts *basicHTTPHandlerTestSuite) prepareData(c *C) {
 	dbt.mustExec("use tidb;")
 	dbt.mustExec("create table tidb.test (a int auto_increment primary key, b varchar(20));")
 	dbt.mustExec("insert tidb.test values (1, 1);")
-	txn1, err := dbt.db.Begin()
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("update tidb.test set b = b + 1 where a = 1;")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test values (2, 2);")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test (a) values (3);")
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert tidb.test values (4, '');")
-	c.Assert(err, IsNil)
-	err = txn1.Commit()
-	c.Assert(err, IsNil)
+	dbt.mustExec("START TRANSACTION;")
+	dbt.mustExec("update tidb.test set b = b + 1 where a = 1;")
+	dbt.mustExec("insert tidb.test values (2, 2);")
+	dbt.mustExec("insert tidb.test (a) values (3);")
+	dbt.mustExec("insert tidb.test values (4, '');")
+	dbt.mustExec("COMMIT;")
 	dbt.mustExec("alter table tidb.test add index idx1 (a, b);")
 	dbt.mustExec("alter table tidb.test add unique index idx2 (a, b);")
 
@@ -457,12 +464,11 @@ partition by range (a)
  partition p1 values less than (512),
  partition p2 values less than (1024))`)
 
-	txn2, err := dbt.db.Begin()
-	c.Assert(err, IsNil)
-	txn2.Exec("insert into tidb.pt values (42, '123')")
-	txn2.Exec("insert into tidb.pt values (256, 'b')")
-	txn2.Exec("insert into tidb.pt values (666, 'def')")
-	err = txn2.Commit()
+	dbt.mustExec("START TRANSACTION;")
+	dbt.mustExec("insert into tidb.pt values (42, '123')")
+	dbt.mustExec("insert into tidb.pt values (256, 'b')")
+	dbt.mustExec("insert into tidb.pt values (666, 'def')")
+	dbt.mustExec("COMMIT;")
 	c.Assert(err, IsNil)
 }
 
@@ -483,7 +489,7 @@ func decodeKeyMvcc(closer io.ReadCloser, c *C, valid bool) {
 
 func (ts *HTTPHandlerTestSuite) TestGetTableMVCC(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 
 	resp, err := ts.fetchStatus(fmt.Sprintf("/mvcc/key/tidb/test/1"))
@@ -545,7 +551,7 @@ func (ts *HTTPHandlerTestSuite) TestGetTableMVCC(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestGetMVCCNotFound(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 	resp, err := ts.fetchStatus(fmt.Sprintf("/mvcc/key/tidb/test/1234"))
 	c.Assert(err, IsNil)
@@ -560,10 +566,10 @@ func (ts *HTTPHandlerTestSuite) TestGetMVCCNotFound(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestTiFlashReplica(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 
-	db, err := sql.Open("mysql", ts.getDSN())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -729,7 +735,7 @@ func (ts *HTTPHandlerTestSuite) TestTiFlashReplica(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestDecodeColumnValue(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 
 	// column is a structure used for test
@@ -793,7 +799,7 @@ func (ts *HTTPHandlerTestSuite) TestDecodeColumnValue(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestGetIndexMVCC(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 
 	// tests for normal index key
@@ -855,7 +861,7 @@ func (ts *HTTPHandlerTestSuite) TestGetIndexMVCC(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestGetSettings(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 	resp, err := ts.fetchStatus("/settings")
 	c.Assert(err, IsNil)
@@ -868,7 +874,7 @@ func (ts *HTTPHandlerTestSuite) TestGetSettings(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestGetSchema(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 	resp, err := ts.fetchStatus("/schema")
 	c.Assert(err, IsNil)
@@ -876,7 +882,9 @@ func (ts *HTTPHandlerTestSuite) TestGetSchema(c *C) {
 	var dbs []*model.DBInfo
 	err = decoder.Decode(&dbs)
 	c.Assert(err, IsNil)
-	expects := []string{"information_schema", "metrics_schema", "mysql", "performance_schema", "test", "tidb"}
+	// the expected result might need to be changed if we ever change table schema
+	// PG Modified
+	expects := []string{"information_schema", "metrics_schema", "mysql", "performance_schema", "pg_catalog", "postgres", "test", "tidb"}
 	names := make([]string, len(dbs))
 	for i, v := range dbs {
 		names[i] = v.Name.L
@@ -934,7 +942,7 @@ func (ts *HTTPHandlerTestSuite) TestGetSchema(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(dbtbl.SchemaVersion, Equals, domain.GetDomain(se.(sessionctx.Context)).InfoSchema().SchemaMetaVersion())
 
-	db, err := sql.Open("mysql", ts.getDSN())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -967,7 +975,7 @@ func (ts *HTTPHandlerTestSuite) TestGetSchema(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestAllHistory(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 	_, err := ts.fetchStatus("/ddl/history/?limit=3")
 	c.Assert(err, IsNil)
@@ -994,7 +1002,7 @@ func (ts *HTTPHandlerTestSuite) TestAllHistory(c *C) {
 
 func (ts *HTTPHandlerTestSuite) TestPostSettings(c *C) {
 	ts.startServer(c)
-	ts.prepareData(c)
+	ts.prepareDataPG(c)
 	defer ts.stopServer(c)
 	form := make(url.Values)
 	form.Set("log_level", "error")
@@ -1027,7 +1035,7 @@ func (ts *HTTPHandlerTestSuite) TestPostSettings(c *C) {
 	c.Assert(atomic.LoadUint32(&variable.DDLSlowOprThreshold), Equals, uint32(200))
 
 	// test check_mb4_value_in_utf8
-	db, err := sql.Open("mysql", ts.getDSN())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
@@ -1041,11 +1049,10 @@ func (ts *HTTPHandlerTestSuite) TestPostSettings(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusOK)
 	c.Assert(config.GetGlobalConfig().CheckMb4ValueInUTF8, Equals, true)
-	txn1, err := dbt.db.Begin()
-	c.Assert(err, IsNil)
-	_, err = txn1.Exec("insert t2 values (unhex('F0A48BAE'));")
+	dbt.mustExec("START TRANSACTION;")
+	_, err = dbt.db.Exec("insert t2 values (unhex('F0A48BAE'));")
 	c.Assert(err, NotNil)
-	txn1.Commit()
+	dbt.mustExec("COMMIT;")
 
 	// Disable CheckMb4ValueInUTF8.
 	form = make(url.Values)
@@ -1172,7 +1179,7 @@ func (ts *HTTPHandlerTestSuite) TestZipInfoForSQL(c *C) {
 	ts.startServer(c)
 	defer ts.stopServer(c)
 
-	db, err := sql.Open("mysql", ts.getDSN())
+	db, err := sql.Open("postgres", ts.getDSN())
 	c.Assert(err, IsNil, Commentf("Error connecting"))
 	defer db.Close()
 	dbt := &DBTest{c, db}
