@@ -308,7 +308,7 @@ const (
 	TablePgTablePrivileges = "table_privileges"
 	// TablePgTables contains all tables and views defined in the current database.
 	// https://www.postgresql.org/docs/13/infoschema-tables.html
-	TablePgTables = "tables"
+	TablePgTables = "TABLES"
 	// TablePgTransforms contains information about the transforms defined in the current database.
 	// https://www.postgresql.org/docs/13/infoschema-transforms.html
 	TablePgTransforms = "transforms"
