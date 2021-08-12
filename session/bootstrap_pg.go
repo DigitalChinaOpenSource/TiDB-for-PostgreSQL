@@ -14,7 +14,7 @@
 package session
 
 // PG SYSTEM TABLE SQL
-const(
+const (
 	CreateTablePgAggregate = `CREATE TABLE IF NOT EXISTS postgres.pg_aggregate
 (
     aggfnoid 			VARCHAR(64) NOT NULL,
