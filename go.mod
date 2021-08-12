@@ -3,6 +3,8 @@ module github.com/pingcap/tidb
 require (
 	cloud.google.com/go v0.51.0 // indirect
 	github.com/BurntSushi/toml v0.3.1
+	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210628023842-8b1d530491a5
+	github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible
 	github.com/Jeffail/gabs/v2 v2.5.1
 	github.com/aws/aws-sdk-go v1.30.24 // indirect
 	github.com/blacktear23/go-proxyprotocol v0.0.0-20180807104634-af7a81e8dd0d
@@ -32,7 +34,7 @@ require (
 	github.com/jackc/pgtype v1.6.2
 	github.com/klauspost/cpuid v1.2.1
 	github.com/kr/pretty v0.2.0 // indirect
-	github.com/lib/pq v1.10.2 // indirect
+	github.com/lib/pq v1.10.2
 	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/ngaut/pools v0.0.0-20180318154953-b7bc8c42aac7
@@ -41,7 +43,6 @@ require (
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/basictracer-go v1.0.0
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible
 	github.com/pingcap/check v0.0.0-20200212061837-5e12011dc712
 	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/pingcap/failpoint v0.0.0-20200702092429-9f69995143ce
@@ -49,7 +50,6 @@ require (
 	github.com/pingcap/goleveldb v0.0.0-20191226122134-f82aafb29989
 	github.com/pingcap/kvproto v0.0.0-20201126113434-70db5fb4b0dc
 	github.com/pingcap/log v0.0.0-20201112100606-8f1e84a3abc8
-	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210628023842-8b1d530491a5
 	github.com/pingcap/sysutil v0.0.0-20201130064824-f0c8aa6a6966
 	github.com/pingcap/tidb-tools v4.0.9-0.20201127090955-2707c97b3853+incompatible
 	github.com/pingcap/tipb v0.0.0-20200618092958-4fad48b4c8c3

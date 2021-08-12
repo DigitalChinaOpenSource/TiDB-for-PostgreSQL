@@ -874,7 +874,7 @@ const(
 
 // PG SYSTEM VIEW SQL
 const (
-	CreateViewPgRoles = `CREATE DEFINER = root VIEW postgres.pg_roles AS
+	CreateViewPgRoles = `CREATE OR REPLACE DEFINER = root VIEW postgres.pg_roles AS
     SELECT
         rolname,
         rolsuper,
@@ -892,7 +892,7 @@ const (
     FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
     ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
 
-	CreateViewPgShadow = `CREATE DEFINER = root VIEW pg_shadow AS
+	CreateViewPgShadow = `CREATE OR REPLACE DEFINER = root VIEW pg_shadow AS
     SELECT
         rolname AS usename,
         pg_authid.oid AS usesysid,
@@ -907,7 +907,7 @@ const (
     ON (pg_authid.oid = setrole AND setdatabase = 0)
     WHERE rolcanlogin;`
 
-	CreateViewPgGroup = `CREATE DEFINER = root VIEW pg_group AS
+	CreateViewPgGroup = `CREATE OR REPLACE DEFINER = root VIEW pg_group AS
     SELECT
         rolname AS groname,
         oid AS grosysid,
@@ -915,7 +915,7 @@ const (
     FROM pg_authid
     WHERE NOT rolcanlogin;`
 
-	CreateViewPgUser = `CREATE DEFINER = root VIEW pg_user AS
+	CreateViewPgUser = `CREATE OR REPLACE DEFINER = root VIEW pg_user AS
     SELECT
         usename,
         usesysid,
@@ -928,7 +928,7 @@ const (
         useconfig
     FROM pg_shadow;`
 
-	CreateViewPgSettings = `CREATE DEFINER = root VIEW pg_settings AS
+	CreateViewPgSettings = `CREATE OR REPLACE DEFINER = root VIEW pg_settings AS
 SELECT * FROM pg_all_settings;`
 )
 
@@ -4839,7 +4839,7 @@ SELECT (ss.a).n FROM
 
 // PG PG_Catalog
 const (
-	CreatePgCalogViewPgRoles = `CREATE DEFINER = root VIEW pg_catalog.pg_roles AS
+	CreatePgCalogViewPgRoles = `CREATE OR REPLACE DEFINER = root VIEW pg_catalog.pg_roles AS
     SELECT
         rolname,
         rolsuper,
