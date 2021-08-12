@@ -211,15 +211,18 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	// according to plan type. Get param type from the plan tree.
 	switch p.(type) {
 	case *plannercore.Insert:
-		SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
+		err = SetInsertParamType(p.(*plannercore.Insert), &prepared.Params)
 	case *plannercore.LogicalProjection:
-		SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
+		err = SetSelectParamType(p.(*plannercore.LogicalProjection), &prepared.Params)
 	case *plannercore.Delete:
-		SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
+		err = SetDeleteParamType(p.(*plannercore.Delete), &prepared.Params)
 	case *plannercore.Update:
-		SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
+		err = SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	case *plannercore.LogicalSort:
-		SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
+		err = SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
+	}
+	if err != nil {
+		return err
 	}
 	if _, ok := stmt.(*ast.SelectStmt); ok {
 		e.Fields = colNames2ResultFields(p.Schema(), p.OutputNames(), vars.CurrentDB)
@@ -286,16 +289,16 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 }
 
 //SetInsertParamType when the plan is insert, set the type of parameter expression
-func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
+func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) error {
 	// if insertPlan already have a select plan,we could use that to set parameter expressions' type
 	if insertPlan.SelectPlan != nil {
-		insertPlan.SelectPlan.SetParamType(paramExprs)
-		return
+		err := insertPlan.SelectPlan.SetParamType(paramExprs)
+		return err
 	}
 
 	// do nothing if no param to set
 	if *paramExprs == nil {
-		return
+		return nil
 	}
 
 	// columns of the table according to the schema, note the order of the columns is set during table definition
@@ -329,6 +332,7 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 			}
 		}
 	}
+	return nil
 }
 
 // a helper function that set the specific parameter expression's type to the type of given column's name
@@ -350,25 +354,26 @@ func setParam(paramExprs *[]ast.ParamMarkerExpr, targetOrder int, givenColumn *e
 }
 
 // SetSelectParamType 从select计划中获取参数类型
-func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) {
-	projection.SetParamType(params)
+func SetSelectParamType(projection *plannercore.LogicalProjection, params *[]ast.ParamMarkerExpr) error {
+	return projection.SetParamType(params)
 }
 
 // SetDeleteParamType 从delete计划中获取参数类型
-func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) {
+func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExpr) error {
 	if delete.SelectPlan != nil {
-		delete.SelectPlan.SetParamType(params)
+		return delete.SelectPlan.SetParamType(params)
 	}
+	return nil
 }
 
 // SetUpdateParamType 从update计划获取参数类型
-func SetUpdateParamType(update *plannercore.Update, params *[]ast.ParamMarkerExpr) {
+func SetUpdateParamType(update *plannercore.Update, params *[]ast.ParamMarkerExpr) error {
 	if list := update.OrderedList; list != nil {
 		for _, l := range list {
 			SetUpdateParamTypes(l, params, &update.SelectPlan.Schema().Columns)
 		}
 	}
-	update.SelectPlan.SetParamType(params)
+	return update.SelectPlan.SetParamType(params)
 }
 
 // SetUpdateParamTypes 这里是处理 update table set name = ?, age = ?这样的位置的参数的
@@ -388,8 +393,8 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 }
 
 // SetSortType 从根节点计划是logicalSort的计划中获取参数类型
-func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) {
-	sort.SetParamType(i)
+func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) error {
+	return sort.SetParamType(i)
 }
 
 // ExecuteExec represents an EXECUTE executor.

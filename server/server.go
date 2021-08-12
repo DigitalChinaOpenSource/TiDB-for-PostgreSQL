@@ -431,8 +431,10 @@ func (s *Server) onConn(conn *clientConn) {
 		}
 
 		// write err to client
-		_ = conn.writeError(ctx, err)
-		_ = conn.flush(ctx)
+		err = conn.writeError(ctx, err)
+		terror.Log(err)
+		err = conn.flush(ctx)
+		terror.Log(err)
 
 		// Some keep alive services will send request to TiDB and disconnect immediately.
 		// So we only record metrics.

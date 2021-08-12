@@ -361,10 +361,13 @@ type LogicalAggregation struct {
 func (p *LogicalAggregation) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childs := p.children; childs != nil {
 		for _, child := range childs {
-			child.SetParamType(paramExprs)
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 // HasDistinct shows whether LogicalAggregation has functions with distinct.
@@ -1037,7 +1040,10 @@ type LogicalSort struct {
 func (p *LogicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childs := p.children; childs != nil {
 		for _, child := range childs {
-			child.SetParamType(paramExprs)
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return err
