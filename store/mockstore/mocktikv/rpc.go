@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/golang/protobuf/proto"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
@@ -31,7 +32,6 @@ import (
 	"github.com/pingcap/kvproto/pkg/errorpb"
 	"github.com/pingcap/kvproto/pkg/kvrpcpb"
 	"github.com/pingcap/kvproto/pkg/metapb"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/store/tikv/tikvrpc"
 	"github.com/pingcap/tipb/go-tipb"

@@ -14,9 +14,9 @@
 package types
 
 import (
+	"github.com/DigitalChinaOpenSource/DCParser/opcode"
 	"github.com/cznic/mathutil"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/opcode"
 )
 
 // ComputePlus computes the result of a+b.

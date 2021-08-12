@@ -16,8 +16,8 @@ package expression
 import (
 	"sync"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
 )

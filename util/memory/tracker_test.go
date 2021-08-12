@@ -22,9 +22,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/cznic/mathutil"
 	. "github.com/pingcap/check"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/testleak"

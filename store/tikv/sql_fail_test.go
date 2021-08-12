@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/session"
 	. "github.com/pingcap/tidb/store/tikv"

@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/table"
 	"github.com/pingcap/tidb/types"

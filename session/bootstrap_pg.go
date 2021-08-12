@@ -14,7 +14,7 @@
 package session
 
 // PG SYSTEM TABLE SQL
-const(
+const (
 	CreateTablePgAggregate = `CREATE TABLE IF NOT EXISTS postgres.pg_aggregate
 (
     aggfnoid 			VARCHAR(64) NOT NULL,
@@ -4834,7 +4834,6 @@ SELECT (ss.a).n FROM
 (13429, 'plpgsql_call_handler', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 0, 0, 'v', 'u', 0, 0, 2280, '', NULL, NULL, NULL, NULL, NULL, 'plpgsql_call_handler', '$libdir/plpgsql', NULL, NULL),
 (13430, 'plpgsql_inline_handler', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 1, 0, 2278, '2281', NULL, NULL, NULL, NULL, NULL, 'plpgsql_inline_handler', '$libdir/plpgsql', NULL, NULL),
 (13431, 'plpgsql_validator', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 1, 0, 2278, '26', NULL, NULL, NULL, NULL, NULL, 'plpgsql_validator', '$libdir/plpgsql', NULL, NULL);`
-
 )
 
 // PG PG_Catalog
@@ -4856,6 +4855,4 @@ const (
         pg_authid.oid
     FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
     ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
-
 )
-

@@ -68,7 +68,7 @@ func (ts *ConnTestSuite) TestMalformHandshakeHeader(c *C) {
 }
 
 // Test a malformed handshake packet from pg client, must error
-func (ts *ConnTestSuite) TestMalformHandshakeHeaderPG (c *C) {
+func (ts *ConnTestSuite) TestMalformHandshakeHeaderPG(c *C) {
 	c.Parallel()
 	data := []byte{0x00}
 	cc := &clientConn{
@@ -147,8 +147,9 @@ func (ts *ConnTestSuite) TestParseHandshakeResponse(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(p.User, Equals, "root")
 }
+
 // Test that tidb for pg is capable of converting the start up message to the correct pgproto3 object
-func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
+func (ts *ConnTestSuite) TestReceiveStartUpMessagePG(c *C) {
 	c.Parallel()
 	// here are packet got from running psql via command[psql "sslmode=disable host=localhost"]
 	data := []byte{
@@ -156,11 +157,11 @@ func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
 		0x00, 0x03, 0x00, 0x00, // Protocol Version: major = 3, minor = 0
 		0x75, 0x73, 0x65, 0x72, 0x00, // user
 		0x64, 0x61, 0x76, 0x69, 0x64, 0x00, // david
-		0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x00,//database
-		0x64, 0x61, 0x76, 0x69, 0x64, 0x00,//david
-		0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x00,// application name
-		0x70, 0x73, 0x71, 0x6c, 0x00,//psql
-		0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x65, 0x6e, 0x63, 0x6f, 0x64, 0x69, 0x6e, 0x67, 0x00,// client encoding
+		0x64, 0x61, 0x74, 0x61, 0x62, 0x61, 0x73, 0x65, 0x00, //database
+		0x64, 0x61, 0x76, 0x69, 0x64, 0x00, //david
+		0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x00, // application name
+		0x70, 0x73, 0x71, 0x6c, 0x00, //psql
+		0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x65, 0x6e, 0x63, 0x6f, 0x64, 0x69, 0x6e, 0x67, 0x00, // client encoding
 		0x55, 0x54, 0x46, 0x38, 0x00, //UTF8
 		0x00,
 	}
@@ -172,11 +173,11 @@ func (ts *ConnTestSuite) TestReceiveStartUpMessagePG (c *C) {
 	response, err := cc.ReceiveStartupMessage()
 	c.Assert(err, IsNil)
 	_, ok := response.(*pgproto3.StartupMessage)
-	c.Assert(ok,IsTrue)
+	c.Assert(ok, IsTrue)
 }
 
 // Test that tidb for pg can correctly construct corresponding pgproto3 response
-func (ts *ConnTestSuite) TestReceiveSSLRequestPG (c *C) {
+func (ts *ConnTestSuite) TestReceiveSSLRequestPG(c *C) {
 	c.Parallel()
 	// here are packet got from running psql via command[psql "host=localhost"]
 	data := []byte{
@@ -191,11 +192,11 @@ func (ts *ConnTestSuite) TestReceiveSSLRequestPG (c *C) {
 	response, err := cc.ReceiveStartupMessage()
 	c.Assert(err, IsNil)
 	_, ok := response.(*pgproto3.SSLRequest)
-	c.Assert(ok,IsTrue)
+	c.Assert(ok, IsTrue)
 }
 
 // TiDB for PG should write back correct authentication ok message when called
-func (ts *ConnTestSuite) TestAuthenticationOKPG (c *C) {
+func (ts *ConnTestSuite) TestAuthenticationOKPG(c *C) {
 	c.Parallel()
 	var outBuffer bytes.Buffer
 	cc := &clientConn{
@@ -211,14 +212,13 @@ func (ts *ConnTestSuite) TestAuthenticationOKPG (c *C) {
 	c.Assert(err, IsNil)
 	expected := new(bytes.Buffer)
 	expected.Write([]byte{
-		0x52, //Message code
+		0x52,                   //Message code
 		0x00, 0x00, 0x00, 0x08, // Length = 8
 		0x00, 0x00, 0x00, 0x00, // Authentication ok
 	})
 
 	c.Assert(outBuffer.Bytes(), DeepEquals, expected.Bytes())
 }
-
 
 func (ts *ConnTestSuite) TestIssue1768(c *C) {
 	c.Parallel()
@@ -540,7 +540,6 @@ func (ts *ConnTestSuite) TestDispatchSimpleQueryPG(c *C) {
 			err: nil,
 			out: do1Response,
 		},
-
 	}
 
 	ts.testDispatch(c, inputs, mysql.ClientProtocol41)

@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/gorilla/mux"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/store/helper"
 	"github.com/pingcap/tidb/store/mockstore"
 	"github.com/pingcap/tidb/store/mockstore/mocktikv"

@@ -250,19 +250,19 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // we choose insert sort here.
 // todo: According to different parameters situations, choose the most suitable sorting method
 func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
-	if len(markers) <=  1 {
+	if len(markers) <= 1 {
 		return
 	}
 
 	var val ast.ParamMarkerExpr
 	var index int
 	for i := 1; i < len(markers); i++ {
-		val, index = markers[i], i -1
+		val, index = markers[i], i-1
 		for {
 			if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order ||
 				(val.(*driver.ParamMarkerExpr).Order == markers[index].(*driver.ParamMarkerExpr).Order &&
-					val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset){
-				markers[index + 1] = markers[index]
+					val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset) {
+				markers[index+1] = markers[index]
 			} else {
 				break
 			}
@@ -271,7 +271,7 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 				break
 			}
 		}
-		markers[index + 1] = val
+		markers[index+1] = val
 	}
 
 	//todo Eliminate compatibility with "?"
@@ -284,7 +284,6 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 		}
 	}
 }
-
 
 //SetInsertParamType when the plan is insert, set the type of parameter expression
 func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamMarkerExpr) {
@@ -314,10 +313,10 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 	// It holds the information about which element is a value expression, so we loop through this one
 	insertLists := insertPlan.Lists
 
-	for _, insertList := range insertLists{
+	for _, insertList := range insertLists {
 		for queryOrder := range insertList {
 			exprConst := insertList[queryOrder].(*expression.Constant)
-			exprOrder := exprConst.Order // the order of the value expression as they appear on paramExpr
+			exprOrder := exprConst.Order   // the order of the value expression as they appear on paramExpr
 			exprOffset := exprConst.Offset // the offset of the value expression
 			// the if the query doesn't specify order, aka 'insert into test values ...', we simply set according to insert order
 			if queryColumns == nil {
@@ -365,8 +364,8 @@ func SetDeleteParamType(delete *plannercore.Delete, params *[]ast.ParamMarkerExp
 // SetUpdateParamType 从update计划获取参数类型
 func SetUpdateParamType(update *plannercore.Update, params *[]ast.ParamMarkerExpr) {
 	if list := update.OrderedList; list != nil {
-		for _,l := range list {
-			SetUpdateParamTypes(l,params,&update.SelectPlan.Schema().Columns)
+		for _, l := range list {
+			SetUpdateParamTypes(l, params, &update.SelectPlan.Schema().Columns)
 		}
 	}
 	update.SelectPlan.SetParamType(params)
@@ -377,7 +376,7 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 	if constant, ok := assignmnet.Expr.(*expression.Constant); ok {
 	cycle:
 		for _, col := range *cols {
-			for _,expr := range *paramExprs {
+			for _, expr := range *paramExprs {
 				if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == assignmnet.Col.OrigName &&
 					paramMarker.Offset == constant.Offset {
 					paramMarker.TexprNode.Type = *col.RetType
@@ -392,7 +391,6 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) {
 	sort.SetParamType(i)
 }
-
 
 // ExecuteExec represents an EXECUTE executor.
 // It cannot be executed by itself, all it needs to do is to build

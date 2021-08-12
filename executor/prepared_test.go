@@ -19,10 +19,10 @@ import (
 	"strings"
 	"sync/atomic"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/domain"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/session"

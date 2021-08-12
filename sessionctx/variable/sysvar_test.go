@@ -16,9 +16,9 @@ package variable
 import (
 	"testing"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
 )
 
 func TestT(t *testing.T) {

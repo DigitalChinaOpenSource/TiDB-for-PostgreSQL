@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/testleak"
 	"go.etcd.io/etcd/clientv3"

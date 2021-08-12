@@ -14,9 +14,9 @@
 package core
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
 )
 
 type testErrorSuite struct{}

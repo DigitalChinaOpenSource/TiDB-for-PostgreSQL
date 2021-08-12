@@ -21,11 +21,11 @@ import (
 	"math"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/cznic/mathutil"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/kvproto/pkg/metapb"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/store/helper"

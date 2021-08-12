@@ -14,11 +14,11 @@
 package server
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/types"
 )
 

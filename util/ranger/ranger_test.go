@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/DigitalChinaOpenSource/DCParser"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/kv"

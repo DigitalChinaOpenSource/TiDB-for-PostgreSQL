@@ -14,9 +14,9 @@
 package core_test
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/planner/core"

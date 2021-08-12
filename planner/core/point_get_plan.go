@@ -18,7 +18,6 @@ import (
 	"fmt"
 	math2 "math"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -26,6 +25,7 @@ import (
 	"github.com/DigitalChinaOpenSource/DCParser/opcode"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	ptypes "github.com/DigitalChinaOpenSource/DCParser/types"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"

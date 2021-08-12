@@ -17,8 +17,8 @@ import (
 	"bytes"
 	"context"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
 )
 
 type testBufferStoreSuite struct{}

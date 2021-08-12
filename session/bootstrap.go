@@ -39,11 +39,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/bindinfo"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
@@ -1318,7 +1318,7 @@ func doDDLWorks(s Session) {
 	// Create opt_rule_blacklist table.
 	mustExecute(s, CreateOptRuleBlacklist)
 	// Create postgres Database
-	mustExecute(s,"CREATE DATABASE IF NOT EXISTS postgres;")
+	mustExecute(s, "CREATE DATABASE IF NOT EXISTS postgres;")
 	// Create postgres pg_aggregate Table
 	mustExecute(s, CreateTablePgAggregate)
 	// Create postgres pg_am Table
@@ -1461,16 +1461,17 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateViewPgSettings)
 
 	// Create postgres Database
-	mustExecute(s,"CREATE DATABASE IF NOT EXISTS pg_catalog;")
+	mustExecute(s, "CREATE DATABASE IF NOT EXISTS pg_catalog;")
 
-	mustExecute(s , CreatePgCalogViewPgRoles)
+	mustExecute(s, CreatePgCalogViewPgRoles)
 }
 
-func doCreatePgViewsWorks(s Session){
+func doCreatePgViewsWorks(s Session) {
 	mustExecute(s, "USE postgres")
 
 	//mustExecute(s, CreateViewPgRoles)
 }
+
 // doDMLWorks executes DML statements in bootstrap stage.
 // All the statements run in a single transaction.
 func doDMLWorks(s Session) {
@@ -1531,7 +1532,7 @@ func doDMLWorks(s Session) {
 
 	mustExecute(s, DataForTablePgAllSettings)
 
-	mustExecute(s ,DataForTablePgProc)
+	mustExecute(s, DataForTablePgProc)
 
 	mustExecute(s, DataForTablePgClass)
 

@@ -21,13 +21,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/opcode"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/domain"
@@ -1900,19 +1900,19 @@ func splitWhere(where ast.ExprNode) []ast.ExprNode {
 func (b *PlanBuilder) buildShow(ctx context.Context, show *ast.ShowStmt) (Plan, error) {
 	p := LogicalShow{
 		ShowContents: ShowContents{
-			Tp:          show.Tp,
-			DBName:      show.DBName,
-			Table:       show.Table,
-			Column:      show.Column,
-			IndexName:   show.IndexName,
-			Flag:        show.Flag,
-			User:        show.User,
-			Roles:       show.Roles,
-			Full:        show.Full,
-			IfNotExists: show.IfNotExists,
-			GlobalScope: show.GlobalScope,
-			Extended:    show.Extended,
-			VariableName:show.VariableName,
+			Tp:           show.Tp,
+			DBName:       show.DBName,
+			Table:        show.Table,
+			Column:       show.Column,
+			IndexName:    show.IndexName,
+			Flag:         show.Flag,
+			User:         show.User,
+			Roles:        show.Roles,
+			Full:         show.Full,
+			IfNotExists:  show.IfNotExists,
+			GlobalScope:  show.GlobalScope,
+			Extended:     show.Extended,
+			VariableName: show.VariableName,
 		},
 	}.Init(b.ctx)
 	isView := false

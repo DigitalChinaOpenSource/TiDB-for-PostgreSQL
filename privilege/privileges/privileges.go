@@ -213,7 +213,7 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 		return
 	}
 
-	pgSalt := [4]byte{salt[0],salt[1],salt[2],salt[3]}
+	pgSalt := [4]byte{salt[0], salt[1], salt[2], salt[3]}
 	if !auth.CheckPassword(pgSalt, hpwd, string(authentication)) {
 		return
 	}

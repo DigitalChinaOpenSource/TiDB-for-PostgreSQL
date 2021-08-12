@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/kvproto/pkg/tikvpb"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/metrics"
 	"github.com/pingcap/tidb/store/tikv/tikvrpc"

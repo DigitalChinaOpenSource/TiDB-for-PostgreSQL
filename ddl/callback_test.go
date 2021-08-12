@@ -16,9 +16,9 @@ package ddl
 import (
 	"context"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/sessionctx"
 	"go.uber.org/zap"

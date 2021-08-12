@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/executor"
 	"github.com/pingcap/tidb/meta/autoid"
 	"github.com/pingcap/tidb/sessionctx/variable"

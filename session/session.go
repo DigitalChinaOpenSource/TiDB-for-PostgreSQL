@@ -43,10 +43,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ngaut/pools"
-	"github.com/opentracing/opentracing-go"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/failpoint"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
@@ -54,6 +50,10 @@ import (
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/ngaut/pools"
+	"github.com/opentracing/opentracing-go"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/bindinfo"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
@@ -1637,7 +1637,7 @@ func (s *session) Auth(user *auth.UserIdentity, authentication []byte, salt []by
 	return false
 }
 
-func (s *session)NeedPassword(user *auth.UserIdentity) bool {
+func (s *session) NeedPassword(user *auth.UserIdentity) bool {
 	pm := privilege.GetPrivilegeManager(s)
 	return pm.NeedPassword(user.Username, user.Hostname)
 }

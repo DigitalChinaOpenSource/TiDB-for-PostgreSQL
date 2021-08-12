@@ -2340,6 +2340,6 @@ func EstimatedMemUsage(array []Datum, numOfRows int) int64 {
 // SetNullType sets the type of the datum to null
 // This is useful when setting the type of value expression, aka '?'
 // PG Modified
-func (d * Datum) SetNullType() {
+func (d *Datum) SetNullType() {
 	d.k = KindNull
 }

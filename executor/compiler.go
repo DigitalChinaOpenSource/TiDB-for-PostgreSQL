@@ -16,9 +16,9 @@ package executor
 import (
 	"context"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/metrics"

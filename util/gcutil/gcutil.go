@@ -16,8 +16,8 @@ package gcutil
 import (
 	"fmt"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/util"

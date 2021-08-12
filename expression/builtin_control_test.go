@@ -17,8 +17,8 @@ import (
 	"errors"
 	"time"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/testutil"

@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser"
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/ddl/testutil"
 	ddlutil "github.com/pingcap/tidb/ddl/util"

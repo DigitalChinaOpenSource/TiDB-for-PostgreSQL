@@ -23,11 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/ddl"
 	ddlutil "github.com/pingcap/tidb/ddl/util"

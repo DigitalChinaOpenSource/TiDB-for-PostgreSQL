@@ -16,8 +16,8 @@ package tables_test
 import (
 	"context"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/sessionctx/binloginfo"

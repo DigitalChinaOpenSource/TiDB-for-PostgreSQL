@@ -17,9 +17,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/chunk"

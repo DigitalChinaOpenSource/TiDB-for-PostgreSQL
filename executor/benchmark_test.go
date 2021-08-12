@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pingcap/log"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/log"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/expression/aggregation"
 	"github.com/pingcap/tidb/planner/core"

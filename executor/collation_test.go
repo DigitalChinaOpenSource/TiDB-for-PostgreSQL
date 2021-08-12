@@ -14,8 +14,8 @@
 package executor
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"

@@ -22,9 +22,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/types/json"

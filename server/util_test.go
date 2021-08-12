@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/session"

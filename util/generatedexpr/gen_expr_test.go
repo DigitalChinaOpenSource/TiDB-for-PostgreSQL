@@ -14,8 +14,8 @@
 package generatedexpr
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	. "github.com/pingcap/check"
 )
 
 var _ = Suite(&testGenExprSuite{})

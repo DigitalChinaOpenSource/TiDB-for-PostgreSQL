@@ -19,8 +19,8 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/cznic/mathutil"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
 )

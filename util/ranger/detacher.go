@@ -14,8 +14,8 @@
 package ranger
 
 import (
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"

@@ -16,8 +16,8 @@ package kv
 import (
 	"context"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/util/testleak"
 )
 

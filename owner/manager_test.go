@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
 	. "github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/owner"
 	"github.com/pingcap/tidb/store/mockstore"

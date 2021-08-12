@@ -20,8 +20,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/check"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/types/json"
 )

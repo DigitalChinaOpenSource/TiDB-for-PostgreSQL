@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/infoschema/perfschema"
 	"github.com/pingcap/tidb/kv"

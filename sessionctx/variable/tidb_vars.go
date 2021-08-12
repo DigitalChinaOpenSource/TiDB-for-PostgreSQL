@@ -52,7 +52,7 @@ import (
 // 增加了三个pg的系统变量 PgDateStyle PgClientMinMessage PgClientEncoding
 const (
 	//PgDatestyle is the pg database system variable
-	PgDateStyle ="datestyle"
+	PgDateStyle = "datestyle"
 
 	//PgClientMinMessage is the pg database system variable
 	PgClientMinMessage = "client_min_messages"
@@ -61,7 +61,7 @@ const (
 	PgClientEncoding = "client_encoding"
 
 	//PgByteaOutput is the pg database system_variable
-	PgByteaOutput 	= "bytea_output"
+	PgByteaOutput = "bytea_output"
 
 	TiDBDDLSlowOprThreshold = "ddl_slow_threshold"
 
@@ -561,10 +561,10 @@ const (
 
 // Default Pg system variable values.
 const (
-	DefPgClientEncoding 			="UTF8"
-	DefPgDateStyle					="ISO"
-	DefPgClientMinMessage			="notice"
-	DefPgByteaOutput				="hex"
+	DefPgClientEncoding   = "UTF8"
+	DefPgDateStyle        = "ISO"
+	DefPgClientMinMessage = "notice"
+	DefPgByteaOutput      = "hex"
 )
 
 // Process global variables.

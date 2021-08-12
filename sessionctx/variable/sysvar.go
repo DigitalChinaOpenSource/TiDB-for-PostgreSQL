@@ -755,10 +755,10 @@ var defaultSysVars = []*SysVar{
 	{ScopeGlobal | ScopeSession, TiDBEnableAmendPessimisticTxn, boolToOnOff(DefTiDBEnableAmendPessimisticTxn)},
 	{ScopeGlobal | ScopeSession, TiDBMultiStatementMode, Warn},
 	//增加了三个pg所用到的全局系统变量
-	{ScopeGlobal | ScopeSession,PgDateStyle,DefPgDateStyle},
-	{ScopeGlobal | ScopeSession,PgClientEncoding, DefPgClientEncoding},
-	{ScopeGlobal | ScopeSession,PgClientMinMessage,DefPgClientMinMessage},
-	{ScopeGlobal | ScopeSession,PgByteaOutput,DefPgByteaOutput},
+	{ScopeGlobal | ScopeSession, PgDateStyle, DefPgDateStyle},
+	{ScopeGlobal | ScopeSession, PgClientEncoding, DefPgClientEncoding},
+	{ScopeGlobal | ScopeSession, PgClientMinMessage, DefPgClientMinMessage},
+	{ScopeGlobal | ScopeSession, PgByteaOutput, DefPgByteaOutput},
 }
 
 // SynonymsSysVariables is synonyms of system variables.

@@ -18,9 +18,9 @@ import (
 	"math"
 	"testing"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	plannercore "github.com/pingcap/tidb/planner/core"
