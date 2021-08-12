@@ -221,7 +221,6 @@ func (dbt *DBTest) mustQueryRows(query string, args ...interface{}) {
 	rows.Close()
 }
 
-
 func (cli *testServerClient) runTestRegression(c *C, overrider configOverrider, dbName string) {
 	cli.runTestsOnNewDB(c, overrider, dbName, func(dbt *DBTest) {
 		// Show the user

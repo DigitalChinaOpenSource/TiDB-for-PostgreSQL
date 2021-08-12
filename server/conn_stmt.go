@@ -58,8 +58,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
@@ -79,7 +79,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 	vars := cc.ctx.GetSessionVars()
 
 	// 将在 Prepare 阶段解析传来的参数类型在这里获取，并保留在 stmt 中
-	var	paramTypes []byte
+	var paramTypes []byte
 	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
 		cachedParams := cachedStmt.PreparedAst.Params
 		for i := range cachedParams {
@@ -102,7 +102,7 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	vars := cc.ctx.GetSessionVars()
 
 	// 当为临时预处理查询，默认设置 Name 为 0
-	if bind.PreparedStatement == ""{
+	if bind.PreparedStatement == "" {
 		bind.PreparedStatement = "0"
 	}
 
@@ -120,11 +120,11 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	}
 
 	numParams := stmt.NumParams()
-	if numParams != len(bind.Parameters){
+	if numParams != len(bind.Parameters) {
 		return mysql.ErrMalformPacket
 	}
 
-	if numParams > 0{
+	if numParams > 0 {
 		paramTypes := stmt.GetParamsType()
 
 		args := make([]types.Datum, numParams)
@@ -150,9 +150,9 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 	// Bind 完成后创建 Portal，Portal Name 由客户端传送过来
 	// 果如 Portal Name 为空则表示为临时门户，用"0"作为默认 Name
 	// 这个位置没有进行真正的 Portal 生成，只是绑定 StmtID 在后面的阶段可以通过 Portal Name 找到 Statement ID
-	if bind.DestinationPortal != ""{
+	if bind.DestinationPortal != "" {
 		vars.Portal[bind.DestinationPortal] = stmtID
-	}else {
+	} else {
 		vars.Portal["0"] = stmtID
 	}
 
@@ -169,7 +169,7 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	vars := cc.ctx.GetSessionVars()
 
 	// 无论是 Stmt Name 还是 Portal Name 当为临时语句的时候，默认 Name 为 "0"
-	if desc.Name == ""{
+	if desc.Name == "" {
 		desc.Name = "0"
 	}
 
@@ -199,11 +199,11 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	// 将解析阶段解析出的参数类型获取到，并转换为PgSQL数据类型传回到客户端
 	paramsType := stmt.GetParamsType()
 	pgType := make([]uint32, numParams)
-	for i,_ := range paramsType{
+	for i := range paramsType {
 		pgType[i] = convertMySQLDataTypeToPgSQLDataType(paramsType[i])
 	}
 
-	if err := cc.writeParameterDescription(pgType); err != nil{
+	if err := cc.writeParameterDescription(pgType); err != nil {
 		return err
 	}
 
@@ -335,7 +335,6 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind, boundParams [][]byte) error {
 	// todo 传参为文本 text 格式时候的处理
 
-
 	for i := 0; i < len(args); i++ {
 
 		// todo 使用boundParams
@@ -357,14 +356,15 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			nilDatum.SetNull()
 			args[i] = nilDatum
 			continue
-		case mysql.TypeTiny:{
-			if isUnsigned {
-				args[i] = types.NewUintDatum(uint64(uint8(bind.Parameters[i][0])))
-			} else {
-				args[i] = types.NewIntDatum(int64(int8(bind.Parameters[i][0])))
+		case mysql.TypeTiny:
+			{
+				if isUnsigned {
+					args[i] = types.NewUintDatum(uint64(uint8(bind.Parameters[i][0])))
+				} else {
+					args[i] = types.NewIntDatum(int64(int8(bind.Parameters[i][0])))
+				}
+				continue
 			}
-			continue
-		}
 
 		case mysql.TypeShort, mysql.TypeYear:
 			valInt, err := strconv.Atoi(string(bind.Parameters[i]))
@@ -379,7 +379,7 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeInt24, mysql.TypeLong:
-			valInt, err :=strconv.Atoi(string(bind.Parameters[i]))
+			valInt, err := strconv.Atoi(string(bind.Parameters[i]))
 			if err != nil {
 				return err
 			}
@@ -391,7 +391,7 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeLonglong:
-			valInt, err :=strconv.Atoi(string(bind.Parameters[i]))
+			valInt, err := strconv.Atoi(string(bind.Parameters[i]))
 			if err != nil {
 				return err
 			}
@@ -496,9 +496,9 @@ func parseExecArgs(sc *stmtctx.StatementContext, args []types.Datum, boundParams
 		switch tp {
 		case mysql.TypeNull:
 			var nilDatum types.Datum
-				nilDatum.SetNull()
-				args[i] = nilDatum
-				continue
+			nilDatum.SetNull()
+			args[i] = nilDatum
+			continue
 
 		case mysql.TypeTiny:
 			if len(paramValues) < (pos + 1) {

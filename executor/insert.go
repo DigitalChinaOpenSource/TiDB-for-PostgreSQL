@@ -20,8 +20,8 @@ import (
 	"runtime/trace"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/table"

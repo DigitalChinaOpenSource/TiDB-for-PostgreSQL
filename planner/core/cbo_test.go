@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/kv"

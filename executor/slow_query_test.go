@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/variable"

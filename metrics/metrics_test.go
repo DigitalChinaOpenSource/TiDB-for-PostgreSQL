@@ -16,9 +16,9 @@ package metrics
 import (
 	"testing"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 )
 
 func TestT(t *testing.T) {

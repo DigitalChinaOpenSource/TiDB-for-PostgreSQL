@@ -18,10 +18,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/danjacques/gofslock/fslock"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/config"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"

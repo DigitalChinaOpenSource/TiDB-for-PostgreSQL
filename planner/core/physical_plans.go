@@ -347,7 +347,6 @@ func (ts *PhysicalTableScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (er
 	return err
 }
 
-
 // IsPartition returns true and partition ID if it's actually a partition.
 func (ts *PhysicalTableScan) IsPartition() (bool, int64) {
 	return ts.isPartition, ts.physicalTableID
@@ -404,7 +403,7 @@ type PhysicalProjection struct {
 // SetParamType 从PhysicalProjection计划中获取参数类型
 func (p *PhysicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := p.children; childPlans != nil {
-		for _,childPlan := range childPlans {
+		for _, childPlan := range childPlans {
 			err = childPlan.SetParamType(paramExprs)
 			if err != nil {
 				return nil
@@ -754,7 +753,7 @@ type PhysicalSelection struct {
 // SetParamType 从PhysicalSelection计划中获取参数类型
 func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	if childPlans := p.children; childPlans != nil {
-		for _,childPlan := range childPlans {
+		for _, childPlan := range childPlans {
 			if err = childPlan.SetParamType(paramExprs); err != nil {
 				return err
 			}
@@ -762,7 +761,7 @@ func (p *PhysicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err
 	}
 
 	if p.Conditions != nil {
-		DeepFirstTravsalTree(p.Conditions,paramExprs,&p.Schema().Columns)
+		DeepFirstTravsalTree(p.Conditions, paramExprs, &p.Schema().Columns)
 	}
 	return err
 }
@@ -943,7 +942,7 @@ func DeepFirstTravsalTree(exprs []expression.Expression, paramExprs *[]ast.Param
 // 当遇到这种情况，我们就在递归过程中直接将参数（这里可能是column或者是constant）返回上层。在上层的逻辑中再调用SetParamTypes设置参数进去。
 func DoDeepFirstTraverSal(args []expression.Expression, paramExprs *[]ast.ParamMarkerExpr, cols *[]*expression.Column) []expression.Expression {
 	//left不是终结点，还可以往下遍历
-	var lRet,rRet []expression.Expression
+	var lRet, rRet []expression.Expression
 	if len(args) == 2 {
 		if left, ok := args[0].(*expression.ScalarFunction); ok {
 			lRet = DoDeepFirstTraverSal(left.Function.GetArgs(), paramExprs, cols)
@@ -976,7 +975,7 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 			if column, ok := args[0].(*expression.Column); ok {
 			cycle:
 				for _, col := range *cols {
-					for _,expr := range *paramExprs {
+					for _, expr := range *paramExprs {
 						if paramMarker, ok := expr.(*driver.ParamMarkerExpr); ok && col.OrigName == column.OrigName &&
 							paramMarker.Offset == constant.Offset {
 							paramMarker.TexprNode.Type = *col.RetType
@@ -987,7 +986,7 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 			}
 		}
 		return nil
-	}else {
+	} else {
 		// todo 完善多参数的处理逻辑
 		return nil
 	}
@@ -995,7 +994,7 @@ func SetParamTypes(args []expression.Expression, paramExprs *[]ast.ParamMarkerEx
 
 // CheckParamFullySeted 检查params是否完全设置完毕
 func CheckParamFullySeted(paramExprs *[]ast.ParamMarkerExpr) bool {
-	for _,p := range *paramExprs {
+	for _, p := range *paramExprs {
 		if p.(*driver.ParamMarkerExpr).Type.Tp == 0 {
 			return false
 		}

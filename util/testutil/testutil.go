@@ -29,9 +29,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/check"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"

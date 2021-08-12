@@ -158,7 +158,6 @@ func dumpLengthEncodedStringByBigEndian(buffer []byte, bytes []byte) []byte {
 	return buffer
 }
 
-
 func dumpUint16(buffer []byte, n uint16) []byte {
 	buffer = append(buffer, byte(n))
 	buffer = append(buffer, byte(n>>8))
@@ -471,7 +470,7 @@ func dumpTextRow(buffer []byte, columns []*ColumnInfo, row chunk.Row) ([]byte, e
 // dumpRowData 向客户端写会RowData
 // PgSQL 在扩展查询中，会指定每一列返回数据的格式，可能是Text(0)或者Binary(1)
 // 当 resultFormat 只有一个值，代表着整行格式都为Text(0)或者Binary(1)
-func dumpRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) ([]byte,error) {
+func dumpRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) ([]byte, error) {
 	if len(rf) == 1 {
 		if rf[0] == 1 {
 			return dumpBinaryRowData(data, columns, row)
@@ -480,14 +479,14 @@ func dumpRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) 
 		}
 	}
 
-	return dumpTextOrBinaryRowData(data , columns , row , rf)
+	return dumpTextOrBinaryRowData(data, columns, row, rf)
 }
 
 // dumpBinaryRowData 向客户端以 Binary 格式写回 RowData
 // MySQL 报文协议为小端序，在 PgSQL 中报文为大端序
 // 每次只写入一行数据
 // 这里只写向缓存，并不发送
-func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte,error) {
+func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte, error) {
 	data = pgio.AppendUint16(data, uint16(len(columns)))
 
 	for i := range columns {
@@ -544,7 +543,7 @@ func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byt
 // dumpTextRowData 向客户端以 Text 格式写回 RowData
 // 每次只写入一行数据
 // 这里只写向缓存，并不发送
-func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte,error)  {
+func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte, error) {
 	data = pgio.AppendUint16(data, uint16(len(columns)))
 	tmp := make([]byte, 0, 20)
 	for i, col := range columns {

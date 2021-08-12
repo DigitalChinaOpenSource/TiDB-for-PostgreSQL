@@ -16,8 +16,8 @@ package chunk
 import (
 	"testing"
 
-	"github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/check"
 	"github.com/pingcap/tidb/types"
 )
 

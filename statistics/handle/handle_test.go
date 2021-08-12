@@ -20,10 +20,10 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/session"

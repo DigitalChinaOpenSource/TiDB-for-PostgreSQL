@@ -18,8 +18,8 @@ package expression
 import (
 	"testing"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/types"
 )
 

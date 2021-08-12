@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"sync"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/util"

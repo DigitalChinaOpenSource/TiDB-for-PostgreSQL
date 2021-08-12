@@ -16,12 +16,12 @@ package mocktikv
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/pingcap/errors"
-	"github.com/pingcap/kvproto/pkg/coprocessor"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/golang/protobuf/proto"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/kvproto/pkg/coprocessor"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/statistics"
 	"github.com/pingcap/tidb/types"

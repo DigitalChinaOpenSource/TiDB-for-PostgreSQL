@@ -34,8 +34,7 @@ type Config struct {
 
 // NewConfig creates a new Config and sets default values.
 func NewConfig() *Config {
-	return &Config{
-	}
+	return &Config{}
 }
 
 // FormatDSN formats the config into a dsn string which can be used in sql.Open
@@ -48,7 +47,7 @@ func (cfg *Config) FormatDSN() string {
 
 	//password = ...
 	if len(cfg.password) > 0 {
-		buf.WriteString("password=" + cfg.password +" ")
+		buf.WriteString("password=" + cfg.password + " ")
 	}
 
 	//host = ...

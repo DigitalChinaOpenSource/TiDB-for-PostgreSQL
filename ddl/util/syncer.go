@@ -23,9 +23,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/metrics"
 	"github.com/pingcap/tidb/owner"
 	tidbutil "github.com/pingcap/tidb/util"

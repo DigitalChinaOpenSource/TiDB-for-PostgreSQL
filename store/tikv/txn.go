@@ -23,11 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/dgryski/go-farm"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/kv/memdb"
 	"github.com/pingcap/tidb/metrics"

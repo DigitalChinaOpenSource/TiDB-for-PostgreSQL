@@ -33,12 +33,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/session"
@@ -72,15 +72,15 @@ type TiDBContext struct {
 // TiDBStatement implements PreparedStatement.
 // PGSQL Modified
 type TiDBStatement struct {
-	id          uint32
-	numParams   int
-	boundParams [][]byte
-	paramsType  []byte
-	ctx         *TiDBContext
-	rs          ResultSet
-	sql         string
-	columnInfo []*ColumnInfo
-	args       []types.Datum
+	id           uint32
+	numParams    int
+	boundParams  [][]byte
+	paramsType   []byte
+	ctx          *TiDBContext
+	rs           ResultSet
+	sql          string
+	columnInfo   []*ColumnInfo
+	args         []types.Datum
 	resultFormat []int16
 }
 
@@ -227,7 +227,7 @@ func (ts *TiDBStatement) GetResultFormat() []int16 {
 }
 
 // SetResultFormat 设置结果返回的格式 0 为 Text, 1 为 Binary
-func (ts *TiDBStatement) SetResultFormat(rf []int16){
+func (ts *TiDBStatement) SetResultFormat(rf []int16) {
 	ts.resultFormat = rf
 }
 

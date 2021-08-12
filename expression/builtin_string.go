@@ -40,10 +40,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/types"
@@ -99,7 +99,7 @@ var (
 	_ functionClass = &instrFunctionClass{}
 	_ functionClass = &loadFileFunctionClass{}
 	_ functionClass = &weightStringFunctionClass{}
-	_ functionClass	= &currentDatabaseFunctionClass{}
+	_ functionClass = &currentDatabaseFunctionClass{}
 	_ functionClass = &pgSettingsDatabaseFunctionClass{}
 )
 

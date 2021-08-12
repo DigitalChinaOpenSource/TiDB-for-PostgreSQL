@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	zaplog "github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/util/logutil"
 	tracing "github.com/uber/jaeger-client-go/config"
 )

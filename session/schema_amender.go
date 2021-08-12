@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/errors"
 	pb "github.com/pingcap/kvproto/pkg/kvrpcpb"
-	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/pingcap/tidb/ddl"
 	"github.com/pingcap/tidb/executor"
 	"github.com/pingcap/tidb/expression"
