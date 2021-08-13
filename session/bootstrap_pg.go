@@ -117,7 +117,7 @@ const (
     admin_option TINYINT(1) NOT NULL
 );`
 
-	CreateTablePgAuthId = `CREATE TABLE IF NOT EXISTS postgres.pg_authid
+	CreateTablePgAuthID = `CREATE TABLE IF NOT EXISTS postgres.pg_authid
 (
     oid INTEGER(32) UNSIGNED NOT NULL,
     rolname VARCHAR(32) NOT NULL,
@@ -260,7 +260,7 @@ const (
     setconfig TEXT
 );`
 
-	CreateTablePgDefaultAcl = `CREATE TABLE IF NOT EXISTS postgres.pg_default_acl
+	CreateTablePgDefaultACL = `CREATE TABLE IF NOT EXISTS postgres.pg_default_acl
 (
     oid INTEGER(32) UNSIGNED NOT NULL,
     defaclrole INTEGER(32) UNSIGNED NOT NULL,

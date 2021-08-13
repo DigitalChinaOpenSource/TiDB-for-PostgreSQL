@@ -19,17 +19,17 @@ import "bytes"
 // Supports options according to the pq documentation:
 // https://pkg.go.dev/github.com/lib/pq#hdr-Connection_String_Parameters
 type Config struct {
-	dbname                    string // The name of the database to connect to
-	user                      string // The user to sign in as
-	password                  string // The user's password
-	host                      string // The host to connect to. Values that start with / are for unix domain sockets. (default is localhost)
-	port                      string // The port to bind to. (default is 5432)
-	sslmode                   string // Whether to use SSL (options are disable, required, verify-ca, verify-full)
-	fallback_application_name string // An application_name to fall back to if one isn't provided.
-	connect_timeout           string // Maximum wait for connection, in seconds. Zero or not specified means wait indefinitely.
-	sslcert                   string // Cert file location. The file must contain PEM encoded data.
-	sslkey                    string // Key file location. The file must contain PEM encoded data.
-	sslrootcert               string // The location of the root certificate file. The file must contain PEM encoded data.
+	dbname                  string // The name of the database to connect to
+	user                    string // The user to sign in as
+	password                string // The user's password
+	host                    string // The host to connect to. Values that start with / are for unix domain sockets. (default is localhost)
+	port                    string // The port to bind to. (default is 5432)
+	sslmode                 string // Whether to use SSL (options are disable, required, verify-ca, verify-full)
+	fallbackApplicationName string // An application_name to fall back to if one isn't provided.
+	connectTimeout          string // Maximum wait for connection, in seconds. Zero or not specified means wait indefinitely.
+	sslcert                 string // Cert file location. The file must contain PEM encoded data.
+	sslkey                  string // Key file location. The file must contain PEM encoded data.
+	sslrootcert             string // The location of the root certificate file. The file must contain PEM encoded data.
 }
 
 // NewConfig creates a new Config and sets default values.

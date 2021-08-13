@@ -39,12 +39,12 @@ func handleTooBigPrecision(m *mysql.SQLError, te *terror.Error, sql string) (*pg
 //handleInvalidUseOfNull 处理设置字段非空时由于原本存在空数据而导致的错误
 // eg.Invalid use of NULL value
 func handleInvalidUseOfNull(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
-	upperSql, beforeTable, beforeCol, empty := strings.ToUpper(sql), "TABLE", "MODIFY", " "
-	tableStart := strings.Index(upperSql, beforeTable) + len(beforeTable)
+	upperSQL, beforeTable, beforeCol, empty := strings.ToUpper(sql), "TABLE", "MODIFY", " "
+	tableStart := strings.Index(upperSQL, beforeTable) + len(beforeTable)
 	tableLen := strings.Index(strings.Trim(sql[tableStart:], empty), empty)
 	table := strings.Trim(sql[tableStart:], empty)[:tableLen]
 
-	colStart := strings.Index(upperSql, beforeCol) + len(beforeCol)
+	colStart := strings.Index(upperSQL, beforeCol) + len(beforeCol)
 	colLen := strings.Index(strings.Trim(sql[colStart:], empty), empty)
 	col := strings.Trim(sql[colStart:], empty)[:colLen]
 
@@ -88,17 +88,17 @@ func handleInvalidGroupFuncUse(m *mysql.SQLError, te *terror.Error, sql string) 
 	where, having := "WHERE", "HAVING"
 	funcList := [...]string{"AVG(", "BIT_AND(", "BIT_OR(", "BIT_XOR(", "COUNT(", "GROUP_CONCAT(", "JSON_ARRAYAGG(", "JSON_OBJECTAGG(",
 		"MAX(", "MIN(", "STD(", "STDDEV(", "STDDEV_POP(", "STDDEV_SAMP(", "SUM(", "VAR_POP(", "VAR_SAMP(", "VARIANCE("}
-	upperSql := strings.ToUpper(sql)
+	upperSQL := strings.ToUpper(sql)
 
 	//错误是where子句使用聚合函数。所以检查的起点就是where的位置，终点是having子句
-	whereIndex := strings.Index(upperSql, where)
-	havingIndex := strings.Index(upperSql, having)
+	whereIndex := strings.Index(upperSQL, where)
+	havingIndex := strings.Index(upperSQL, having)
 
 	//在where子句中的第一个聚合函数位置
 	firstIndex := len(sql)
 
 	for _, f := range funcList {
-		fIndex := strings.Index(upperSql, f)
+		fIndex := strings.Index(upperSQL, f)
 		if havingIndex == -1 {
 			if fIndex != -1 && fIndex > whereIndex && fIndex < firstIndex {
 				firstIndex = fIndex
@@ -159,14 +159,14 @@ func handleFiledSpecifiedTwice(m *mysql.SQLError, te *terror.Error, sql string) 
 func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string) (*pgproto3.ErrorResponse, error) {
 	del, empty, point, comma := "DELETE", " ", ".", ","
 	columnStart := strings.Index(strings.ToUpper(sql), del) + len(del)
-	cutSql := strings.Trim(sql[columnStart:], empty)
+	cutSQL := strings.Trim(sql[columnStart:], empty)
 	// eg1. delete a.name from test
 	// eg2. delete id from test
 	// eg3 delete id,name from test
-	pointLen := strings.Index(cutSql, point)
-	commaLen := strings.Index(cutSql, comma)
-	emptyLen := strings.Index(cutSql, empty)
-	finalLen := len(cutSql)
+	pointLen := strings.Index(cutSQL, point)
+	commaLen := strings.Index(cutSQL, comma)
+	emptyLen := strings.Index(cutSQL, empty)
+	finalLen := len(cutSQL)
 	if pointLen != -1 && finalLen > pointLen {
 		finalLen = pointLen
 	}
@@ -176,7 +176,7 @@ func handleUnknownTableInDelete(m *mysql.SQLError, te *terror.Error, sql string)
 	if emptyLen != -1 && finalLen > emptyLen {
 		finalLen = emptyLen
 	}
-	column := cutSql[:finalLen]
+	column := cutSQL[:finalLen]
 	pgMsg := fmt.Sprintf("syntax error at or near \"%s\"", column)
 
 	position := strings.Index(sql, column) + 1
@@ -205,9 +205,9 @@ func handleCantDropFieldOrKey(m *mysql.SQLError, te *terror.Error, sql string) (
 	column := msg[columnStart : columnStart+columnLen]
 
 	tableStart := strings.Index(strings.Trim(strings.ToUpper(sql), empty), beforeTable) + len(beforeTable)
-	cutSql := strings.Trim(sql[tableStart:], empty)
-	tableLen := strings.Index(cutSql, empty)
-	table := cutSql[:tableLen]
+	cutSQL := strings.Trim(sql[tableStart:], empty)
+	tableLen := strings.Index(cutSQL, empty)
+	table := cutSQL[:tableLen]
 
 	pgMsg := fmt.Sprintf("column \"%s\" of relation \"%s\" does not exist", column, table)
 
