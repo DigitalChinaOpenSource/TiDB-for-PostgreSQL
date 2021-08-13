@@ -59,6 +59,7 @@ import (
 	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/pdapi"
 )
+// todo Table names in system tables need to be replaced with lower case
 
 const (
 	// TableSchemata is the string constant of infoschema table.
@@ -308,7 +309,7 @@ const (
 	TablePgTablePrivileges = "table_privileges"
 	// TablePgTables contains all tables and views defined in the current database.
 	// https://www.postgresql.org/docs/13/infoschema-tables.html
-	TablePgTables = "tables"
+	TablePgTables = "TABLES"
 	// TablePgTransforms contains information about the transforms defined in the current database.
 	// https://www.postgresql.org/docs/13/infoschema-transforms.html
 	TablePgTransforms = "transforms"
