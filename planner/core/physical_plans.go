@@ -89,15 +89,15 @@ type PhysicalTableReader struct {
 }
 
 // SetParamType 从tableReader计划中获取参数类型
-func (tr *PhysicalTableReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
-	if childPlans := tr.children; childPlans != nil {
+func (p *PhysicalTableReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childPlans := p.children; childPlans != nil {
 		for _, childPlan := range childPlans {
 			if err = childPlan.SetParamType(paramExprs); err != nil {
 				return err
 			}
 		}
 	}
-	if tablePlans := tr.TablePlans; tablePlans != nil {
+	if tablePlans := p.TablePlans; tablePlans != nil {
 		for _, tablePlan := range tablePlans {
 			if err = tablePlan.SetParamType(paramExprs); err != nil {
 				return err
@@ -164,6 +164,7 @@ type PhysicalIndexReader struct {
 	OutputColumns []*expression.Column
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from physicalIndexReader
 // todo 获取PhysicalIndexReader计划中的参数类型
 func (p *PhysicalIndexReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -212,6 +213,7 @@ type PhysicalIndexLookUpReader struct {
 	PushedLimit *PushedDownLimit
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalIndexLookUpReader
 // todo 从PhysicalIndexLookUpReader计划中获取参数类型
 func (p *PhysicalIndexLookUpReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -231,6 +233,7 @@ type PhysicalIndexMergeReader struct {
 	tablePlan PhysicalPlan
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalIndexMergeReader
 // todo 从PhysicalIndexMergeReader计划中获取参数类型
 func (p *PhysicalIndexMergeReader) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -276,6 +279,7 @@ type PhysicalIndexScan struct {
 	DoubleRead bool
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalIndexScan
 // todo 从PhysicalIndexScan计划中获取参数类型
 func (p *PhysicalIndexScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -422,6 +426,7 @@ type PhysicalTopN struct {
 	Count   uint64
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalTopN
 // todo 从PhysicalTopN中获取参数类型
 func (lt *PhysicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -434,6 +439,7 @@ type PhysicalApply struct {
 	OuterSchema []*expression.CorrelatedColumn
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalApply
 // todo 从PhysicalApply计划中获取参数类型
 func (la *PhysicalApply) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -529,6 +535,7 @@ type PhysicalIndexJoin struct {
 	InnerHashKeys []*expression.Column
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalIndexJoin
 // todo 从PhysicalIndexJoin计划中获取参数类型
 func (p *PhysicalIndexJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -568,6 +575,7 @@ type PhysicalMergeJoin struct {
 	Desc bool
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalMergeJoin
 // todo 从PhysicalMergeJoin中获取参数类型
 func (join *PhysicalMergeJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -579,6 +587,7 @@ type PhysicalBroadCastJoin struct {
 	globalChildIndex int
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalBroadCastJoin
 // todo 从PhysicalBroadCastJoin计划中获取参数类型
 func (lock *PhysicalBroadCastJoin) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -594,6 +603,7 @@ type PhysicalLock struct {
 	PartitionedTable []table.PartitionedTable
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalLock
 // todo 从PhysicalLock计划中获取参数类型
 func (lock *PhysicalLock) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -607,6 +617,7 @@ type PhysicalLimit struct {
 	Count  uint64
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalLimit
 // todo 从PhysicalLimit计划中获取参数类型
 func (p *PhysicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -617,6 +628,7 @@ type PhysicalUnionAll struct {
 	physicalSchemaProducer
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalUnionAll
 // todo 从PhysicalUnionAll计划中获取参数类型
 func (unionAll *PhysicalUnionAll) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -629,8 +641,9 @@ type basePhysicalAgg struct {
 	GroupByItems []expression.Expression
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from basePhysicalAgg
 // todo 从basePhysicalAgg计划中获取参数类型
-func (agg *basePhysicalAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+func (p *basePhysicalAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -663,6 +676,7 @@ type PhysicalHashAgg struct {
 	basePhysicalAgg
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalHashAgg
 // todo 从PhysicalHashAgg中获取参数类型
 func (agg *PhysicalHashAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -682,7 +696,8 @@ type PhysicalStreamAgg struct {
 	basePhysicalAgg
 }
 
-// SetParamType todo 从PhysicalStreamAgg孔家中获取参数类型
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalStreamAgg
+// todo 从PhysicalStreamAgg孔家中获取参数类型
 func (agg *PhysicalStreamAgg) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -694,6 +709,7 @@ type PhysicalSort struct {
 	ByItems []*util.ByItems
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalSort
 // todo 从PhysicalSort计划中获取参数类型
 func (ls *PhysicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -711,7 +727,8 @@ type NominalSort struct {
 	OnlyColumn bool
 }
 
-//todo 从NominalSort计划中获取参数类型
+// SetParamType set the parameter type in ParamMarkerExpr from NominalSort
+// todo 从NominalSort计划中获取参数类型
 func (sort *NominalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -725,6 +742,7 @@ type PhysicalUnionScan struct {
 	HandleCol *expression.Column
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalUnionScan
 // todo 从PhysicalUnionScan获取参数类型
 func (p *PhysicalUnionScan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -771,6 +789,7 @@ type PhysicalMaxOneRow struct {
 	basePhysicalPlan
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalMaxOneRow
 // todo 从PhysicalMaxOneRow计划中获取参数类型
 func (p *PhysicalMaxOneRow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -787,6 +806,7 @@ type PhysicalTableDual struct {
 	names []*types.FieldName
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalTableDual
 // todo 从PhysicalTableDual计划中获取参数类型
 func (p *PhysicalTableDual) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -812,6 +832,7 @@ type PhysicalWindow struct {
 	Frame           *WindowFrame
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalWindow
 // todo 从PhysicalWindow获取参数类型
 func (p *PhysicalWindow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -836,6 +857,7 @@ type PhysicalShuffle struct {
 	HashByItems  []expression.Expression
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalShuffle
 // todo 从PhysicalShuffle计划中获取参数类型
 func (shuffle *PhysicalShuffle) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -858,6 +880,7 @@ type PhysicalShuffleDataSourceStub struct {
 	Worker unsafe.Pointer
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalShuffleDataSourceStub
 // todo 从PhysicalShuffleDataSourceStub计划中获取参数类型
 func (p *PhysicalShuffleDataSourceStub) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -893,6 +916,7 @@ type PhysicalShow struct {
 	ShowContents
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalShow
 // todo 从PhysicalShow计划中获取参数类型
 func (show *PhysicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
@@ -905,6 +929,7 @@ type PhysicalShowDDLJobs struct {
 	JobNumber int64
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PhysicalShowDDLJobs
 // todo 从PhysicalShowDDLJobs中获取参数类型
 func (ddl *PhysicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err

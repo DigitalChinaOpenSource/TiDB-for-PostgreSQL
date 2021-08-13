@@ -224,7 +224,7 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	return
 }
 
-// NeedPassword
+// NeedPassword returns true if password is required for the given user
 func (p *UserPrivileges) NeedPassword(user, host string) bool {
 	mysqlPriv := p.Handle.Get()
 	record := mysqlPriv.connectionVerification(user, host)

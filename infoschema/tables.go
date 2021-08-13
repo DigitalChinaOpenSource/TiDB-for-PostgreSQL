@@ -288,18 +288,18 @@ const (
 	// TablePgSequences contains all sequences defined in the current database.
 	// https://www.postgresql.org/docs/13/infoschema-sequences.html
 	TablePgSequences = "sequences"
-	// TablePgSqlFeatures contains information about which formal features defined in the SQL standard are supported by PostgreSQL.
+	// TablePgSQLFeatures contains information about which formal features defined in the SQL standard are supported by PostgreSQL.
 	// https://www.postgresql.org/docs/13/infoschema-sql-features.html
-	TablePgSqlFeatures = "sql_features"
-	// TablePgSqlImplementationInfo contains information about various aspects that are left implementation-defined by the SQL standard.
+	TablePgSQLFeatures = "sql_features"
+	// TablePgSQLImplementationInfo contains information about various aspects that are left implementation-defined by the SQL standard.
 	// https://www.postgresql.org/docs/13/infoschema-sql-implementation-info.html
-	TablePgSqlImplementationInfo = "sql_implementation_info"
-	// TablePgSqlParts contains information about which of the several parts of the SQL standard are supported by PostgreSQL.
+	TablePgSQLImplementationInfo = "sql_implementation_info"
+	// TablePgSQLParts contains information about which of the several parts of the SQL standard are supported by PostgreSQL.
 	// https://www.postgresql.org/docs/13/infoschema-sql-parts.html
-	TablePgSqlParts = "sql_parts"
-	// TablePgSqlSizing contains information about various size limits and maximum values in PostgreSQL.
+	TablePgSQLParts = "sql_parts"
+	// TablePgSQLSizing contains information about various size limits and maximum values in PostgreSQL.
 	// https://www.postgresql.org/docs/13/infoschema-sql-sizing.html
-	TablePgSqlSizing = "sql_sizing"
+	TablePgSQLSizing = "sql_sizing"
 	// TablePgTableConstraints contains all constraints belonging to tables that the current user owns or has some privilege other than SELECT on.
 	// https://www.postgresql.org/docs/13/infoschema-table-constraints.html
 	TablePgTableConstraints = "table_constraints"
@@ -454,10 +454,10 @@ var tableIDMap = map[string]int64{
 	TablePgRoutines:                           autoid.InformationSchemaDBID + 104,
 	TablePgSchemata:                           autoid.InformationSchemaDBID + 105,
 	TablePgSequences:                          autoid.InformationSchemaDBID + 106,
-	TablePgSqlFeatures:                        autoid.InformationSchemaDBID + 107,
-	TablePgSqlImplementationInfo:              autoid.InformationSchemaDBID + 108,
-	TablePgSqlParts:                           autoid.InformationSchemaDBID + 109,
-	TablePgSqlSizing:                          autoid.InformationSchemaDBID + 110,
+	TablePgSQLFeatures:                        autoid.InformationSchemaDBID + 107,
+	TablePgSQLImplementationInfo:              autoid.InformationSchemaDBID + 108,
+	TablePgSQLParts:                           autoid.InformationSchemaDBID + 109,
+	TablePgSQLSizing:                          autoid.InformationSchemaDBID + 110,
 	TablePgTableConstraints:                   autoid.InformationSchemaDBID + 111,
 	TablePgTablePrivileges:                    autoid.InformationSchemaDBID + 112,
 	TablePgTables:                             autoid.InformationSchemaDBID + 113,
@@ -2000,9 +2000,9 @@ var pgTableSequencesCols = []columnInfo{
 	{name: "COMMENT", tp: mysql.TypeVarchar, size: 64, comment: "TiDB Table Cols"},
 }
 
-// pgTableSqlFeaturesCols is table sql_features columns
+// pgTableSQLFeaturesCols is table sql_features columns
 // https://www.postgresql.org/docs/13/infoschema-sql-features.html
-var pgTableSqlFeaturesCols = []columnInfo{
+var pgTableSQLFeaturesCols = []columnInfo{
 	{name: "feature_id", tp: mysql.TypeVarchar, size: 64},
 	{name: "feature_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "sub_feature_id", tp: mysql.TypeVarchar, size: 64},
@@ -2012,9 +2012,9 @@ var pgTableSqlFeaturesCols = []columnInfo{
 	{name: "comments", tp: mysql.TypeVarchar, size: 64},
 }
 
-// pgTableSqlImplementationInfoCols is table sql_implementation_info columns
+// pgTableSQLImplementationInfoCols is table sql_implementation_info columns
 // https://www.postgresql.org/docs/13/infoschema-sql-implementation-info.html
-var pgTableSqlImplementationInfoCols = []columnInfo{
+var pgTableSQLImplementationInfoCols = []columnInfo{
 	{name: "implementation_info_id", tp: mysql.TypeVarchar, size: 64},
 	{name: "implementation_info_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "integer_value", tp: mysql.TypeVarchar, size: 64},
@@ -2022,9 +2022,9 @@ var pgTableSqlImplementationInfoCols = []columnInfo{
 	{name: "comments", tp: mysql.TypeVarchar, size: 64},
 }
 
-// pgTableSqlPartsCols is table sql_parts columns
+// pgTableSQLPartsCols is table sql_parts columns
 // https://www.postgresql.org/docs/13/infoschema-sql-parts.html
-var pgTableSqlPartsCols = []columnInfo{
+var pgTableSQLPartsCols = []columnInfo{
 	{name: "feature_id", tp: mysql.TypeVarchar, size: 64},
 	{name: "feature_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "is_supported", tp: mysql.TypeVarchar, size: 64},
@@ -2034,7 +2034,7 @@ var pgTableSqlPartsCols = []columnInfo{
 
 // pgTableSqlSizing is table sql_sizing columns
 // https://www.postgresql.org/docs/13/infoschema-sql-sizing.html
-var pgTableSqlSizingCols = []columnInfo{
+var pgTableSQLSizingCols = []columnInfo{
 	{name: "sizing_id", tp: mysql.TypeInt24, size: 64},
 	{name: "sizing_name", tp: mysql.TypeVarchar, size: 64},
 	{name: "supported_value", tp: mysql.TypeInt24, size: 64},
@@ -2956,10 +2956,10 @@ var tableNameToColumns = map[string][]columnInfo{
 	TablePgRoutines:                           pgTableRoutinesCols,
 	TablePgSchemata:                           pgTableSchemataCols,
 	TablePgSequences:                          pgTableSequencesCols,
-	TablePgSqlFeatures:                        pgTableSqlFeaturesCols,
-	TablePgSqlImplementationInfo:              pgTableSqlImplementationInfoCols,
-	TablePgSqlParts:                           pgTableSqlPartsCols,
-	TablePgSqlSizing:                          pgTableSqlSizingCols,
+	TablePgSQLFeatures:                        pgTableSQLFeaturesCols,
+	TablePgSQLImplementationInfo:              pgTableSQLImplementationInfoCols,
+	TablePgSQLParts:                           pgTableSQLPartsCols,
+	TablePgSQLSizing:                          pgTableSQLSizingCols,
 	TablePgTableConstraints:                   pgTableTableConstraintsCols,
 	TablePgTablePrivileges:                    pgTableTablePrivilegesCols,
 	TablePgTables:                             pgTableTablesCols,

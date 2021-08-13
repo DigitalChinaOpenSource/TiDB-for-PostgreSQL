@@ -474,9 +474,8 @@ func dumpRowData(data []byte, columns []*ColumnInfo, row chunk.Row, rf []int16) 
 	if len(rf) == 1 {
 		if rf[0] == 1 {
 			return dumpBinaryRowData(data, columns, row)
-		} else {
-			return dumpTextRowData(data, columns, row)
 		}
+		return dumpTextRowData(data, columns, row)
 	}
 
 	return dumpTextOrBinaryRowData(data, columns, row, rf)
