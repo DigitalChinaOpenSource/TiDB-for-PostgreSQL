@@ -17,8 +17,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/util/mock"
 )
 

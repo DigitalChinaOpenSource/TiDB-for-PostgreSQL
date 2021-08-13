@@ -14,8 +14,8 @@
 package metrics
 
 import (
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

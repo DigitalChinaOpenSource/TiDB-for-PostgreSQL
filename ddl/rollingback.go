@@ -14,10 +14,10 @@
 package ddl
 
 import (
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/meta"
 	"github.com/pingcap/tidb/util/logutil"
 	"go.uber.org/zap"

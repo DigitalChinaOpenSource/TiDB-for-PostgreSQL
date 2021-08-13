@@ -41,12 +41,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/opcode"
+	"github.com/gogo/protobuf/proto"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
@@ -911,17 +911,17 @@ var funcs = map[string]functionClass{
 	ast.SetVal:  &setValFunctionClass{baseFunctionClass{ast.SetVal, 2, 2}},
 
 	// Pg function
-	ast.PgFuncCurrentDatabase: &currentDatabaseFunctionClass{baseFunctionClass{ast.PgFuncCurrentDatabase,0,0}},
-	ast.PgFuncSetConfig: &pgSettingsDatabaseFunctionClass{baseFunctionClass{ast.PgFuncSetConfig,2,3}},
-	ast.PgFuncEncodingToChar: &pgEncodingToCharFunctionClass{baseFunctionClass{ast.PgFuncEncodingToChar,1,1}},
-	ast.PgFuncHasDatabasePrivilege: &pgHasDatabasePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasDatabasePrivilege,2,3}},
-	ast.PgFuncHasTablePrivilege: &pgHasTablePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasTablePrivilege,2,3}},
-	ast.PgFuncHasSchemaPrivilege: &pgHasSchemaPrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasSchemaPrivilege,2,3}},
-	ast.PgFuncIsInRecovery: &pgIsInRecoveryFunctionClass{baseFunctionClass{ast.PgFuncIsInRecovery,0,0}},
-	ast.PgFuncIsWalReplayPaused: &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused,0,0}},
-	ast.PgFuncGetUserById: &pgGetUserByIdFunctionClass{baseFunctionClass{ast.PgFuncGetUserById,1,1}},
-	ast.PgFuncShobjDescription: &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription,2,2}},
-	ast.PgFuncObjDescription: &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription,1,1}},
+	ast.PgFuncCurrentDatabase:      &currentDatabaseFunctionClass{baseFunctionClass{ast.PgFuncCurrentDatabase, 0, 0}},
+	ast.PgFuncSetConfig:            &pgSettingsDatabaseFunctionClass{baseFunctionClass{ast.PgFuncSetConfig, 2, 3}},
+	ast.PgFuncEncodingToChar:       &pgEncodingToCharFunctionClass{baseFunctionClass{ast.PgFuncEncodingToChar, 1, 1}},
+	ast.PgFuncHasDatabasePrivilege: &pgHasDatabasePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasDatabasePrivilege, 2, 3}},
+	ast.PgFuncHasTablePrivilege:    &pgHasTablePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasTablePrivilege, 2, 3}},
+	ast.PgFuncHasSchemaPrivilege:   &pgHasSchemaPrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasSchemaPrivilege, 2, 3}},
+	ast.PgFuncIsInRecovery:         &pgIsInRecoveryFunctionClass{baseFunctionClass{ast.PgFuncIsInRecovery, 0, 0}},
+	ast.PgFuncIsWalReplayPaused:    &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused, 0, 0}},
+	ast.PgFuncGetUserById:          &pgGetUserByIDFunctionClass{baseFunctionClass{ast.PgFuncGetUserById, 1, 1}},
+	ast.PgFuncShobjDescription:     &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription, 2, 2}},
+	ast.PgFuncObjDescription:       &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription, 1, 1}},
 }
 
 // IsFunctionSupported check if given function name is a builtin sql function.

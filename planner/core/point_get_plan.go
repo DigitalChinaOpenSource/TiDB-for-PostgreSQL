@@ -18,7 +18,6 @@ import (
 	"fmt"
 	math2 "math"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -26,6 +25,7 @@ import (
 	"github.com/DigitalChinaOpenSource/DCParser/opcode"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	ptypes "github.com/DigitalChinaOpenSource/DCParser/types"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/infoschema"
 	"github.com/pingcap/tidb/kv"
@@ -70,8 +70,9 @@ type PointGetPlan struct {
 	Path *util.AccessPath
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from PointGetPlan
 // todo PointGetPlan计划中获取参数类型
-func (pointGet *PointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
+func (p *PointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
 	return nil
 }
 
@@ -251,6 +252,7 @@ type BatchPointGetPlan struct {
 	Path *util.AccessPath
 }
 
+// SetParamType set the parameter type in ParamMarkerExpr from BatchPointGetPlan
 // todo 从BatchPointGetPlan计划中获取参数类型
 func (p *BatchPointGetPlan) SetParamType(paramExprs *[]ast.ParamMarkerExpr) error {
 	return nil

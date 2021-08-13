@@ -16,10 +16,10 @@ package tikv
 import (
 	"context"
 
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
-	"github.com/DigitalChinaOpenSource/DCParser/terror"
 	"github.com/pingcap/tidb/kv"
 )
 

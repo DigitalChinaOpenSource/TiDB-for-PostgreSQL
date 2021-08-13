@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cznic/mathutil"
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/sessionctx"

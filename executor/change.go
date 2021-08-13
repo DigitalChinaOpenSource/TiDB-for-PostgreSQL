@@ -17,8 +17,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb-tools/tidb-binlog/node"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/util/chunk"

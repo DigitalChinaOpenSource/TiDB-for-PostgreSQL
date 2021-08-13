@@ -314,7 +314,7 @@ func (p *LogicalProjection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err
 				return err
 
 			}
-				return err
+			return err
 		}
 	}
 	return err
@@ -358,13 +358,16 @@ type LogicalAggregation struct {
 }
 
 // SetParamType todo 设置参数类型
-func (p *LogicalAggregation) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
-	if childs := p.children; childs != nil {
+func (la *LogicalAggregation) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := la.children; childs != nil {
 		for _, child := range childs {
-			child.SetParamType(paramExprs)
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 // HasDistinct shows whether LogicalAggregation has functions with distinct.
@@ -456,7 +459,7 @@ func (p *LogicalSelection) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err 
 		}
 	}
 	if p.Conditions != nil {
-		DeepFirstTravsalTree(p.Conditions,paramExprs,&p.Schema().Columns)
+		DeepFirstTravsalTree(p.Conditions, paramExprs, &p.Schema().Columns)
 	}
 	return err
 }
@@ -609,7 +612,7 @@ type DataSource struct {
 }
 
 // SetParamType todo 设置参数类型
-func (p *DataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+func (ds *DataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -1034,10 +1037,13 @@ type LogicalSort struct {
 }
 
 // SetParamType todo 设置参数类型
-func (p *LogicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
-	if childs := p.children; childs != nil {
+func (ls *LogicalSort) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := ls.children; childs != nil {
 		for _, child := range childs {
-			child.SetParamType(paramExprs)
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return err
@@ -1064,7 +1070,7 @@ type LogicalTopN struct {
 }
 
 // SetParamType todo 设置参数类型
-func (p *LogicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+func (lt *LogicalTopN) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
 
@@ -1221,10 +1227,10 @@ type ShowContents struct {
 	User      *auth.UserIdentity   // Used for show grants.
 	Roles     []*auth.RoleIdentity // Used for show grants.
 
-	Full        bool
-	IfNotExists bool // Used for `show create database if not exists`.
-	GlobalScope bool // Used by show variables.
-	Extended    bool // Used for `show extended columns from ...`
+	Full         bool
+	IfNotExists  bool // Used for `show create database if not exists`.
+	GlobalScope  bool // Used by show variables.
+	Extended     bool // Used for `show extended columns from ...`
 	VariableName string
 }
 

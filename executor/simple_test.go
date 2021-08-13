@@ -16,12 +16,12 @@ package executor_test
 import (
 	"context"
 
-	. "github.com/pingcap/check"
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	. "github.com/pingcap/check"
+	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/domain"
 	"github.com/pingcap/tidb/executor"
@@ -447,7 +447,7 @@ func (s *testSuite7) TestUser(c *C) {
 	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password 'xxx';`
 	_, err = tk.Exec(createUserSQL)
 	c.Assert(terror.ErrorEqual(executor.ErrPasswordFormat, err), IsTrue, Commentf("err %v", err))
-//	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password '*3D56A309CD04FA2EEF181462E59011F075C89548';`
+	//	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password '*3D56A309CD04FA2EEF181462E59011F075C89548';`
 	createUserSQL = `CREATE USER 'test1'@'localhost' identified by password 'md5f87360da467d468620ddb9d4370942ae';`
 	tk.MustExec(createUserSQL)
 	dropUserSQL = `DROP USER 'test1'@'localhost';`

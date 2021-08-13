@@ -414,6 +414,7 @@ func (e *memtableRetriever) setDataForStatisticsInTable(schema *model.DBInfo, ta
 	}
 	e.rows = append(e.rows, rows...)
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromTables(ctx sessionctx.Context, schemas []*model.DBInfo) error {
 	tableRowsMap, colLengthMap, err := tableStatsCache.get(ctx)
@@ -751,6 +752,7 @@ func (e *memtableRetriever) setDataFromPartitions(ctx sessionctx.Context, schema
 	e.rows = rows
 	return nil
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromIndexes(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
@@ -822,6 +824,7 @@ func (e *memtableRetriever) setDataFromIndexes(ctx sessionctx.Context, schemas [
 	}
 	e.rows = rows
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromViews(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
@@ -934,6 +937,7 @@ func (e *memtableRetriever) setDataFromEngines() {
 	)
 	e.rows = rows
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromCharacterSets() {
 	var rows [][]types.Datum
@@ -945,6 +949,7 @@ func (e *memtableRetriever) setDataFromCharacterSets() {
 	}
 	e.rows = rows
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromCollations() {
 	var rows [][]types.Datum
@@ -960,6 +965,7 @@ func (e *memtableRetriever) setDataFromCollations() {
 	}
 	e.rows = rows
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) dataForCollationCharacterSetApplicability() {
 	var rows [][]types.Datum
@@ -1001,6 +1007,7 @@ func (e *memtableRetriever) dataForTiDBClusterInfo(ctx sessionctx.Context) error
 	e.rows = rows
 	return nil
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromKeyColumnUsage(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
@@ -1562,6 +1569,7 @@ func (e *memtableRetriever) setDataForServersInfo() error {
 	e.rows = rows
 	return nil
 }
+
 // todo can delete it after a full postgresQL compliant system table is implemented
 func (e *memtableRetriever) setDataFromSequences(ctx sessionctx.Context, schemas []*model.DBInfo) {
 	checker := privilege.GetPrivilegeManager(ctx)
@@ -1908,9 +1916,9 @@ func adjustColumns(input [][]types.Datum, outColumns []*model.ColumnInfo, table 
 
 type pgMemTableRetriever struct {
 	dummyCloser
-	table		*model.TableInfo
-	columns 	[]*model.ColumnInfo
-	retrieved  	bool
+	table       *model.TableInfo
+	columns     []*model.ColumnInfo
+	retrieved   bool
 	initialized bool
 	rows        [][]types.Datum
 	dbs         []*model.DBInfo
@@ -1919,7 +1927,7 @@ type pgMemTableRetriever struct {
 	rowIdx      int
 }
 
-func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Context)([][]types.Datum, error) {
+func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Context) ([][]types.Datum, error) {
 	if e.retrieved {
 		return nil, nil
 	}
@@ -1945,9 +1953,9 @@ func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Cont
 		case infoschema.TablePgSequences:
 			e.setDataForPgSequences(sctx, dbs)
 		case infoschema.TablePgViews:
-			e.setDataForPgViews(sctx,dbs)
+			e.setDataForPgViews(sctx, dbs)
 		case infoschema.TablePgTableConstraints:
-			e.setDataForPgTableConstraints(sctx,dbs)
+			e.setDataForPgTableConstraints(sctx, dbs)
 		case infoschema.TablePgCharacterSets:
 			e.setDataForPgCharacterSets()
 		case infoschema.TablePgKeyColumnUsage:
@@ -1979,11 +1987,11 @@ func (e *pgMemTableRetriever) retrieve(ctx context.Context, sctx sessionctx.Cont
 
 // setDataForPgInformationSchemaCatalogName set data for pgTable information_schema_catalog_name
 // todo 这个值应该是动态的，这里先写死
-func (e *pgMemTableRetriever) setDataForPgInformationSchemaCatalogName(){
+func (e *pgMemTableRetriever) setDataForPgInformationSchemaCatalogName() {
 	var rows [][]types.Datum
 	rows = append(rows,
 		types.MakeDatums(
-			"postgres",  // catalog_name
+			"postgres", // catalog_name
 		),
 	)
 	e.rows = rows
@@ -1994,9 +2002,9 @@ func (e *pgMemTableRetriever) setDataForPgAdministrableRoleAuthorizations() {
 	var rows [][]types.Datum
 	rows = append(rows,
 		types.MakeDatums(
-			"root",   // grantee
-			"admin",		// role_name
-			"YES",			// is_grantable
+			"root",  // grantee
+			"admin", // role_name
+			"YES",   // is_grantable
 		),
 	)
 	e.rows = rows
@@ -2026,14 +2034,14 @@ func (e *pgMemTableRetriever) setDataForPgSchemata(ctx sessionctx.Context, schem
 		}
 
 		record := types.MakeDatums(
-			"postgres", 		// catalog_name
-			schema.Name.O,         	// schema_name
-			"root",               	// schema_owner
-			nil,             		// default_character_set_catalog
-			nil,					// default_character_set_schema
-			charset,				// default_character_set_name
-			nil, 					// sql_path
-			collation,				// DEFAULT_COLLATION_NAME
+			"postgres",    // catalog_name
+			schema.Name.O, // schema_name
+			"root",        // schema_owner
+			nil,           // default_character_set_catalog
+			nil,           // default_character_set_schema
+			charset,       // default_character_set_name
+			nil,           // sql_path
+			collation,     // DEFAULT_COLLATION_NAME
 		)
 		rows = append(rows, record)
 	}
@@ -2042,7 +2050,7 @@ func (e *pgMemTableRetriever) setDataForPgSchemata(ctx sessionctx.Context, schem
 
 // setDataForPgTables set data for pgTable tables
 func (e *pgMemTableRetriever) setDataForPgTables(ctx sessionctx.Context, schemas []*model.DBInfo) error {
-	tableRowsMap, colLengthMap, err :=tableStatsCache.get(ctx)
+	tableRowsMap, colLengthMap, err := tableStatsCache.get(ctx)
 	if err != nil {
 		return err
 	}
@@ -2051,13 +2059,13 @@ func (e *pgMemTableRetriever) setDataForPgTables(ctx sessionctx.Context, schemas
 
 	var rows [][]types.Datum
 	createTimeTp := mysql.TypeDatetime
-	for _ , schema := range schemas{
-		for _, table := range schema.Tables{
+	for _, schema := range schemas {
+		for _, table := range schema.Tables {
 			collation := table.Collate
-			if collation == ""{
+			if collation == "" {
 				collation = mysql.DefaultCollationName
 			}
-			createTime := types.NewTime(types.FromGoTime(table.GetUpdateTime()),createTimeTp,types.DefaultFsp)
+			createTime := types.NewTime(types.FromGoTime(table.GetUpdateTime()), createTimeTp, types.DefaultFsp)
 
 			createOptions := ""
 
@@ -2065,28 +2073,28 @@ func (e *pgMemTableRetriever) setDataForPgTables(ctx sessionctx.Context, schemas
 				continue
 			}
 
-			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask){
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
 
-			if !table.IsView(){
-				if table.GetPartitionInfo()!=nil{
+			if !table.IsView() {
+				if table.GetPartitionInfo() != nil {
 					createOptions = "partitioned"
 				}
 				var autoIncID interface{}
-				hasAutoincID, _ :=infoschema.HasAutoIncrementColumn(table)
+				hasAutoincID, _ := infoschema.HasAutoIncrementColumn(table)
 				if hasAutoincID {
-					autoIncID, err = getAutoIncrementID(ctx,schema,table)
-					if err != nil{
+					autoIncID, err = getAutoIncrementID(ctx, schema, table)
+					if err != nil {
 						return err
 					}
 				}
 				var rowCount, dataLength, indexLength uint64
 				if table.GetPartitionInfo() == nil {
 					rowCount = tableRowsMap[table.ID]
-					dataLength,indexLength = getDataAndIndexLength(table, table.ID, rowCount, colLengthMap)
-				}else {
-					for _ , pi := range table.GetPartitionInfo().Definitions{
+					dataLength, indexLength = getDataAndIndexLength(table, table.ID, rowCount, colLengthMap)
+				} else {
+					for _, pi := range table.GetPartitionInfo().Definitions {
 						rowCount += tableRowsMap[pi.ID]
 						parDataLen, parIndexLen := getDataAndIndexLength(table, pi.ID, tableRowsMap[pi.ID], colLengthMap)
 						dataLength += parDataLen
@@ -2101,78 +2109,78 @@ func (e *pgMemTableRetriever) setDataForPgTables(ctx sessionctx.Context, schemas
 				switch schema.Name.L {
 				case util.InformationSchemaName.L, util.PerformanceSchemaName.L,
 					util.MetricSchemaName.L:
-						tableType = "SYSTEM VIEW"
+					tableType = "SYSTEM VIEW"
 				default:
 					tableType = "BASE TABLE"
 				}
 				shardingInfo := infoschema.GetShardingInfo(schema, table)
 				record := types.MakeDatums(
-					"postgres", // TABLE_CATALOG
-					schema.Name.O,         // TABLE_SCHEMA
-					table.Name.O,          // TABLE_NAME
-					tableType,             // TABLE_TYPE
-					nil,				   // self_referencing_column_name
-					nil,				   // reference_generation
-					nil,				   // user_defined_type_catalog
-					nil,				   // user_defined_type_schema
-					nil,				   // user_defined_type_name
-					nil,                   // is_insertable_into
-					nil,                   // is_typed
-					nil,                   // commit_action
-					"InnoDB",              // ENGINE
-					uint64(10),            // VERSION
-					"Compact",             // ROW_FORMAT
-					rowCount,              // TABLE_ROWS
-					avgRowLength,          // AVG_ROW_LENGTH
-					dataLength,            // DATA_LENGTH
-					uint64(0),             // MAX_DATA_LENGTH
-					indexLength,           // INDEX_LENGTH
-					uint64(0),             // DATA_FREE
-					autoIncID,             // AUTO_INCREMENT
-					createTime,            // CREATE_TIME
-					nil,                   // UPDATE_TIME
-					nil,                   // CHECK_TIME
-					collation,             // TABLE_COLLATION
-					nil,                   // CHECKSUM
-					createOptions,         // CREATE_OPTIONS
-					table.Comment,         // TABLE_COMMENT
-					table.ID,              // TIDB_TABLE_ID
-					shardingInfo,          // TIDB_ROW_ID_SHARDING_INFO
+					"postgres",    // TABLE_CATALOG
+					schema.Name.O, // TABLE_SCHEMA
+					table.Name.O,  // TABLE_NAME
+					tableType,     // TABLE_TYPE
+					nil,           // self_referencing_column_name
+					nil,           // reference_generation
+					nil,           // user_defined_type_catalog
+					nil,           // user_defined_type_schema
+					nil,           // user_defined_type_name
+					nil,           // is_insertable_into
+					nil,           // is_typed
+					nil,           // commit_action
+					"InnoDB",      // ENGINE
+					uint64(10),    // VERSION
+					"Compact",     // ROW_FORMAT
+					rowCount,      // TABLE_ROWS
+					avgRowLength,  // AVG_ROW_LENGTH
+					dataLength,    // DATA_LENGTH
+					uint64(0),     // MAX_DATA_LENGTH
+					indexLength,   // INDEX_LENGTH
+					uint64(0),     // DATA_FREE
+					autoIncID,     // AUTO_INCREMENT
+					createTime,    // CREATE_TIME
+					nil,           // UPDATE_TIME
+					nil,           // CHECK_TIME
+					collation,     // TABLE_COLLATION
+					nil,           // CHECKSUM
+					createOptions, // CREATE_OPTIONS
+					table.Comment, // TABLE_COMMENT
+					table.ID,      // TIDB_TABLE_ID
+					shardingInfo,  // TIDB_ROW_ID_SHARDING_INFO
 				)
 				rows = append(rows, record)
 			} else {
 				record := types.MakeDatums(
-					"postgres", // TABLE_CATALOG
-					schema.Name.O,         // TABLE_SCHEMA
-					table.Name.O,          // TABLE_NAME
-					"VIEW",                // TABLE_TYPE
-					nil,				   // self_referencing_column_name
-					nil,				   // reference_generation
-					nil,				   // user_defined_type_catalog
-					nil,				   // user_defined_type_schema
-					nil,				   // user_defined_type_name
-					nil,                   // is_insertable_into
-					nil,                   // is_typed
-					nil,                   // commit_action
-					nil,                   // ENGINE
-					nil,                   // VERSION
-					nil,                   // ROW_FORMAT
-					nil,                   // TABLE_ROWS
-					nil,                   // AVG_ROW_LENGTH
-					nil,                   // DATA_LENGTH
-					nil,                   // MAX_DATA_LENGTH
-					nil,                   // INDEX_LENGTH
-					nil,                   // DATA_FREE
-					nil,                   // AUTO_INCREMENT
-					createTime,            // CREATE_TIME
-					nil,                   // UPDATE_TIME
-					nil,                   // CHECK_TIME
-					nil,                   // TABLE_COLLATION
-					nil,                   // CHECKSUM
-					nil,                   // CREATE_OPTIONS
-					"VIEW",                // TABLE_COMMENT
-					table.ID,              // TIDB_TABLE_ID
-					nil,                   // TIDB_ROW_ID_SHARDING_INFO
+					"postgres",    // TABLE_CATALOG
+					schema.Name.O, // TABLE_SCHEMA
+					table.Name.O,  // TABLE_NAME
+					"VIEW",        // TABLE_TYPE
+					nil,           // self_referencing_column_name
+					nil,           // reference_generation
+					nil,           // user_defined_type_catalog
+					nil,           // user_defined_type_schema
+					nil,           // user_defined_type_name
+					nil,           // is_insertable_into
+					nil,           // is_typed
+					nil,           // commit_action
+					nil,           // ENGINE
+					nil,           // VERSION
+					nil,           // ROW_FORMAT
+					nil,           // TABLE_ROWS
+					nil,           // AVG_ROW_LENGTH
+					nil,           // DATA_LENGTH
+					nil,           // MAX_DATA_LENGTH
+					nil,           // INDEX_LENGTH
+					nil,           // DATA_FREE
+					nil,           // AUTO_INCREMENT
+					createTime,    // CREATE_TIME
+					nil,           // UPDATE_TIME
+					nil,           // CHECK_TIME
+					nil,           // TABLE_COLLATION
+					nil,           // CHECKSUM
+					nil,           // CREATE_OPTIONS
+					"VIEW",        // TABLE_COMMENT
+					table.ID,      // TIDB_TABLE_ID
+					nil,           // TIDB_ROW_ID_SHARDING_INFO
 				)
 				rows = append(rows, record)
 			}
@@ -2187,12 +2195,12 @@ func (e *pgMemTableRetriever) setDataForPgEnabledRoles() {
 	var rows [][]types.Datum
 	rows = append(rows,
 		types.MakeDatums(
-			"root",  // catalog_name
+			"root", // catalog_name
 		),
 	)
 	rows = append(rows,
 		types.MakeDatums(
-			"admin",  // catalog_name
+			"admin", // catalog_name
 		),
 	)
 	e.rows = rows
@@ -2208,7 +2216,7 @@ func (e *pgMemTableRetriever) setDataForPgCollations() {
 			isDefault = "Yes"
 		}
 		rows = append(rows,
-			types.MakeDatums("postgres","pg_catalog",collation.Name,"NO PAD", collation.CharsetName, collation.ID, isDefault, "Yes", 1),
+			types.MakeDatums("postgres", "pg_catalog", collation.Name, "NO PAD", collation.CharsetName, collation.ID, isDefault, "Yes", 1),
 		)
 	}
 	e.rows = rows
@@ -2300,7 +2308,7 @@ func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tb
 		var record = types.MakeDatums()
 		if schema.Name.O == "information_schema" {
 			record = types.MakeDatums(
-				"postgres",                // TABLE_CATALOG
+				"postgres",                           // TABLE_CATALOG
 				schema.Name.O,                        // TABLE_SCHEMA
 				tbl.Name.O,                           // TABLE_NAME
 				col.Name.O,                           // COLUMN_NAME
@@ -2314,45 +2322,45 @@ func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tb
 				nil,                                  // numeric_precision_radix
 				numericScale,                         // NUMERIC_SCALE
 				datetimePrecision,                    // DATETIME_PRECISION
-				nil,								  // interval_type
-				nil,								  // interval_precision
-				nil, 								  // character_set_catalog
-				nil,								  // character_set_schema
+				nil,                                  // interval_type
+				nil,                                  // interval_precision
+				nil,                                  // character_set_catalog
+				nil,                                  // character_set_schema
 				columnDesc.Charset,                   // CHARACTER_SET_NAME
-				"postgres",							  // collation_catalog
-				"pg_catalog",						  // collation_schema
+				"postgres",                           // collation_catalog
+				"pg_catalog",                         // collation_schema
 				columnDesc.Collation,                 // COLLATION_NAME
-				"postgres",							  // domain_catalog
-				"information_schema",				  // domain_schema
-				"sql_identifier",					  // domain_name
-				"postgres",							  // udt_catalog
+				"postgres",                           // domain_catalog
+				"information_schema",                 // domain_schema
+				"sql_identifier",                     // domain_name
+				"postgres",                           // udt_catalog
 				"pg_catalog",                         // udt_schema
-				nil,								  // udt_name
-				nil,								  // scope_catalog
-				nil,								  // scope_schema
-				nil,								  // scope_name
-				nil,								  // maximum_cardinality
-				nil,								  // dtd_identifier
-				nil,								  // is_self_referencing
-				nil,								  // is_identity
-				nil,								  // identity_generation
-				nil,								  // identity_start
-				nil,								  // identity_increment
-				nil,								  // identity_maximum
-				nil,								  // identity_minimum
-				nil,						 		  // identity_cycle
-				nil,								  // is_generated
+				nil,                                  // udt_name
+				nil,                                  // scope_catalog
+				nil,                                  // scope_schema
+				nil,                                  // scope_name
+				nil,                                  // maximum_cardinality
+				nil,                                  // dtd_identifier
+				nil,                                  // is_self_referencing
+				nil,                                  // is_identity
+				nil,                                  // identity_generation
+				nil,                                  // identity_start
+				nil,                                  // identity_increment
+				nil,                                  // identity_maximum
+				nil,                                  // identity_minimum
+				nil,                                  // identity_cycle
+				nil,                                  // is_generated
 				col.GeneratedExprString,              // GENERATION_EXPRESSION
-				nil,								  // is_updatable
+				nil,                                  // is_updatable
 				columnType,                           // COLUMN_TYPE
 				columnDesc.Key,                       // COLUMN_KEY
 				columnDesc.Extra,                     // EXTRA
 				"select,insert,update,references",    // PRIVILEGES
 				columnDesc.Comment,                   // COLUMN_COMMENT
 			)
-		}else{
+		} else {
 			record = types.MakeDatums(
-				"postgres",                // TABLE_CATALOG
+				"postgres",                           // TABLE_CATALOG
 				schema.Name.O,                        // TABLE_SCHEMA
 				tbl.Name.O,                           // TABLE_NAME
 				col.Name.O,                           // COLUMN_NAME
@@ -2366,36 +2374,36 @@ func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tb
 				nil,                                  // numeric_precision_radix
 				numericScale,                         // NUMERIC_SCALE
 				datetimePrecision,                    // DATETIME_PRECISION
-				nil,								  // interval_type
-				nil,								  // interval_precision
-				nil, 								  // character_set_catalog
-				nil,								  // character_set_schema
+				nil,                                  // interval_type
+				nil,                                  // interval_precision
+				nil,                                  // character_set_catalog
+				nil,                                  // character_set_schema
 				columnDesc.Charset,                   // CHARACTER_SET_NAME
-				nil,							  	  // collation_catalog
-				nil,						 		  // collation_schema
+				nil,                                  // collation_catalog
+				nil,                                  // collation_schema
 				columnDesc.Collation,                 // COLLATION_NAME
-				nil,							  	  // domain_catalog
-				nil,				  				  // domain_schema
-				nil,					  			  // domain_name
-				"postgres",							  // udt_catalog
+				nil,                                  // domain_catalog
+				nil,                                  // domain_schema
+				nil,                                  // domain_name
+				"postgres",                           // udt_catalog
 				"pg_catalog",                         // udt_schema
-				nil,								  // udt_name
-				nil,								  // scope_catalog
-				nil,								  // scope_schema
-				nil,								  // scope_name
-				nil,								  // maximum_cardinality
-				nil,								  // dtd_identifier
-				nil,								  // is_self_referencing
-				nil,								  // is_identity
-				nil,								  // identity_generation
-				nil,								  // identity_start
-				nil,								  // identity_increment
-				nil,								  // identity_maximum
-				nil,								  // identity_minimum
-				nil,						 		  // identity_cycle
-				nil,								  // is_generated
+				nil,                                  // udt_name
+				nil,                                  // scope_catalog
+				nil,                                  // scope_schema
+				nil,                                  // scope_name
+				nil,                                  // maximum_cardinality
+				nil,                                  // dtd_identifier
+				nil,                                  // is_self_referencing
+				nil,                                  // is_identity
+				nil,                                  // identity_generation
+				nil,                                  // identity_start
+				nil,                                  // identity_increment
+				nil,                                  // identity_maximum
+				nil,                                  // identity_minimum
+				nil,                                  // identity_cycle
+				nil,                                  // is_generated
 				col.GeneratedExprString,              // GENERATION_EXPRESSION
-				nil,								  // is_updatable
+				nil,                                  // is_updatable
 				columnType,                           // COLUMN_TYPE
 				columnDesc.Key,                       // COLUMN_KEY
 				columnDesc.Extra,                     // EXTRA
@@ -2420,7 +2428,7 @@ func (e *pgMemTableRetriever) setDataForPgSequences(ctx sessionctx.Context, sche
 				continue
 			}
 			record := types.MakeDatums(
-				"postgres",     	   // sequence_catalog
+				"postgres",                // sequence_catalog
 				schema.Name.O,             // sequence_schema
 				table.Name.O,              // sequence_name
 				nil,                       // data_type
@@ -2429,10 +2437,10 @@ func (e *pgMemTableRetriever) setDataForPgSequences(ctx sessionctx.Context, sche
 				nil,                       // numeric_scale
 				nil,                       // start_value
 				nil,                       // minimum_value
-				nil,					   // maximum_value
+				nil,                       // maximum_value
 				table.Sequence.Increment,  // INCREMENT
-				nil,					   // cycle_option
-				"postgres",				   // TABLE_CATALOG
+				nil,                       // cycle_option
+				"postgres",                // TABLE_CATALOG
 				table.Sequence.Cache,      // Cache
 				table.Sequence.CacheValue, // CACHE_VALUE
 				table.Sequence.Cycle,      // CYCLE
@@ -2468,16 +2476,16 @@ func (e *pgMemTableRetriever) setDataForPgViews(ctx sessionctx.Context, schemas 
 				continue
 			}
 			record := types.MakeDatums(
-				"postgres",           	 // TABLE_CATALOG
+				"postgres",                      // TABLE_CATALOG
 				schema.Name.O,                   // TABLE_SCHEMA
 				table.Name.O,                    // TABLE_NAME
 				table.View.SelectStmt,           // VIEW_DEFINITION
 				table.View.CheckOption.String(), // CHECK_OPTION
 				"NO",                            // IS_UPDATABLE
-				nil,							 // is_insertable_into
-				nil,							 // is_trigger_updatable
-				nil,							 // is_trigger_deletable
-				nil,							 // is_trigger_insertable_into
+				nil,                             // is_insertable_into
+				nil,                             // is_trigger_updatable
+				nil,                             // is_trigger_deletable
+				nil,                             // is_trigger_insertable_into
 				table.View.Definer.String(),     // DEFINER
 				table.View.Security.String(),    // SECURITY_TYPE
 				charset,                         // CHARACTER_SET_CLIENT
@@ -2501,10 +2509,10 @@ func (e *pgMemTableRetriever) setDataForPgTableConstraints(ctx sessionctx.Contex
 
 			if tbl.PKIsHandle {
 				record := types.MakeDatums(
-					"postgres",          // CONSTRAINT_CATALOG
+					"postgres",                // CONSTRAINT_CATALOG
 					schema.Name.O,             // CONSTRAINT_SCHEMA
 					mysql.PrimaryKeyName,      // CONSTRAINT_NAME
-					"postgres",				   // table_catalog
+					"postgres",                // table_catalog
 					schema.Name.O,             // TABLE_SCHEMA
 					tbl.Name.O,                // TABLE_NAME
 					infoschema.PrimaryKeyType, // CONSTRAINT_TYPE
@@ -2528,16 +2536,16 @@ func (e *pgMemTableRetriever) setDataForPgTableConstraints(ctx sessionctx.Contex
 					continue
 				}
 				record := types.MakeDatums(
-					"postgres", // CONSTRAINT_CATALOG
-					schema.Name.O,         // CONSTRAINT_SCHEMA
-					cname,                 // CONSTRAINT_NAME
-					"postgres",            // table_catalog
-					schema.Name.O,         // TABLE_SCHEMA
-					tbl.Name.O,            // TABLE_NAME
-					ctype,                 // CONSTRAINT_TYPE
-					nil,                   // is_deferrable
-					nil,                   // initially_deferred
-					nil,                   // enforced
+					"postgres",    // CONSTRAINT_CATALOG
+					schema.Name.O, // CONSTRAINT_SCHEMA
+					cname,         // CONSTRAINT_NAME
+					"postgres",    // table_catalog
+					schema.Name.O, // TABLE_SCHEMA
+					tbl.Name.O,    // TABLE_NAME
+					ctype,         // CONSTRAINT_TYPE
+					nil,           // is_deferrable
+					nil,           // initially_deferred
+					nil,           // enforced
 				)
 				rows = append(rows, record)
 			}
@@ -2564,7 +2572,7 @@ func (e *pgMemTableRetriever) SetDataForCollationCharacterSetApplicability() {
 	collations := collate.GetSupportedCollations()
 	for _, collation := range collations {
 		rows = append(rows,
-			types.MakeDatums("postgres","pg_catalog",collation.Name, nil, nil, collation.CharsetName),
+			types.MakeDatums("postgres", "pg_catalog", collation.Name, nil, nil, collation.CharsetName),
 		)
 	}
 	e.rows = rows
@@ -2593,10 +2601,10 @@ func pgKeyColumnUsageInTable(schema *model.DBInfo, table *model.TableInfo) [][]t
 		for _, col := range table.Columns {
 			if mysql.HasPriKeyFlag(col.Flag) {
 				record := types.MakeDatums(
-					"postgres",        // CONSTRAINT_CATALOG
+					"postgres",                   // CONSTRAINT_CATALOG
 					schema.Name.O,                // CONSTRAINT_SCHEMA
 					infoschema.PrimaryConstraint, // CONSTRAINT_NAME
-					"postgres",        			  // TABLE_CATALOG
+					"postgres",                   // TABLE_CATALOG
 					schema.Name.O,                // TABLE_SCHEMA
 					table.Name.O,                 // TABLE_NAME
 					col.Name.O,                   // COLUMN_NAME
@@ -2628,18 +2636,18 @@ func pgKeyColumnUsageInTable(schema *model.DBInfo, table *model.TableInfo) [][]t
 		for i, key := range index.Columns {
 			col := nameToCol[key.Name.L]
 			record := types.MakeDatums(
-				"postgres", // CONSTRAINT_CATALOG
-				schema.Name.O,         // CONSTRAINT_SCHEMA
-				idxName,               // CONSTRAINT_NAME
-				"postgres", // TABLE_CATALOG
-				schema.Name.O,         // TABLE_SCHEMA
-				table.Name.O,          // TABLE_NAME
-				col.Name.O,            // COLUMN_NAME
-				i+1,                   // ORDINAL_POSITION,
-				nil,                   // POSITION_IN_UNIQUE_CONSTRAINT
-				nil,                   // REFERENCED_TABLE_SCHEMA
-				nil,                   // REFERENCED_TABLE_NAME
-				nil,                   // REFERENCED_COLUMN_NAME
+				"postgres",    // CONSTRAINT_CATALOG
+				schema.Name.O, // CONSTRAINT_SCHEMA
+				idxName,       // CONSTRAINT_NAME
+				"postgres",    // TABLE_CATALOG
+				schema.Name.O, // TABLE_SCHEMA
+				table.Name.O,  // TABLE_NAME
+				col.Name.O,    // COLUMN_NAME
+				i+1,           // ORDINAL_POSITION,
+				nil,           // POSITION_IN_UNIQUE_CONSTRAINT
+				nil,           // REFERENCED_TABLE_SCHEMA
+				nil,           // REFERENCED_TABLE_NAME
+				nil,           // REFERENCED_COLUMN_NAME
 			)
 			rows = append(rows, record)
 		}
@@ -2652,18 +2660,18 @@ func pgKeyColumnUsageInTable(schema *model.DBInfo, table *model.TableInfo) [][]t
 		for i, key := range fk.Cols {
 			col := nameToCol[key.L]
 			record := types.MakeDatums(
-				"postgres", // CONSTRAINT_CATALOG
-				schema.Name.O,         // CONSTRAINT_SCHEMA
-				fk.Name.O,             // CONSTRAINT_NAME
-				"postgres", // TABLE_CATALOG
-				schema.Name.O,         // TABLE_SCHEMA
-				table.Name.O,          // TABLE_NAME
-				col.Name.O,            // COLUMN_NAME
-				i+1,                   // ORDINAL_POSITION,
-				1,                     // POSITION_IN_UNIQUE_CONSTRAINT
-				schema.Name.O,         // REFERENCED_TABLE_SCHEMA
-				fk.RefTable.O,         // REFERENCED_TABLE_NAME
-				fkRefCol,              // REFERENCED_COLUMN_NAME
+				"postgres",    // CONSTRAINT_CATALOG
+				schema.Name.O, // CONSTRAINT_SCHEMA
+				fk.Name.O,     // CONSTRAINT_NAME
+				"postgres",    // TABLE_CATALOG
+				schema.Name.O, // TABLE_SCHEMA
+				table.Name.O,  // TABLE_NAME
+				col.Name.O,    // COLUMN_NAME
+				i+1,           // ORDINAL_POSITION,
+				1,             // POSITION_IN_UNIQUE_CONSTRAINT
+				schema.Name.O, // REFERENCED_TABLE_SCHEMA
+				fk.RefTable.O, // REFERENCED_TABLE_NAME
+				fkRefCol,      // REFERENCED_COLUMN_NAME
 			)
 			rows = append(rows, record)
 		}

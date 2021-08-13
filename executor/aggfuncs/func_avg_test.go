@@ -16,9 +16,9 @@ package aggfuncs_test
 import (
 	"testing"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 )
 
 func (s *testSuite) TestMergePartialResult4Avg(c *C) {

@@ -14,7 +14,7 @@
 package session
 
 // PG SYSTEM TABLE SQL
-const(
+const (
 	CreateTablePgAggregate = `CREATE TABLE IF NOT EXISTS postgres.pg_aggregate
 (
     aggfnoid 			VARCHAR(64) NOT NULL,
@@ -117,7 +117,7 @@ const(
     admin_option TINYINT(1) NOT NULL
 );`
 
-	CreateTablePgAuthId = `CREATE TABLE IF NOT EXISTS postgres.pg_authid
+	CreateTablePgAuthID = `CREATE TABLE IF NOT EXISTS postgres.pg_authid
 (
     oid INTEGER(32) UNSIGNED NOT NULL,
     rolname VARCHAR(32) NOT NULL,
@@ -260,7 +260,7 @@ const(
     setconfig TEXT
 );`
 
-	CreateTablePgDefaultAcl = `CREATE TABLE IF NOT EXISTS postgres.pg_default_acl
+	CreateTablePgDefaultACL = `CREATE TABLE IF NOT EXISTS postgres.pg_default_acl
 (
     oid INTEGER(32) UNSIGNED NOT NULL,
     defaclrole INTEGER(32) UNSIGNED NOT NULL,
@@ -874,7 +874,7 @@ const(
 
 // PG SYSTEM VIEW SQL
 const (
-	CreateViewPgRoles = `CREATE DEFINER = root VIEW postgres.pg_roles AS
+	CreateViewPgRoles = `CREATE OR REPLACE DEFINER = root VIEW postgres.pg_roles AS
     SELECT
         rolname,
         rolsuper,
@@ -892,7 +892,7 @@ const (
     FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
     ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
 
-	CreateViewPgShadow = `CREATE DEFINER = root VIEW pg_shadow AS
+	CreateViewPgShadow = `CREATE OR REPLACE DEFINER = root VIEW pg_shadow AS
     SELECT
         rolname AS usename,
         pg_authid.oid AS usesysid,
@@ -907,7 +907,7 @@ const (
     ON (pg_authid.oid = setrole AND setdatabase = 0)
     WHERE rolcanlogin;`
 
-	CreateViewPgGroup = `CREATE DEFINER = root VIEW pg_group AS
+	CreateViewPgGroup = `CREATE OR REPLACE DEFINER = root VIEW pg_group AS
     SELECT
         rolname AS groname,
         oid AS grosysid,
@@ -915,7 +915,7 @@ const (
     FROM pg_authid
     WHERE NOT rolcanlogin;`
 
-	CreateViewPgUser = `CREATE DEFINER = root VIEW pg_user AS
+	CreateViewPgUser = `CREATE OR REPLACE DEFINER = root VIEW pg_user AS
     SELECT
         usename,
         usesysid,
@@ -928,7 +928,7 @@ const (
         useconfig
     FROM pg_shadow;`
 
-	CreateViewPgSettings = `CREATE DEFINER = root VIEW pg_settings AS
+	CreateViewPgSettings = `CREATE OR REPLACE DEFINER = root VIEW pg_settings AS
 SELECT * FROM pg_all_settings;`
 )
 
@@ -4834,12 +4834,11 @@ SELECT (ss.a).n FROM
 (13429, 'plpgsql_call_handler', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 0, 0, 'v', 'u', 0, 0, 2280, '', NULL, NULL, NULL, NULL, NULL, 'plpgsql_call_handler', '$libdir/plpgsql', NULL, NULL),
 (13430, 'plpgsql_inline_handler', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 1, 0, 2278, '2281', NULL, NULL, NULL, NULL, NULL, 'plpgsql_inline_handler', '$libdir/plpgsql', NULL, NULL),
 (13431, 'plpgsql_validator', 11, 10, 13, 1, 0, 0, '-', 'f', 0, 0, 1, 0, 'v', 'u', 1, 0, 2278, '26', NULL, NULL, NULL, NULL, NULL, 'plpgsql_validator', '$libdir/plpgsql', NULL, NULL);`
-
 )
 
 // PG PG_Catalog
 const (
-	CreatePgCalogViewPgRoles = `CREATE DEFINER = root VIEW pg_catalog.pg_roles AS
+	CreatePgCalogViewPgRoles = `CREATE OR REPLACE DEFINER = root VIEW pg_catalog.pg_roles AS
     SELECT
         rolname,
         rolsuper,
@@ -4856,6 +4855,4 @@ const (
         pg_authid.oid
     FROM postgres.pg_authid LEFT JOIN postgres.pg_db_role_setting s
     ON (postgres.pg_authid.oid = setrole AND setdatabase = 0);`
-
 )
-

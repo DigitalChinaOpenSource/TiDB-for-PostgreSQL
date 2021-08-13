@@ -19,8 +19,8 @@ import (
 	"math"
 	"time"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/executor"
 	"github.com/pingcap/tidb/metrics"
 	plannercore "github.com/pingcap/tidb/planner/core"
@@ -204,7 +204,7 @@ func (s *seqTestSuite) TestPrepared(c *C) {
 		c.Assert(fields[0].TableAsName.L, Equals, "")
 		c.Assert(fields[0].ColumnAsName.L, Equals, "(1,1) in (select 1,1)")
 
-		_, _, fields, err = tk.Se.PrepareStmt("select a from prepare3 where a = (" +
+		_, _, fields, err = tk.Se.PrepareStmt("select a from prepare3 where a = ("+
 			"select a from prepare2 where a = ?)", "")
 		c.Assert(err, IsNil)
 		c.Assert(fields[0].DBName.L, Equals, "test")

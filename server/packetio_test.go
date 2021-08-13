@@ -19,8 +19,8 @@ import (
 	"net"
 	"time"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	. "github.com/pingcap/check"
 )
 
 type PacketIOTestSuite struct {

@@ -16,10 +16,10 @@ package core
 import (
 	"context"
 
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/planner/util"
 	"github.com/pingcap/tidb/types"

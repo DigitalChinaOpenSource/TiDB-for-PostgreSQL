@@ -17,10 +17,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/pingcap/errors"
-	"github.com/pingcap/log"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/pingcap/errors"
+	"github.com/pingcap/log"
 	"go.uber.org/zap"
 )
 

@@ -16,9 +16,9 @@ package ddl
 import (
 	"sync"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/ngaut/pools"
 	"github.com/pingcap/errors"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/logutil"
 	"github.com/pingcap/tidb/util/mock"

@@ -17,10 +17,10 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/dgryski/go-farm"
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/dgryski/go-farm"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/executor/aggfuncs"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"

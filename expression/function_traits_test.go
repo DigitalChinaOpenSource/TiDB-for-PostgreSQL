@@ -14,8 +14,8 @@
 package expression
 
 import (
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	. "github.com/pingcap/check"
 )
 
 func (s *testEvaluatorSuite) TestUnfoldableFuncs(c *C) {

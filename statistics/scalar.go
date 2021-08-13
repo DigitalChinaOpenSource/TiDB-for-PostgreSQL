@@ -18,8 +18,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/cznic/mathutil"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"
 )

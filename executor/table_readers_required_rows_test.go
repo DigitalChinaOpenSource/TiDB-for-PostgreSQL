@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/cznic/mathutil"
-	. "github.com/pingcap/check"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
+	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/distsql"
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/kv"

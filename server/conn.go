@@ -45,7 +45,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 package server
 
 import (
@@ -105,11 +104,11 @@ const (
 	connStatusWaitShutdown // Notified by server to close.
 )
 
-const ProtocolVersionNumber = 196608 // 3.0
+const protocolVersionNumber = 196608 // 3.0
 const sslRequestNumber = 80877103
 const cancelRequestCode = 80877102
 const gssEncReqNumber = 80877104
-const ProtocolSSL = false
+const protocolSSL = false
 
 var (
 	queryTotalCountOk = [...]prometheus.Counter{
@@ -324,14 +323,14 @@ func (cc *clientConn) readPacket() ([]byte, error) {
 	// 后面四个字节为长度，包括自己
 	msgLength := make([]byte, 4)
 
-	if _, err := io.ReadFull(cc.bufReadConn, msgLength); err != nil{
+	if _, err := io.ReadFull(cc.bufReadConn, msgLength); err != nil {
 		return nil, err
 	}
 
 	msgLen := binary.BigEndian.Uint32(msgLength)
 
 	// 获取请求的具体信息
-	msg := make([]byte, msgLen - 4)
+	msg := make([]byte, msgLen-4)
 
 	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil {
 		return nil, err
@@ -988,51 +987,51 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 
 	dataStr := string(hack.String(data))
 	switch cmd {
-	case 'Q':            /* simple query */
+	case 'Q': /* simple query */
 		if len(data) > 0 && data[len(data)-1] == 0 {
 			data = data[:len(data)-1]
 			dataStr = string(hack.String(data))
 		}
 		return cc.handleQuery(ctx, dataStr)
-	case 'P':            /* parse */
+	case 'P': /* parse */
 		parse := pgproto3.Parse{}
 		if err := parse.Decode(data); err != nil {
 			return err
 		}
-		return cc.handleStmtPrepare(ctx,parse)
-	case 'B':            /* bind */
+		return cc.handleStmtPrepare(ctx, parse)
+	case 'B': /* bind */
 		bind := pgproto3.Bind{}
 		if err := bind.Decode(data); err != nil {
 			return err
 		}
 		return cc.handleStmtBind(ctx, bind)
-	case 'E':            /* execute */
+	case 'E': /* execute */
 		execute := pgproto3.Execute{}
 		if err := execute.Decode(data); err != nil {
 			return err
 		}
 		return cc.handleStmtExecute(ctx, execute)
-	case 'F':            /* fastpath function call */
-	case 'C':            /* close */
+	case 'F': /* fastpath function call */
+	case 'C': /* close */
 		c := pgproto3.Close{}
 		if err := c.Decode(data); err != nil {
 			return err
 		}
 		return cc.handleStmtClose(ctx, c)
-	case 'D':            /* describe */
+	case 'D': /* describe */
 		desc := pgproto3.Describe{}
 		if err := desc.Decode(data); err != nil {
 			return err
 		}
 		return cc.handleStmtDescription(ctx, desc)
-	case 'H':            /* flush */
-	case 'S':            /* sync */
+	case 'H': /* flush */
+	case 'S': /* sync */
 		return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 	case 'X':
 		return io.EOF
-	case 'd':            /* copy data */
-	case 'c':            /* copy done */
-	case 'f':            /* copy fail */
+	case 'd': /* copy data */
+	case 'c': /* copy done */
+	case 'f': /* copy fail */
 	default:
 		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 	}
@@ -1077,11 +1076,7 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 
 // writeOkWith 这个方法没什么用,后面可以考虑删除
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
-	if err := cc.writeCommandComplete(); err != nil {
-		return err
-	}
-
-	return nil
+	return cc.writeCommandComplete()
 }
 
 // writeError 向客户端写回错误信息
@@ -1113,7 +1108,7 @@ func (cc *clientConn) writeError(ctx context.Context, e error) error {
 	//读包获取sql，去除第一位的类型，
 	var sql string
 	if cc.lastPacket != nil {
-		sql = string(cc.lastPacket)[1 : ]
+		sql = string(cc.lastPacket)[1:]
 	}
 
 	// todo 完成MySQL错误与PgSQL错误的转换和返回
@@ -1459,7 +1454,7 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 
 		// 如果是预处理查询,则不需要返回ReadyForQuery
 		isPrepareStmt := rs.IsPrepareStmt()
-		if isPrepareStmt{
+		if isPrepareStmt {
 			return nil
 		}
 	} else {
@@ -1482,8 +1477,8 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, lastStm
 	}
 
 	// 如果是最后一个查询,则需要返回ReadyForQuery
-	if lastStmt{
-		if err:= cc.writeReadyForQuery(ctx,status);err!=nil {
+	if lastStmt {
+		if err := cc.writeReadyForQuery(ctx, status); err != nil {
 			return err
 		}
 	}
@@ -1521,16 +1516,16 @@ func (cc *clientConn) handleQuerySpecial(ctx context.Context) (bool, error) {
 	return handled, cc.writeCommandComplete()
 }
 
-func (cc *clientConn) handleQueryWithStmt(stmt ast.StmtNode) error{
+func (cc *clientConn) handleQueryWithStmt(stmt ast.StmtNode) error {
 	// 判断 stmt 的类型
 	// 如果是 SET 类型的语句
 	// 其余的暂不做处理
-	if set, OK := stmt.(*ast.SetStmt);OK {
+	if set, OK := stmt.(*ast.SetStmt); OK {
 		key := set.Variables[0].Name
 		value := set.Variables[0].Value.(ast.ValueExpr).GetDatumString()
 		par := make(map[string]string)
-		par[key]=value
-		if err := cc.writeParameterStatus(par); err != nil{
+		par[key] = value
+		if err := cc.writeParameterStatus(par); err != nil {
 			return err
 		}
 	}
@@ -1593,9 +1588,9 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFo
 	if mysql.HasCursorExistsFlag(serverStatus) {
 		// todo writeChunksWithFetchSize
 		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
-		return nil
+		err = nil
 	} else {
-		err = cc.writeChunks(ctx, rs,  serverStatus, resultFormat)
+		err = cc.writeChunks(ctx, rs, serverStatus, resultFormat)
 	}
 
 	return err
@@ -1660,7 +1655,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, serverStatu
 		// rowdata : 'D' + len(msg) + len(columns) + for(len(val) + val)
 		data = append(data, 'D')
 		data = pgio.AppendInt32(data, -1)
- 		for i := 0; i < rowCount; i++ {
+		for i := 0; i < rowCount; i++ {
 			data = data[0:5]
 			if len(rf) > 0 {
 				data, err = dumpRowData(data, rs.Columns(), req.GetRow(i), rf)
@@ -1681,11 +1676,8 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, serverStatu
 		}
 		reg.End()
 	}
-	if err := cc.writeCommandComplete(); err != nil {
-		return err
-	}
 
-	return nil
+	return cc.writeCommandComplete()
 }
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
@@ -1930,12 +1922,12 @@ func (cc *clientConn) handshake(ctx context.Context) error {
 	// 一般会先接收 SSLRequest 报文，决定是否开启 SSL 后，才会再次接收 StartUpMessage
 	// 如果接收的第一个包就为启动包，则为危险连接（可处理）
 	m, err := cc.ReceiveStartupMessage()
-	if err != nil{
+	if err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
 
-	switch m.(type){
+	switch m.(type) {
 	case *pgproto3.CancelRequest:
 		// todo 结束连接
 		return err
@@ -1951,28 +1943,28 @@ func (cc *clientConn) handshake(ctx context.Context) error {
 }
 
 //接收到来自客户端的SSLRequest之后，服务端需要对其进行一定的处理
-func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
-	if ProtocolSSL{
-		tlsConfig,err := loadSSLCertificates()
+func (cc *clientConn) handleSSLRequest(ctx context.Context) error {
+	if protocolSSL {
+		tlsConfig, err := loadSSLCertificates()
 		if err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
 
 		// 写回 'S' 表示使用 SSL 连接
-		if err := cc.writeSSLRequest('S', ctx); err != nil {
+		if err := cc.writeSSLRequest(ctx, 'S'); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
 
 		//将现有的连接升级为SSL连接
-		if err := cc.upgradeToTLS(tlsConfig);err != nil{
+		if err := cc.upgradeToTLS(tlsConfig); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
-	}else {
+	} else {
 		// 写回 'N' 表示不使用 SSL 连接
-		if err := cc.writeSSLRequest('N', ctx); err != nil {
+		if err := cc.writeSSLRequest(ctx, 'N'); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
@@ -2008,24 +2000,24 @@ func(cc *clientConn) handleSSLRequest(ctx context.Context) error{
 // 初始化Session时，由于TiDB中存在MySQL协议使用，会有许多参数和 PgSQL 有差异，这里会自定义部分参数直接赋值给Session
 // 用户认证时，客服端可能会断开连接，等待用户输入密码后再重新建立连接，需要注意
 // 最后发送 AuthenticationOK 或 ErrorResponse 来表式认证成功或失败
-func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *pgproto3.StartupMessage) error {
+func (cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *pgproto3.StartupMessage) error {
 
 	// 这里获取到的启动包后会发现只有部分参数
 	// 而MySQL协议会需求更多的参数
 	// 所以添加部分常量作为参数 参照客户端为 Mysql 5.6.47
 	resp := handshakeResponse41{
 		Capability: uint32(8365701),
-		Collation: uint8(28),  //gbk_chinese_ci
-		User: startupMessage.Parameters["user"],
-		DBName: startupMessage.Parameters["database"],
+		Collation:  uint8(28), //gbk_chinese_ci
+		User:       startupMessage.Parameters["user"],
+		DBName:     startupMessage.Parameters["database"],
 		Attrs: map[string]string{
-			"_os":"Win64",
-			"_client_name":"libmysql",
-			"_pid":"3692",
-			"_thread":"480",
-			"_platform":"x86_64",
-			"program_name":"mysql",
-			"_client_version":"5.6.47",
+			"_os":             "Win64",
+			"_client_name":    "libmysql",
+			"_pid":            "3692",
+			"_thread":         "480",
+			"_platform":       "x86_64",
+			"program_name":    "mysql",
+			"_client_version": "5.6.47",
 		},
 	}
 
@@ -2037,23 +2029,23 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 	cc.attrs = resp.Attrs
 
 	// 初始化Session并进行用户验证
-	if err := cc.PgOpenSessionAndDoAuth(ctx); err!= nil{
+	if err := cc.PgOpenSessionAndDoAuth(ctx); err != nil {
 		logutil.Logger(ctx).Warn("open new session failure", zap.Error(err))
 		return err
 	}
 
 	parameters := map[string]string{
-		"client_encoding": "UTF8",
-		"DateStyle": "ISO, YMD",
+		"client_encoding":   "UTF8",
+		"DateStyle":         "ISO, YMD",
 		"integer_datetimes": "on",
-		"is_superuser": "on",
-		"server_encoding": "UTF8",
-		"server_version": "version: TiDB-v4.0.11 TiDB Server (Apache License 2.0) Community Edition, PostgreSQL 12 compatible",
-		"TimeZone": "PRC",
+		"is_superuser":      "on",
+		"server_encoding":   "UTF8",
+		"server_version":    "version: TiDB-v4.0.11 TiDB Server (Apache License 2.0) Community Edition, PostgreSQL 12 compatible",
+		"TimeZone":          "PRC",
 	}
 
 	// 发送 ParameterStatus
-	if err := cc.writeParameterStatus(parameters); err != nil{
+	if err := cc.writeParameterStatus(parameters); err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2072,22 +2064,22 @@ func(cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *p
 // will return either a StartupMessage, SSLRequest, GSSEncRequest, or CancelRequest.
 func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) {
 	header := make([]byte, 4)
-	if _, err := io.ReadFull(cc.bufReadConn, header); err != nil{
+	if _, err := io.ReadFull(cc.bufReadConn, header); err != nil {
 		return nil, err
 	}
 	msgLen := int(binary.BigEndian.Uint32(header) - 4)
 
 	msg := make([]byte, msgLen)
-	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil{
+	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil {
 		return nil, err
 	}
 
 	code := binary.BigEndian.Uint32(msg)
 
 	switch code {
-	case ProtocolVersionNumber:
+	case protocolVersionNumber:
 		startMessage := &pgproto3.StartupMessage{}
-		if err := startMessage.Decode(msg); err != nil{
+		if err := startMessage.Decode(msg); err != nil {
 			return nil, err
 		}
 		return startMessage, nil
@@ -2099,13 +2091,13 @@ func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) 
 		return sslRequest, nil
 	case cancelRequestCode:
 		cancelRequest := &pgproto3.CancelRequest{}
-		if err := cancelRequest.Decode(msg); err != nil{
+		if err := cancelRequest.Decode(msg); err != nil {
 			return nil, err
 		}
 		return cancelRequest, nil
 	case gssEncReqNumber:
 		gssEncRequest := &pgproto3.GSSEncRequest{}
-		if err := gssEncRequest.Decode(msg); err != nil{
+		if err := gssEncRequest.Decode(msg); err != nil {
 			return nil, err
 		}
 		return gssEncRequest, nil
@@ -2210,7 +2202,7 @@ func (cc *clientConn) DoAuth(ctx context.Context, user *auth.UserIdentity, auth 
 	}
 
 	// 去掉第一个 'p' 和最后一个结束符，中间的为认证信息
-	auth = auth[1:len(auth)-1]
+	auth = auth[1 : len(auth)-1]
 
 	if !cc.ctx.Auth(user, auth, cc.salt) {
 		return errAccessDenied.FastGenByArgs(cc.user, user.Hostname, hasPassword)
@@ -2226,8 +2218,8 @@ func (cc *clientConn) DoAuth(ctx context.Context, user *auth.UserIdentity, auth 
 // writeSSLRequest
 // 服务端回复 'S'，表示同意SSL握手
 // 服务端回复 'N'，表示不使用SSL握手
-func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) error {
-	if err := cc.WriteData([]byte{pgRequestSSL}); err != nil{
+func (cc *clientConn) writeSSLRequest(ctx context.Context, pgRequestSSL byte) error {
+	if err := cc.WriteData([]byte{pgRequestSSL}); err != nil {
 		return err
 	}
 
@@ -2237,9 +2229,9 @@ func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) er
 // writeParameterStatus 用于写回一些参数给客户端 ParameterStatus
 // pgAdmin 需要 client_encoding 这个参数
 func (cc *clientConn) writeParameterStatus(parameters map[string]string) error {
-	for k ,v := range parameters{
+	for k, v := range parameters {
 		parameterStatus := &pgproto3.ParameterStatus{Name: k, Value: v}
-		if err :=  cc.WriteData(parameterStatus.Encode(nil)); err != nil{
+		if err := cc.WriteData(parameterStatus.Encode(nil)); err != nil {
 			return errors.New("write ParameterStatus to client failed: " + err.Error())
 		}
 	}
@@ -2249,7 +2241,7 @@ func (cc *clientConn) writeParameterStatus(parameters map[string]string) error {
 // writeAuthenticationOK 向客户端写回 AuthenticationOK
 func (cc *clientConn) writeAuthenticationOK(ctx context.Context) error {
 	authOK := &pgproto3.AuthenticationOk{}
-	if err := cc.WriteData(authOK.Encode(nil)); err != nil{
+	if err := cc.WriteData(authOK.Encode(nil)); err != nil {
 		logutil.Logger(ctx).Debug(err.Error())
 		return err
 	}
@@ -2273,7 +2265,7 @@ func (cc *clientConn) WriteRowDescription(columns []*ColumnInfo) error {
 // 这里只写向缓存，并不发送
 func (cc *clientConn) writeCommandComplete() error {
 	stmtType := strings.ToUpper(cc.ctx.GetSessionVars().StmtCtx.StmtType)
-	affectedRows := strconv.FormatUint(cc.ctx.AffectedRows(),10)
+	affectedRows := strconv.FormatUint(cc.ctx.AffectedRows(), 10)
 	var msg string
 
 	// 如果是 INSERT 语句 则需要返回 table oid
@@ -2318,7 +2310,7 @@ func (cc *clientConn) writeBindComplete() error {
 
 // writeCloseComplete 向客户端写回 BindComplete 表示绑定命令完成
 func (cc *clientConn) writeCloseComplete() error {
-	closeComplete  := pgproto3.CloseComplete{}
+	closeComplete := pgproto3.CloseComplete{}
 	return cc.WriteData(closeComplete.Encode(nil))
 }
 
@@ -2355,11 +2347,11 @@ func (cc *clientConn) WriteData(data []byte) error {
 func convertColumnInfoToRowDescription(columns []*ColumnInfo) pgproto3.RowDescription {
 	// todo 完善两者字段结构信息的转换
 
-	if strings.Contains(columns[0].Name,"("){
-		columns[0].Name = strings.Split(columns[0].Name,"(")[0]
+	if strings.Contains(columns[0].Name, "(") {
+		columns[0].Name = strings.Split(columns[0].Name, "(")[0]
 	}
 	fieldDescriptions := make([]pgproto3.FieldDescription, len(columns))
-	for index, _ := range columns {
+	for index := range columns {
 		fieldDescriptions[index] = pgproto3.FieldDescription{
 			Name:                 []byte(columns[index].Name),
 			TableOID:             0,
@@ -2378,7 +2370,7 @@ func convertColumnInfoToRowDescription(columns []*ColumnInfo) pgproto3.RowDescri
 // MySQL 数据类型为 Uint8 PgSQL数据类型为OID Uint32
 // MySQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/DigitalChinaOpenSource/DCParser@v0.0.0-20210108074737-814a888e05e2/mysql/type.go:17
 // PgSQL 数据类型查看 D:/GoRepository/pkg/mod/github.com/jackc/pgtype@v1.6.2/pgtype.go:16
-func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
+func convertMySQLDataTypeToPgSQLDataType(mysqlType uint8) uint32 {
 	// todo 完善 mysql 和 pgsql 对应的数据类型
 
 	switch mysqlType {
@@ -2392,7 +2384,7 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 		return pgtype.Float4OID
 	case mysql.TypeDouble:
 		return pgtype.Float8OID
-	case mysql.TypeNull:  //未找到对应类型
+	case mysql.TypeNull: //未找到对应类型
 		return pgtype.UnknownOID
 	case mysql.TypeTimestamp:
 		return pgtype.TimestampOID
@@ -2401,7 +2393,7 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	case mysql.TypeDate:
 		return pgtype.DateOID
 	case mysql.TypeDuration:
-		return pgtype.TimeOID  //与Time并不完全想对应
+		return pgtype.TimeOID //与Time并不完全想对应
 	case mysql.TypeDatetime:
 		return pgtype.TimestampOID
 	case mysql.TypeYear:
@@ -2417,15 +2409,15 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 	case mysql.TypeNewDecimal:
 		return pgtype.NumericOID
 	case mysql.TypeEnum:
-		return pgtype.UnknownOID  //未找到对应类型dumpLengthEncodedStringByEndian
+		return pgtype.UnknownOID //未找到对应类型dumpLengthEncodedStringByEndian
 	case mysql.TypeSet:
-		return pgtype.UnknownOID  //未找到对应类型
-	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob,mysql.TypeBlob:
+		return pgtype.UnknownOID //未找到对应类型
+	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
 		return pgtype.ByteaOID
 	case mysql.TypeVarString, mysql.TypeString:
 		return pgtype.TextOID
 	case mysql.TypeGeometry:
-		return pgtype.UnknownOID  //未找到对应类型
+		return pgtype.UnknownOID //未找到对应类型
 	default:
 		return pgtype.UnknownOID
 	}
@@ -2434,7 +2426,7 @@ func convertMySQLDataTypeToPgSQLDataType (mysqlType uint8) uint32 {
 // convertMySQLServerStatusToPgSQLServerStatus 将 MySQL 服务器状态转为 PgSQL 服务器状态
 // PgSQL 的状态有三种 'I' 表示处于空闲中 'T' 表示处于事务中 'E' 表示事务失败中
 // 而在 MySQL 中则存在多种状态，
-func convertMySQLServerStatusToPgSQLServerStatus(mysqlStatus uint16) (byte,error) {
+func convertMySQLServerStatusToPgSQLServerStatus(mysqlStatus uint16) (byte, error) {
 	// todo 完善 mysql 和 pgsql 对应的状态
 
 	switch mysqlStatus {
@@ -2446,49 +2438,50 @@ func convertMySQLServerStatusToPgSQLServerStatus(mysqlStatus uint16) (byte,error
 }
 
 // loadSSLCertificates 服务端加载证书
-func loadSSLCertificates()(tlsConfig *tls.Config,err error){
-	tlsCert ,err := tls.LoadX509KeyPair("server/certs/pgserver.crt","server/certs/pgserver.key")
-	if err!=nil {
-		println("Load X509 failed"+err.Error())
+func loadSSLCertificates() (tlsConfig *tls.Config, err error) {
+	tlsCert, err := tls.LoadX509KeyPair("server/certs/pgserver.crt", "server/certs/pgserver.key")
+	if err != nil {
+		println("Load X509 failed" + err.Error())
 	}
 	clientAutoPolicy := tls.RequireAndVerifyClientCert
 
 	//建立受信任的CA池
-	caCert,err :=ioutil.ReadFile("server/certs/pgroot.crt")
+	caCert, err := ioutil.ReadFile("server/certs/pgroot.crt")
 	if err != nil {
-		println("read ca file filed"+err.Error())
-		return nil,nil
+		println("read ca file filed" + err.Error())
+		return nil, nil
 	}
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caCert)
 	tlsConfig = &tls.Config{
-		ClientAuth: clientAutoPolicy,
-		ClientCAs: certPool,
+		ClientAuth:   clientAutoPolicy,
+		ClientCAs:    certPool,
 		Certificates: []tls.Certificate{tlsCert},
 	}
-	return tlsConfig,nil
+	return tlsConfig, nil
 }
+
 // convertMysqlErrorToPgError 从mysql消息体中获取信息转换出pgsql所需要的信息
 func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string) (response *pgproto3.ErrorResponse, err error) {
 	switch m.Code {
 	case 1007:
-		return handleCreateDBFail(m,te,sql)
+		return handleCreateDBFail(m, te, sql)
 	case 1008:
-		return handleDropDBFail(m,te,sql)
+		return handleDropDBFail(m, te, sql)
 	case 1045:
-		return handleAccessDenied(m,te,sql)
+		return handleAccessDenied(m, te, sql)
 	case 1049:
-		return handleUnknownDB(m,te,sql)
+		return handleUnknownDB(m, te, sql)
 	case 1050:
-		return handleTableExists(m,te,sql)
+		return handleTableExists(m, te, sql)
 	case 1051:
 		return handleUndefinedTable(m, te, sql)
 	case 1054:
-		return handleUnknownColumn(m,te, sql)
+		return handleUnknownColumn(m, te, sql)
 	case 1062:
-		return handleDuplicateKey(m,te,sql)
+		return handleDuplicateKey(m, te, sql)
 	case 1064:
-		return handleParseError(m,te, sql)
+		return handleParseError(m, te, sql)
 	case 1068:
 		return handleMultiplePKDefined(m, te, sql)
 	case 1091:
@@ -2502,9 +2495,9 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1113:
 		return handleTableNoColumn(m, te, sql)
 	case 1136:
-		return handleColumnMisMatch(m, te,sql)
+		return handleColumnMisMatch(m, te, sql)
 	case 1138:
-		return handleInvalidUseOfNull(m, te,sql)
+		return handleInvalidUseOfNull(m, te, sql)
 	case 1142:
 		return handleTableAccessDenied(m, te, sql)
 	case 1143:
@@ -2516,7 +2509,7 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1222:
 		return handleWrongNumberOfColsInSelect(m, te, sql)
 	case 1242:
-		return handleSubqueryNo1Row(m ,te, sql)
+		return handleSubqueryNo1Row(m, te, sql)
 	case 1248:
 		return handleDerivedMustHaveAlias(m, te, sql)
 	case 1264:
@@ -2528,10 +2521,10 @@ func convertMysqlErrorToPgError(m *mysql.SQLError, te *terror.Error, sql string)
 	case 1426:
 		return handleTooBigPrecision(m, te, sql)
 	default:
-		return &pgproto3.ErrorResponse {
-			Code: "MySQL"+strconv.Itoa(int(m.Code)),
+		return &pgproto3.ErrorResponse{
+			Code:     "MySQL" + strconv.Itoa(int(m.Code)),
 			Severity: "ERROR",
-			Message: "Unknown Error: " + m.Message,
+			Message:  "Unknown Error: " + m.Message,
 		}, err
 	}
 }

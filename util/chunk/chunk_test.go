@@ -26,9 +26,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/cznic/mathutil"
 	"github.com/pingcap/check"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/types"

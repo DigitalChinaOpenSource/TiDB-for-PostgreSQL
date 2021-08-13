@@ -21,14 +21,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DigitalChinaOpenSource/dcbr/pkg/glue"
-	"github.com/DigitalChinaOpenSource/dcbr/pkg/storage"
-	"github.com/DigitalChinaOpenSource/dcbr/pkg/task"
-	"github.com/pingcap/errors"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/DigitalChinaOpenSource/dcbr/pkg/glue"
+	"github.com/DigitalChinaOpenSource/dcbr/pkg/storage"
+	"github.com/DigitalChinaOpenSource/dcbr/pkg/task"
+	"github.com/pingcap/errors"
 	filter "github.com/pingcap/tidb-tools/pkg/table-filter"
 	pd "github.com/tikv/pd/client"
 

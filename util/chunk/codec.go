@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/cznic/mathutil"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/cznic/mathutil"
 	"github.com/pingcap/tidb/types"
 )
 

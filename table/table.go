@@ -20,8 +20,8 @@ package table
 import (
 	"context"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
+	"github.com/opentracing/opentracing-go"
 	mysql "github.com/pingcap/tidb/errno"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/meta/autoid"
