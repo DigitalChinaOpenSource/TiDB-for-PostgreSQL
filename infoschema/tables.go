@@ -59,6 +59,7 @@ import (
 	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/pdapi"
 )
+
 // todo Table names in system tables need to be replaced with lower case
 
 const (

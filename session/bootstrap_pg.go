@@ -933,6 +933,7 @@ SELECT * FROM pg_all_settings;`
 )
 
 //DATA FOR PG SYSTEM TABLE
+//nolint
 const (
 	DataForTablePgAggregate = `INSERT INTO postgres.pg_authid VALUES
 (3373, 'pg_monitor', 0, 1, 0, 0, 0, 0, 0, -1, NULL, NULL),
