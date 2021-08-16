@@ -306,7 +306,7 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 	// It holds the correct type information we want
 	schemaColumns := insertPlan.GetTableSchema().Columns
 
-	// queryColumn is the column that we are inserting into, note the order here is the same as the sql statment
+	// queryColumn is the column that we are inserting into, note the order here is the same as the sql statement
 	// aka, for sql:  "...insert into table(b, a) ... " have query columns [b, a]
 	// It holds the order in which we insert
 	queryColumns := insertPlan.Columns

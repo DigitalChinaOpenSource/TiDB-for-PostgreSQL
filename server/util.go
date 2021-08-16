@@ -544,7 +544,7 @@ func dumpBinaryRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byt
 // 这里只写向缓存，并不发送
 func dumpTextRowData(data []byte, columns []*ColumnInfo, row chunk.Row) ([]byte, error) {
 	data = pgio.AppendUint16(data, uint16(len(columns)))
-	tmp := make([]byte, 0, 20)
+	var tmp []byte
 	for i, col := range columns {
 		if row.IsNull(i) {
 			data = pgio.AppendInt32(data, -1)

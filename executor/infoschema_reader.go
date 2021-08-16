@@ -2305,7 +2305,7 @@ func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tb
 		if columnDesc.DefaultValue != nil {
 			columnDefault = fmt.Sprintf("%v", columnDesc.DefaultValue)
 		}
-		var record = types.MakeDatums()
+		var record []types.Datum
 		if schema.Name.O == "information_schema" {
 			record = types.MakeDatums(
 				"postgres",                           // TABLE_CATALOG
