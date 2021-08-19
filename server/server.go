@@ -254,19 +254,24 @@ func NewServer(cfg *config.Config, driver IDriver) (*Server, error) {
 		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 		if s.listener, err = net.Listen("tcp", addr); err == nil {
 			logutil.BgLogger().Info("server is running postgresql protocol", zap.String("addr", addr))
+			// initiate socket forwarding if we provide both host and a socket
 			if cfg.Socket != "" {
-				if s.socket, err = net.Listen("unix", s.cfg.Socket); err == nil {
-					logutil.BgLogger().Info("server redirecting", zap.String("from", s.cfg.Socket), zap.String("to", addr))
+				// if we are running go test, the real port should be avalible from tcp listener address
+				if runInGoTest && s.cfg.Port == 0 {
+					s.cfg.Port = uint(s.listener.Addr().(*net.TCPAddr).Port)
+				}
+				// in postgres socket standard, socket file name is of the form ".s.PGSQL.Port" instead of mysql's "***.sock"
+				socketFileLocation := fmt.Sprintf("%s/.s.PGSQL.%d", cfg.Socket, cfg.Port)
+				if s.socket, err = net.Listen("unix", socketFileLocation); err == nil {
+					logutil.BgLogger().Info("server redirecting", zap.String("from", socketFileLocation), zap.String("to", addr))
 					go s.forwardUnixSocketToTCP()
 				}
 			}
-			if runInGoTest && s.cfg.Port == 0 {
-				s.cfg.Port = uint(s.listener.Addr().(*net.TCPAddr).Port)
-			}
 		}
-	} else if cfg.Socket != "" {
-		if s.listener, err = net.Listen("unix", cfg.Socket); err == nil {
-			logutil.BgLogger().Info("server is running postgresql protocol", zap.String("socket", cfg.Socket))
+	} else if cfg.Socket != "" { // socket connection is used when we only provide socket directory
+		socketFileLocation := fmt.Sprintf("%s/.s.PGSQL.%d", cfg.Socket, cfg.Port)
+		if s.listener, err = net.Listen("unix", socketFileLocation); err == nil {
+			logutil.BgLogger().Info("server is running postgresql protocol via UNIX domain socket", zap.String("socket", socketFileLocation))
 		}
 	} else {
 		err = errors.New("Server not configured to listen on either -socket or -host and -port")
