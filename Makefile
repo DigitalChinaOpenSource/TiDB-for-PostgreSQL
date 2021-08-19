@@ -174,6 +174,9 @@ upload-coverage:
 ifeq ("$(TRAVIS_COVERAGE)", "1")
 	mv overalls.coverprofile coverage.txt
 	bash <(curl -s https://codecov.io/bash)
+else
+	@echo "uploading coverage."
+	bash <(curl -s https://codecov.io/bash) -t 32a48ff2-1d45-4b49-920d-1a89ed29174a
 endif
 
 gotest: failpoint-enable
