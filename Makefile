@@ -14,6 +14,7 @@
 PROJECT=tidb
 GOPATH ?= $(shell go env GOPATH)
 P=8
+TESTINGA=1
 
 # Ensure GOPATH is set before running build process.
 ifeq "$(GOPATH)" ""
