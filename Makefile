@@ -85,6 +85,10 @@ parser:
 
 dev: checklist check test
 
+# Skip explain-test
+dev-tmp: checklist check test_part_2
+	@echo "Great, all tests passed."
+
 build:
 	$(GOBUILD)
 
@@ -137,8 +141,8 @@ vet:
 	@echo "vet"
 	$(GO) vet -all $(PACKAGES) 2>&1 | $(FAIL_ON_STDOUT)
 
+# limit the static check tool to an early version as the newer version require higher go version
 staticcheck:
-	#limit the tool to an early version as the newer version require higher go version
 	$(GO) get honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.6
 	$(STATICCHECK) ./...
 
