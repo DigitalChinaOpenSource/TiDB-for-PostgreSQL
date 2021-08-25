@@ -93,3 +93,5 @@ require (
 )
 
 go 1.13
+
+replace github.com/codahale/hdrhistogram => github.com/HdrHistogram/hdrhistogram-go v0.9.0
