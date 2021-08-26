@@ -30,6 +30,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -516,4 +517,52 @@ func (ts *tidbTestSerialSuite) TestPrepareCount(c *C) {
 	err = qctx.GetStatement(stmt.ID()).Close()
 	c.Assert(err, IsNil)
 	c.Assert(atomic.LoadInt64(&variable.PreparedStmtCount), Equals, prepareCnt)
+}
+
+func (ts *tidbTestSuite) TestSocket(c *C) {
+	cfg := config.NewConfig()
+	cfg.Socket = "/tmp"
+	cfg.Port = 0
+	socketFileLocation := fmt.Sprintf("%s/.s.PGSQL.%d", cfg.Socket, cfg.Port)
+	os.Remove(socketFileLocation)
+	cfg.Host = ""
+	cfg.Status.ReportStatus = false
+
+	server, err := NewServer(cfg, ts.tidbdrv)
+	c.Assert(err, IsNil)
+	go server.Run()
+	time.Sleep(time.Millisecond * 100)
+	defer server.Close()
+
+	//a fake server client, config is override, just used to run tests
+	cli := newTestServerClient()
+	cli.runTestRegression(c, func(config *Config) {
+		config.user = "root"
+		config.host = "/tmp"
+		config.dbname = "test"
+	}, "SocketRegression")
+
+}
+
+func (ts *tidbTestSuite) TestSocketForwarding(c *C) {
+	cli := newTestServerClient()
+	cfg := config.NewConfig()
+	cfg.Socket = "/tmp"
+	cfg.Port = cli.port
+	socketFileLocation := fmt.Sprintf("%s/.s.PGSQL.%d", cfg.Socket, cfg.Port)
+	os.Remove(socketFileLocation)
+	cfg.Status.ReportStatus = false
+
+	server, err := NewServer(cfg, ts.tidbdrv)
+	c.Assert(err, IsNil)
+	cli.port = getPortFromTCPAddr(server.listener.Addr())
+	go server.Run()
+	time.Sleep(time.Millisecond * 100)
+	defer server.Close()
+
+	cli.runTestRegression(c, func(config *Config) {
+		config.user = "root"
+		config.host = "/tmp"
+		config.dbname = "test"
+	}, "SocketRegression")
 }

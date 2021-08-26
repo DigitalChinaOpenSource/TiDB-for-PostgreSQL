@@ -1,10 +1,11 @@
-# TiDB for postgresql
+# TiDB for PostgreSQL
 
 [![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LICENSE)
 [![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+[![Build Status](http://tidb4pgci.eastasia.cloudapp.azure.com:8080/buildStatus/icon?job=jenkins-tidb4pg-build)](http://tidb4pgci.eastasia.cloudapp.azure.com/:8080/job/jenkins-tidb4pg-build/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)](https://goreportcard.com/report/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![codecov](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL/branch/main/graph/badge.svg?token=OZ16DNE6JH)](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 
 ## Introduction
 
