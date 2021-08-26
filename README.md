@@ -95,10 +95,10 @@ First, download the official binary package file and unzip it.
 wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
 wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
 
-sha256sum -c tidb-latest-linux-amd64.sha256
+sha256sum -c tidb-v4.0.11-linux-amd64.sha256
 
-tar -xzf tidb-latest-linux-amd64.tar.gz
-cd tidb-latest-linux-amd64/bin
+tar -xzf tidb-v4.0.11-linux-amd64.tar.gz
+cd tidb-v4.0.11-linux-amd64/bin
 ```
 
 Second, deploy each node in the cluster in order. According to the cluster architecture of TiDB for PostgreSQL, pd nodes are deployed first, then the tikv node, and finally the TiDB for PostgreSQL node. The number of nodes in the cluster is not specified, but there is at least one of each type.
