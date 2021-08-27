@@ -289,7 +289,7 @@ func (s *TestDDLSuite) startServer(i int, fp *os.File) (*server, error) {
 	sleepTime := time.Millisecond * 250
 	startTime := time.Now()
 	for i := 0; i < s.retryCount; i++ {
-		db, err = sql.Open("mysql", fmt.Sprintf("root@(%s)/test_ddl", addr))
+		db, err = sql.Open("postgres", fmt.Sprintf("postgres://root@%s/test_ddl?sslmode=disable", addr))
 		if err != nil {
 			log.Warnf("open addr %v failed, retry count %d err %v", addr, i, err)
 			continue
