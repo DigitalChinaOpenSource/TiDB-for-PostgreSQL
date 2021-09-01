@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
+	_ "github.com/lib/pq"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/util/logutil"
@@ -615,8 +615,8 @@ func main() {
 	}
 
 	mdb, err = openDBWithRetry(
-		"mysql",
-		"root@tcp(localhost:4001)/"+dbName+"?allowAllFiles=true",
+		"postgres",
+		"postgres://root@localhost:4001/"+dbName+"?sslmode=disable",
 	)
 	if err != nil {
 		log.Fatal("open DB failed", zap.Error(err))
