@@ -579,6 +579,13 @@ func (e *SimpleExec) executeBegin(ctx context.Context, s *ast.BeginStmt) error {
 			e.ctx.GetSessionVars().TxnCtx.IsPessimistic = true
 		}
 	}
+
+	// if the isolation level is set during the transaction start
+	// it will overwrite the previously set isolation level
+	if s.IsolationLevel != "" {
+		e.ctx.GetSessionVars().TxnCtx.Isolation = s.IsolationLevel
+	}
+
 	txn, err := e.ctx.Txn(true)
 	if err != nil {
 		return err
