@@ -49,7 +49,7 @@ import (
 */
 
 // TiDB system variable names that only in session scope.
-// 增加了三个pg的系统变量 PgDateStyle PgClientMinMessage PgClientEncoding
+// Add PostgreSQL system variable
 const (
 	//PgSearchPath is the database system variable
 	PgSearchPath = "search_path"
