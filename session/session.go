@@ -2134,6 +2134,7 @@ var builtinGlobalVariable = []string{
 	variable.TiDBMultiStatementMode,
 
 	/* 三个Pg系统变量: */
+	variable.PgSearchPath,
 	variable.PgClientMinMessage,
 	variable.PgDateStyle,
 	variable.PgClientEncoding,
