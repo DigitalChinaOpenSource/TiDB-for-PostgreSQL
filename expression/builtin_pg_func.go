@@ -123,12 +123,12 @@ func (b *builtinPgEncodingToCharSig) evalString(row chunk.Row) (string, bool, er
 	return charset, false, nil
 }
 
-type EncodingToInt struct {
+type encodingToInt struct {
 	name string
 	code int
 }
 
-var encodingToChar = []EncodingToInt{
+var encodingToChar = []encodingToInt{
 	{"SQL_ASCII", 0},
 	{"EUC_JP", 20932},
 	{"EUC_CN", 20936},
@@ -354,11 +354,11 @@ func (b *builtinPgIsWalReplayPaused) evalString(row chunk.Row) (string, bool, er
 }
 
 // pg_get_userbyid
-type pgGetUserByIdFunctionClass struct {
+type pgGetUserByIDFunctionClass struct {
 	baseFunctionClass
 }
 
-func (p *pgGetUserByIdFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+func (p *pgGetUserByIDFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
 	if err := p.verifyArgs(args); err != nil {
 		return nil, err
 	}
@@ -368,21 +368,21 @@ func (p *pgGetUserByIdFunctionClass) getFunction(ctx sessionctx.Context, args []
 	}
 	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
 	bf.tp.Flen = 64
-	sig := &builtinPgGetUserByIdSig{bf}
+	sig := &builtinPgGetUserByIDSig{bf}
 	return sig, nil
 }
 
-type builtinPgGetUserByIdSig struct {
+type builtinPgGetUserByIDSig struct {
 	baseBuiltinFunc
 }
 
-func (b *builtinPgGetUserByIdSig) Clone() builtinFunc {
-	newSig := &builtinPgGetUserByIdSig{}
+func (b *builtinPgGetUserByIDSig) Clone() builtinFunc {
+	newSig := &builtinPgGetUserByIDSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }
 
-func (b *builtinPgGetUserByIdSig) evalString(row chunk.Row) (string, bool, error) {
+func (b *builtinPgGetUserByIDSig) evalString(row chunk.Row) (string, bool, error) {
 	id, isNull, err := b.args[0].EvalInt(b.ctx, row)
 	if isNull || err != nil {
 		return "", isNull, err
@@ -418,7 +418,7 @@ type builtinPgShobjDescriptionSig struct {
 }
 
 func (b *builtinPgShobjDescriptionSig) Clone() builtinFunc {
-	newSig := &builtinPgGetUserByIdSig{}
+	newSig := &builtinPgGetUserByIDSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }
@@ -452,7 +452,7 @@ type builtinPgObjDescriptionSig struct {
 }
 
 func (b *builtinPgObjDescriptionSig) Clone() builtinFunc {
-	newSig := &builtinPgGetUserByIdSig{}
+	newSig := &builtinPgGetUserByIDSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }

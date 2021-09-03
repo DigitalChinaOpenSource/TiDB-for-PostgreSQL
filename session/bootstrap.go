@@ -1334,7 +1334,7 @@ func doDDLWorks(s Session) {
 	// Create postgres pg_auth_members Table
 	mustExecute(s, CreateTablePgAuthMembers)
 	// Create postgres pg_authid Table
-	mustExecute(s, CreateTablePgAuthId)
+	mustExecute(s, CreateTablePgAuthID)
 	// Create postgres pg_cast Table
 	mustExecute(s, CreateTablePgCast)
 	// Create postgres pg_calss Table
@@ -1350,7 +1350,7 @@ func doDDLWorks(s Session) {
 	// Create postgres pg_db_role_setting Table
 	mustExecute(s, CreateTablePgDbRoleSetting)
 	// Create postgres pg_default_acl Table
-	mustExecute(s, CreateTablePgDefaultAcl)
+	mustExecute(s, CreateTablePgDefaultACL)
 	// Create postgres pg_depend Table
 	mustExecute(s, CreateTablePgDepend)
 	// Create postgres pg_description Table

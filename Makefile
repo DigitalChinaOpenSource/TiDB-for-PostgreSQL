@@ -85,6 +85,10 @@ parser:
 
 dev: checklist check test
 
+# Skip explain-test
+dev-tmp: checklist check test_part_2
+	@echo "Great, all tests passed."
+
 build:
 	$(GOBUILD)
 
@@ -137,8 +141,9 @@ vet:
 	@echo "vet"
 	$(GO) vet -all $(PACKAGES) 2>&1 | $(FAIL_ON_STDOUT)
 
+# limit the static check tool to an early version as the newer version require higher go version
 staticcheck:
-	$(GO) get honnef.co/go/tools/cmd/staticcheck
+	$(GO) get honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.6
 	$(STATICCHECK) ./...
 
 tidy:
@@ -173,6 +178,9 @@ upload-coverage:
 ifeq ("$(TRAVIS_COVERAGE)", "1")
 	mv overalls.coverprofile coverage.txt
 	bash <(curl -s https://codecov.io/bash)
+else
+	@echo "uploading coverage."
+	bash <(curl -s https://codecov.io/bash) -t 32a48ff2-1d45-4b49-920d-1a89ed29174a
 endif
 
 gotest: failpoint-enable
@@ -189,7 +197,7 @@ ifeq ("$(TRAVIS_COVERAGE)", "1")
 else
 	@echo "Running in native mode."
 	@export log_level=fatal; export TZ='Asia/Shanghai'; \
-	$(GOTEST) -ldflags '$(TEST_LDFLAGS)' -cover $(PACKAGES) -check.p true -check.timeout 4s || { $(FAILPOINT_DISABLE); exit 1; }
+	$(GOTEST) -ldflags '$(TEST_LDFLAGS)' -coverprofile=coverage.txt -covermode=atomic -cover $(PACKAGES) -check.p true -check.timeout 4s || { $(FAILPOINT_DISABLE); exit 1; }
 endif
 	@$(FAILPOINT_DISABLE)
 

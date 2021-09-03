@@ -919,7 +919,7 @@ var funcs = map[string]functionClass{
 	ast.PgFuncHasSchemaPrivilege:   &pgHasSchemaPrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasSchemaPrivilege, 2, 3}},
 	ast.PgFuncIsInRecovery:         &pgIsInRecoveryFunctionClass{baseFunctionClass{ast.PgFuncIsInRecovery, 0, 0}},
 	ast.PgFuncIsWalReplayPaused:    &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused, 0, 0}},
-	ast.PgFuncGetUserById:          &pgGetUserByIdFunctionClass{baseFunctionClass{ast.PgFuncGetUserById, 1, 1}},
+	ast.PgFuncGetUserById:          &pgGetUserByIDFunctionClass{baseFunctionClass{ast.PgFuncGetUserById, 1, 1}},
 	ast.PgFuncShobjDescription:     &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription, 2, 2}},
 	ast.PgFuncObjDescription:       &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription, 1, 1}},
 }

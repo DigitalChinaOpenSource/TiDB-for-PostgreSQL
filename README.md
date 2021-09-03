@@ -1,10 +1,11 @@
-# TiDB for postgresql
+# TiDB for PostgreSQL
 
 [![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LICENSE)
 [![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.svg?branch=main)](https://travis-ci.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+[![Build Status](http://tidb4pgci.eastasia.cloudapp.azure.com/buildStatus/icon?job=jenkins-tidb4pg-build)](http://tidb4pgci.eastasia.cloudapp.azure.com/job/jenkins-tidb4pg-build/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)](https://goreportcard.com/report/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 [![codecov](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL/branch/main/graph/badge.svg?token=OZ16DNE6JH)](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 
 ## Introduction
 
@@ -94,10 +95,10 @@ First, download the official binary package file and unzip it.
 wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
 wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
 
-sha256sum -c tidb-latest-linux-amd64.sha256
+sha256sum -c tidb-v4.0.11-linux-amd64.sha256
 
-tar -xzf tidb-latest-linux-amd64.tar.gz
-cd tidb-latest-linux-amd64/bin
+tar -xzf tidb-v4.0.11-linux-amd64.tar.gz
+cd tidb-v4.0.11-linux-amd64/bin
 ```
 
 Second, deploy each node in the cluster in order. According to the cluster architecture of TiDB for PostgreSQL, pd nodes are deployed first, then the tikv node, and finally the TiDB for PostgreSQL node. The number of nodes in the cluster is not specified, but there is at least one of each type.

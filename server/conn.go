@@ -104,11 +104,11 @@ const (
 	connStatusWaitShutdown // Notified by server to close.
 )
 
-const ProtocolVersionNumber = 196608 // 3.0
+const protocolVersionNumber = 196608 // 3.0
 const sslRequestNumber = 80877103
 const cancelRequestCode = 80877102
 const gssEncReqNumber = 80877104
-const ProtocolSSL = false
+const protocolSSL = false
 
 var (
 	queryTotalCountOk = [...]prometheus.Counter{
@@ -1076,11 +1076,7 @@ func (cc *clientConn) writeOK(ctx context.Context) error {
 
 // writeOkWith 这个方法没什么用,后面可以考虑删除
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
-	if err := cc.writeCommandComplete(); err != nil {
-		return err
-	}
-
-	return nil
+	return cc.writeCommandComplete()
 }
 
 // writeError 向客户端写回错误信息
@@ -1592,7 +1588,7 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFo
 	if mysql.HasCursorExistsFlag(serverStatus) {
 		// todo writeChunksWithFetchSize
 		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
-		return nil
+		err = nil
 	} else {
 		err = cc.writeChunks(ctx, rs, serverStatus, resultFormat)
 	}
@@ -1680,11 +1676,8 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, serverStatu
 		}
 		reg.End()
 	}
-	if err := cc.writeCommandComplete(); err != nil {
-		return err
-	}
 
-	return nil
+	return cc.writeCommandComplete()
 }
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
@@ -1951,7 +1944,7 @@ func (cc *clientConn) handshake(ctx context.Context) error {
 
 //接收到来自客户端的SSLRequest之后，服务端需要对其进行一定的处理
 func (cc *clientConn) handleSSLRequest(ctx context.Context) error {
-	if ProtocolSSL {
+	if protocolSSL {
 		tlsConfig, err := loadSSLCertificates()
 		if err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
@@ -1959,7 +1952,7 @@ func (cc *clientConn) handleSSLRequest(ctx context.Context) error {
 		}
 
 		// 写回 'S' 表示使用 SSL 连接
-		if err := cc.writeSSLRequest('S', ctx); err != nil {
+		if err := cc.writeSSLRequest(ctx, 'S'); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
@@ -1971,7 +1964,7 @@ func (cc *clientConn) handleSSLRequest(ctx context.Context) error {
 		}
 	} else {
 		// 写回 'N' 表示不使用 SSL 连接
-		if err := cc.writeSSLRequest('N', ctx); err != nil {
+		if err := cc.writeSSLRequest(ctx, 'N'); err != nil {
 			logutil.Logger(ctx).Debug(err.Error())
 			return err
 		}
@@ -2084,7 +2077,7 @@ func (cc *clientConn) ReceiveStartupMessage() (pgproto3.FrontendMessage, error) 
 	code := binary.BigEndian.Uint32(msg)
 
 	switch code {
-	case ProtocolVersionNumber:
+	case protocolVersionNumber:
 		startMessage := &pgproto3.StartupMessage{}
 		if err := startMessage.Decode(msg); err != nil {
 			return nil, err
@@ -2225,7 +2218,7 @@ func (cc *clientConn) DoAuth(ctx context.Context, user *auth.UserIdentity, auth 
 // writeSSLRequest
 // 服务端回复 'S'，表示同意SSL握手
 // 服务端回复 'N'，表示不使用SSL握手
-func (cc *clientConn) writeSSLRequest(pgRequestSSL byte, ctx context.Context) error {
+func (cc *clientConn) writeSSLRequest(ctx context.Context, pgRequestSSL byte) error {
 	if err := cc.WriteData([]byte{pgRequestSSL}); err != nil {
 		return err
 	}
@@ -2275,14 +2268,19 @@ func (cc *clientConn) writeCommandComplete() error {
 	affectedRows := strconv.FormatUint(cc.ctx.AffectedRows(), 10)
 	var msg string
 
-	// 如果是 INSERT 语句 则需要返回 table oid
-	// 当表存在 oid 时返回 oid, 不存在则 默认为 0
-	// mysql 中暂且不知道是否存在oid，现在默认为 0
-	if stmtType == "INSERT" {
+	/*
+		The following block of code handles tag field of command completion message based on query type
+		Note that:
+		For Insert statements, TiDB4PG will return "INSERT 0 {affected rows}" as there is no table oid in mysql
+	*/
+	switch stmtType {
+	case "INSERT":
 		msg = stmtType + " 0 " + affectedRows
-	} else if stmtType == "SET" {
+	case "SET":
 		msg = stmtType
-	} else {
+	case "BEGIN":
+		msg = stmtType
+	default:
 		msg = stmtType + " " + affectedRows
 	}
 	commandComplete := pgproto3.CommandComplete{CommandTag: []byte(msg)}
@@ -2430,14 +2428,16 @@ func convertMySQLDataTypeToPgSQLDataType(mysqlType uint8) uint32 {
 	}
 }
 
-// convertMySQLServerStatusToPgSQLServerStatus 将 MySQL 服务器状态转为 PgSQL 服务器状态
-// PgSQL 的状态有三种 'I' 表示处于空闲中 'T' 表示处于事务中 'E' 表示事务失败中
-// 而在 MySQL 中则存在多种状态，
+// convertMySQLServerStatusToPgSQLServerStatus converts MySQL's server status into postgreSQL's
+// In mysql, server status is a bit map of different server states, and server can be in multiple state at the same time.
+// In postgres, server is in on of the following three mutually exclusive states:
+// "T" for in transaction
+// "I" for idle
+// "E" for error
 func convertMySQLServerStatusToPgSQLServerStatus(mysqlStatus uint16) (byte, error) {
-	// todo 完善 mysql 和 pgsql 对应的状态
-
-	switch mysqlStatus {
-	case mysql.ServerStatusInTrans:
+	// TODO: Find error indicator and complete server status translation
+	switch true {
+	case mysqlStatus&mysql.ServerStatusInTrans > 0:
 		return 'T', nil
 	default:
 		return 'I', nil

@@ -2210,77 +2210,75 @@ func (s *testSuiteP2) TestIsPointGet(c *C) {
 	}
 }
 
-// TODO: This test blocked by chan, please fix it.
-//func (s *testSuiteP2) TestPointGetRepeatableRead(c *C) {
-//	tk1 := testkit.NewTestKit(c, s.store)
-//	tk1.MustExec("use test")
-//	tk1.MustExec(`create table point_get (a int, b int, c int,
-//			primary key k_a(a),
-//			unique key k_b(b))`)
-//	tk1.MustExec("insert into point_get values (1, 1, 1)")
-//	tk2 := testkit.NewTestKit(c, s.store)
-//	tk2.MustExec("use test")
-//
-//	var (
-//		step1 = "github.com/pingcap/tidb/executor/pointGetRepeatableReadTest-step1"
-//		step2 = "github.com/pingcap/tidb/executor/pointGetRepeatableReadTest-step2"
-//	)
-//
-//	c.Assert(failpoint.Enable(step1, "return"), IsNil)
-//	c.Assert(failpoint.Enable(step2, "pause"), IsNil)
-//
-//	updateWaitCh := make(chan struct{})
-//	go func() {
-//		ctx := context.WithValue(context.Background(), "pointGetRepeatableReadTest", updateWaitCh)
-//		ctx = failpoint.WithHook(ctx, func(ctx context.Context, fpname string) bool {
-//			return fpname == step1 || fpname == step2
-//		})
-//		rs, err := tk1.Se.Execute(ctx, "select c from point_get where b = 1")
-//		c.Assert(err, IsNil)
-//		result := tk1.ResultSetToResultWithCtx(ctx, rs[0], Commentf("execute sql fail"))
-//		result.Check(testkit.Rows("1"))
-//	}()
-//
-//	<-updateWaitCh // Wait `POINT GET` first time `get`
-//	c.Assert(failpoint.Disable(step1), IsNil)
-//	tk2.MustExec("update point_get set b = 2, c = 2 where a = 1")
-//	c.Assert(failpoint.Disable(step2), IsNil)
-//}
+func (s *testSuiteP2) TestPointGetRepeatableRead(c *C) {
+	tk1 := testkit.NewTestKit(c, s.store)
+	tk1.MustExec("use test")
+	tk1.MustExec(`create table point_get (a int, b int, c int,
+			primary key k_a(a),
+			unique key k_b(b))`)
+	tk1.MustExec("insert into point_get values (1, 1, 1)")
+	tk2 := testkit.NewTestKit(c, s.store)
+	tk2.MustExec("use test")
 
-// TODO: This test blocked by chan, please fix it.
-//func (s *testSuiteP2) TestBatchPointGetRepeatableRead(c *C) {
-//	tk1 := testkit.NewTestKit(c, s.store)
-//	tk1.MustExec("use test")
-//	tk1.MustExec(`create table batch_point_get (a int, b int, c int, unique key k_b(a, b, c))`)
-//	tk1.MustExec("insert into batch_point_get values (1, 1, 1), (2, 3, 4), (3, 4, 5)")
-//	tk2 := testkit.NewTestKit(c, s.store)
-//	tk2.MustExec("use test")
-//
-//	var (
-//		step1 = "github.com/pingcap/tidb/executor/batchPointGetRepeatableReadTest-step1"
-//		step2 = "github.com/pingcap/tidb/executor/batchPointGetRepeatableReadTest-step2"
-//	)
-//
-//	c.Assert(failpoint.Enable(step1, "return"), IsNil)
-//	c.Assert(failpoint.Enable(step2, "pause"), IsNil)
-//
-//	updateWaitCh := make(chan struct{})
-//	go func() {
-//		ctx := context.WithValue(context.Background(), "batchPointGetRepeatableReadTest", updateWaitCh)
-//		ctx = failpoint.WithHook(ctx, func(ctx context.Context, fpname string) bool {
-//			return fpname == step1 || fpname == step2
-//		})
-//		rs, err := tk1.Se.Execute(ctx, "select c from batch_point_get where (a, b, c) in ((1, 1, 1))")
-//		c.Assert(err, IsNil)
-//		result := tk1.ResultSetToResultWithCtx(ctx, rs[0], Commentf("execute sql fail"))
-//		result.Check(testkit.Rows("1"))
-//	}()
-//
-//	<-updateWaitCh // Wait `POINT GET` first time `get`
-//	c.Assert(failpoint.Disable(step1), IsNil)
-//	tk2.MustExec("update batch_point_get set b = 2, c = 2 where a = 1")
-//	c.Assert(failpoint.Disable(step2), IsNil)
-//}
+	var (
+		step1 = "github.com/pingcap/tidb/executor/pointGetRepeatableReadTest-step1"
+		step2 = "github.com/pingcap/tidb/executor/pointGetRepeatableReadTest-step2"
+	)
+
+	c.Assert(failpoint.Enable(step1, "return"), IsNil)
+	c.Assert(failpoint.Enable(step2, "pause"), IsNil)
+
+	updateWaitCh := make(chan struct{})
+	go func() {
+		ctx := context.WithValue(context.Background(), "pointGetRepeatableReadTest", updateWaitCh)
+		ctx = failpoint.WithHook(ctx, func(ctx context.Context, fpname string) bool {
+			return fpname == step1 || fpname == step2
+		})
+		rs, err := tk1.Se.Execute(ctx, "select c from point_get where b = 1")
+		c.Assert(err, IsNil)
+		result := tk1.ResultSetToResultWithCtx(ctx, rs[0], Commentf("execute sql fail"))
+		result.Check(testkit.Rows("1"))
+	}()
+
+	<-updateWaitCh // Wait `POINT GET` first time `get`
+	c.Assert(failpoint.Disable(step1), IsNil)
+	tk2.MustExec("update point_get set b = 2, c = 2 where a = 1")
+	c.Assert(failpoint.Disable(step2), IsNil)
+}
+
+func (s *testSuiteP2) TestBatchPointGetRepeatableRead(c *C) {
+	tk1 := testkit.NewTestKit(c, s.store)
+	tk1.MustExec("use test")
+	tk1.MustExec(`create table batch_point_get (a int, b int, c int, unique key k_b(a, b, c))`)
+	tk1.MustExec("insert into batch_point_get values (1, 1, 1), (2, 3, 4), (3, 4, 5)")
+	tk2 := testkit.NewTestKit(c, s.store)
+	tk2.MustExec("use test")
+
+	var (
+		step1 = "github.com/pingcap/tidb/executor/batchPointGetRepeatableReadTest-step1"
+		step2 = "github.com/pingcap/tidb/executor/batchPointGetRepeatableReadTest-step2"
+	)
+
+	c.Assert(failpoint.Enable(step1, "return"), IsNil)
+	c.Assert(failpoint.Enable(step2, "pause"), IsNil)
+
+	updateWaitCh := make(chan struct{})
+	go func() {
+		ctx := context.WithValue(context.Background(), "batchPointGetRepeatableReadTest", updateWaitCh)
+		ctx = failpoint.WithHook(ctx, func(ctx context.Context, fpname string) bool {
+			return fpname == step1 || fpname == step2
+		})
+		rs, err := tk1.Se.Execute(ctx, "select c from batch_point_get where (a, b, c) in ((1, 1, 1))")
+		c.Assert(err, IsNil)
+		result := tk1.ResultSetToResultWithCtx(ctx, rs[0], Commentf("execute sql fail"))
+		result.Check(testkit.Rows("1"))
+	}()
+
+	<-updateWaitCh // Wait `POINT GET` first time `get`
+	c.Assert(failpoint.Disable(step1), IsNil)
+	tk2.MustExec("update batch_point_get set b = 2, c = 2 where a = 1")
+	c.Assert(failpoint.Disable(step2), IsNil)
+}
 
 func (s *testSuite7) TestSplitRegionTimeout(c *C) {
 	c.Assert(failpoint.Enable("github.com/pingcap/tidb/store/tikv/MockSplitRegionTimeout", `return(true)`), IsNil)
@@ -6208,30 +6206,29 @@ func (s *testClusterTableSuite) TestLogSlowLogIndex(c *C) {
 		))
 }
 
-// TODO: This test blocked by waitgroup, please fix it.
-//func (s *testSplitTable) TestKillTableReader(c *C) {
-//	var retry = "github.com/pingcap/tidb/store/tikv/mockRetrySendReqToRegion"
-//	defer func() {
-//		c.Assert(failpoint.Disable(retry), IsNil)
-//	}()
-//	tk := testkit.NewTestKit(c, s.store)
-//	tk.MustExec("use test;")
-//	tk.MustExec("drop table if exists t")
-//	tk.MustExec("create table t (a int)")
-//	tk.MustExec("insert into t values (1),(2),(3)")
-//	tk.MustExec("set @@tidb_distsql_scan_concurrency=1")
-//	atomic.StoreUint32(&tk.Se.GetSessionVars().Killed, 0)
-//	c.Assert(failpoint.Enable(retry, `return(true)`), IsNil)
-//	wg := &sync.WaitGroup{}
-//	wg.Add(1)
-//	go func() {
-//		defer wg.Done()
-//		c.Assert(int(terror.ToSQLError(errors.Cause(tk.QueryToErr("select * from t")).(*terror.Error)).Code), Equals, int(executor.ErrQueryInterrupted.Code()))
-//	}()
-//	time.Sleep(1 * time.Second)
-//	atomic.StoreUint32(&tk.Se.GetSessionVars().Killed, 1)
-//	wg.Wait()
-//}
+func (s *testSplitTable) TestKillTableReader(c *C) {
+	var retry = "github.com/pingcap/tidb/store/tikv/mockRetrySendReqToRegion"
+	defer func() {
+		c.Assert(failpoint.Disable(retry), IsNil)
+	}()
+	tk := testkit.NewTestKit(c, s.store)
+	tk.MustExec("use test;")
+	tk.MustExec("drop table if exists t")
+	tk.MustExec("create table t (a int)")
+	tk.MustExec("insert into t values (1),(2),(3)")
+	tk.MustExec("set @@tidb_distsql_scan_concurrency=1")
+	atomic.StoreUint32(&tk.Se.GetSessionVars().Killed, 0)
+	c.Assert(failpoint.Enable(retry, `return(true)`), IsNil)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.Assert(int(terror.ToSQLError(errors.Cause(tk.QueryToErr("select * from t")).(*terror.Error)).Code), Equals, int(executor.ErrQueryInterrupted.Code()))
+	}()
+	time.Sleep(1 * time.Second)
+	atomic.StoreUint32(&tk.Se.GetSessionVars().Killed, 1)
+	wg.Wait()
+}
 
 func (s *testSerialSuite1) TestPrevStmtDesensitization(c *C) {
 	tk := testkit.NewTestKit(c, s.store)
