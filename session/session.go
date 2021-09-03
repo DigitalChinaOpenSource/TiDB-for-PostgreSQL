@@ -2134,6 +2134,7 @@ var builtinGlobalVariable = []string{
 	variable.TiDBMultiStatementMode,
 
 	/* PostgreSQL System Variable: */
+	variable.PgExtraFloatDigit,
 	variable.PgSearchPath,
 	variable.PgClientMinMessage,
 	variable.PgDateStyle,
