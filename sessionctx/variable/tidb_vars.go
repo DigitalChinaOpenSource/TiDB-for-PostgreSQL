@@ -49,9 +49,15 @@ import (
 */
 
 // TiDB system variable names that only in session scope.
-// 增加了三个pg的系统变量 PgDateStyle PgClientMinMessage PgClientEncoding
+// Add PostgreSQL system variable
 const (
-	//PgDatestyle is the pg database system variable
+	//PgExtraFloatDigit is the database system variable
+	PgExtraFloatDigit = "extra_float_digit"
+
+	//PgSearchPath is the database system variable
+	PgSearchPath = "search_path"
+
+	//PgDateStyle is the pg database system variable
 	PgDateStyle = "datestyle"
 
 	//PgClientMinMessage is the pg database system variable
@@ -565,6 +571,8 @@ const (
 	DefPgDateStyle        = "ISO"
 	DefPgClientMinMessage = "notice"
 	DefPgByteaOutput      = "hex"
+	DefPgSearchPath		  = "public"
+	DefPgExtraFloatDigits = 1
 )
 
 // Process global variables.
