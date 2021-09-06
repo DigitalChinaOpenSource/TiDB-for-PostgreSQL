@@ -59,10 +59,8 @@ import (
 	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/pdapi"
 )
-// todo Table names in system tables need to be replaced with lower case
 
 // todo Table names in system tables need to be replaced with lower case
-
 const (
 	// TableSchemata is the string constant of infoschema table.
 	TableSchemata = "TIDB_SCHEMATA"
