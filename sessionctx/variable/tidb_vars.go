@@ -571,7 +571,7 @@ const (
 	DefPgDateStyle        = "ISO"
 	DefPgClientMinMessage = "notice"
 	DefPgByteaOutput      = "hex"
-	DefPgSearchPath		  = "public"
+	DefPgSearchPath       = "public"
 	DefPgExtraFloatDigits = 1
 )
 

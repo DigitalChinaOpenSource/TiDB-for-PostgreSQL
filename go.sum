@@ -23,8 +23,6 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210901083130-295ed319e8ab h1:OpXxX9O/w9Iyew29NSyb1EE2TPCrh3EU/dXZ03OweEM=
-github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210901083130-295ed319e8ab/go.mod h1:3n404SkCabBM0pYRgCyXEKttOLdrmMyBaWMGvaRs/ns=
 github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210906032539-5020c84eb0ab h1:H25pUoHH6J1OPNIZjFeHgeCsKvdpBL0iiMSMAt8SlTo=
 github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210906032539-5020c84eb0ab/go.mod h1:3n404SkCabBM0pYRgCyXEKttOLdrmMyBaWMGvaRs/ns=
 github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible h1:ICQTYSnJC7i3Ns4xXGS5DMi1wTfg44woW4eWQi2ZNTQ=
