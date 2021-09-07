@@ -51,8 +51,8 @@ import (
 // TiDB system variable names that only in session scope.
 // Add PostgreSQL system variable
 const (
-	//PgExtraFloatDigit is the database system variable
-	PgExtraFloatDigit = "extra_float_digit"
+	//PgExtraFloatDigits is the database system variable
+	PgExtraFloatDigits = "extra_float_digits"
 
 	//PgSearchPath is the database system variable
 	PgSearchPath = "search_path"
