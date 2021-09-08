@@ -755,7 +755,7 @@ var defaultSysVars = []*SysVar{
 	{ScopeGlobal | ScopeSession, TiDBEnableAmendPessimisticTxn, boolToOnOff(DefTiDBEnableAmendPessimisticTxn)},
 	{ScopeGlobal | ScopeSession, TiDBMultiStatementMode, Warn},
 	//PostgreSQL Global System Variable
-	{ScopeGlobal | ScopeSession, PgExtraFloatDigit, strconv.FormatInt(DefPgExtraFloatDigits, 10)},
+	{ScopeGlobal | ScopeSession, PgExtraFloatDigits, strconv.FormatInt(DefPgExtraFloatDigits, 10)},
 	{ScopeGlobal | ScopeSession, PgSearchPath, DefPgSearchPath},
 	{ScopeGlobal | ScopeSession, PgDateStyle, DefPgDateStyle},
 	{ScopeGlobal | ScopeSession, PgClientEncoding, DefPgClientEncoding},
