@@ -1025,6 +1025,7 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		}
 		return cc.handleStmtDescription(ctx, desc)
 	case 'H': /* flush */
+		return cc.flush(ctx)
 	case 'S': /* sync */
 		return cc.writeReadyForQuery(ctx, cc.ctx.Status())
 	case 'X':
