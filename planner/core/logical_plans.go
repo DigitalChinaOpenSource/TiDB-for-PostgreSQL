@@ -611,7 +611,8 @@ type DataSource struct {
 	isForUpdateRead bool
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of dataSource plan
+// dataSource plan is always the last node of o plan tree and it will not contain any parameter.Just return nil
 func (ds *DataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -1240,7 +1241,11 @@ type LogicalShow struct {
 	ShowContents
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of logicalShow plan
+// https://www.postgresql.org/docs/current/sql-show.html
+// According to the postgresql document, any parameter won't follow the show statement.
+// Besides, show statement won't be the sub statement of any other sql statement.
+// So, Show statement doesn't need actual implement. Just return nil.
 func (p *LogicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -1252,7 +1257,10 @@ type LogicalShowDDLJobs struct {
 	JobNumber int64
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of logicalShowDDLJobs plan
+// https://www.postgresql.org/docs/current/sql-show.html
+// Actually, postgresql doesn't support the syntax like "show create table tname"
+// And showddl statement won't contain parameter. Just return nil
 func (p *LogicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
