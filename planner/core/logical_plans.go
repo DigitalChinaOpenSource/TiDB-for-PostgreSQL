@@ -1099,8 +1099,17 @@ type LogicalLimit struct {
 	limitHints limitHintInfo
 }
 
-// SetParamType todo 设置参数类型
-func (p *LogicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+// SetParamType set the parameter type of logicalLimit plan
+// when send "limit $1 offset $2",planbuilder will convert it to a tableDual plan.see why at /planner/core/logical_plan_builder.go buildLimit
+func (ll *LogicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := ll.children; childs != nil {
+		for _, child := range childs {
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
