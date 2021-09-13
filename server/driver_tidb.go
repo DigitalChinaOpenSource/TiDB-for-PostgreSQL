@@ -442,6 +442,12 @@ func (trs *tidbResultSet) IsPrepareStmt() bool {
 	return false
 }
 
+func (trs *tidbResultSet) IsReturning() bool {
+	rows := trs.recordSet.Rows()
+
+	return len(rows) > 0
+}
+
 func (trs *tidbResultSet) NewChunk() *chunk.Chunk {
 	return trs.recordSet.NewChunk()
 }
@@ -455,7 +461,11 @@ func (trs *tidbResultSet) StoreFetchedRows(rows []chunk.Row) {
 }
 
 func (trs *tidbResultSet) GetFetchedRows() []chunk.Row {
-	if trs.rows == nil {
+	rows := trs.recordSet.Rows()
+
+	if len(rows) > 0 {
+		trs.rows = rows
+	} else if trs.rows == nil {
 		trs.rows = make([]chunk.Row, 0, 1024)
 	}
 	return trs.rows
