@@ -25,7 +25,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/DigitalChinaOpenSource/DCParser"
+	parser "github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/format"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -4280,6 +4280,13 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		}
 	}
 
+	if delete.Returning != nil {
+		p, err = b.buildReturning(ctx, delete, p, delete.Returning)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	proj := LogicalProjection{Exprs: expression.Column2Exprs(p.Schema().Columns[:oldLen])}.Init(b.ctx, b.getSelectOffset())
 	proj.SetChildren(p)
 	proj.SetSchema(oldSchema.Clone())
@@ -5163,4 +5170,21 @@ func containDifferentJoinTypes(preferJoinType uint) bool {
 		cnt++
 	}
 	return cnt > 1
+}
+
+func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt, src LogicalPlan, returning *ast.ReturningClause) (p LogicalPlan, err error) {
+
+	p, err = b.buildTableRefsWithCache(ctx, delete.TableRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	returning.Fields.Fields, err = b.unfoldWildStar(p, returning.Fields.Fields)
+	if err != nil {
+		return nil, err
+	}
+
+	p.SetChildren(src)
+
+	return p, err
 }

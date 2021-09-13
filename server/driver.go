@@ -184,6 +184,7 @@ type ResultSet interface {
 	GetFetchedRows() []chunk.Row
 	Close() error
 	IsPrepareStmt() bool
+	IsReturning() bool
 }
 
 // fetchNotifier represents notifier will be called in COM_FETCH.
