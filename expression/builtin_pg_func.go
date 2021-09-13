@@ -18,11 +18,24 @@ import (
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
+	"strings"
 )
 
 var (
 	_ functionClass = &currentDatabaseFunctionClass{}
 	_ functionClass = &pgSettingsDatabaseFunctionClass{}
+	_ functionClass = &pgEncodingToCharFunctionClass{}
+	_ functionClass = &pgHasDatabasePrivilegeFunctionClass{}
+	_ functionClass = &pgHasTablePrivilegeFunctionClass{}
+	_ functionClass = &pgHasSchemaPrivilegeFunctionClass{}
+	_ functionClass = &pgIsInRecoveryFunctionClass{}
+	_ functionClass = &pgIsWalReplayPausedFunctionClass{}
+	_ functionClass = &pgGetUserByIDFunctionClass{}
+	_ functionClass = &pgShobjDescriptionFunctionClass{}
+	_ functionClass = &pgObjDescriptionFunctionClass{}
+	_ functionClass = &pgCurrentSchemaFunctionClass{}
+	_ functionClass = &pgCurrentSchemasFunctionClass{}
+	_ functionClass = &pgArrayPositionFunctionClass{}
 )
 
 type currentDatabaseFunctionClass struct {
@@ -183,14 +196,14 @@ func (p *pgHasDatabasePrivilegeFunctionClass) getFunction(ctx sessionctx.Context
 	if err := p.verifyArgs(args); err != nil {
 		return nil, err
 	}
-	argTps := make([]types.EvalType, 0, 3)
-	argTps = append(argTps, types.ETInt, types.ETString)
+	argsTps := make([]types.EvalType, 0, 3)
+	argsTps = append(argsTps, types.ETString, types.ETString)
 	if len(args) > 2 {
-		idArgTp := make([]types.EvalType, 0, 1)
-		idArgTp = append(idArgTp, types.ETInt)
-		argTps = append(idArgTp, argTps...)
+		userArgTp := make([]types.EvalType, 0, 1)
+		userArgTp = append(userArgTp, types.ETString)
+		argsTps = append(userArgTp, argsTps...)
 	}
-	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argTps...)
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argsTps...)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +241,9 @@ func (p *pgHasTablePrivilegeFunctionClass) getFunction(ctx sessionctx.Context, a
 	argsTps := make([]types.EvalType, 0, 3)
 	argsTps = append(argsTps, types.ETString, types.ETString)
 	if len(args) > 2 {
-		argsTps = append(argsTps)
+		userArgTp := make([]types.EvalType, 0, 1)
+		userArgTp = append(userArgTp, types.ETString)
+		argsTps = append(userArgTp, argsTps...)
 	}
 	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, argsTps...)
 	if err != nil {
@@ -418,7 +433,7 @@ type builtinPgShobjDescriptionSig struct {
 }
 
 func (b *builtinPgShobjDescriptionSig) Clone() builtinFunc {
-	newSig := &builtinPgGetUserByIDSig{}
+	newSig := &builtinPgShobjDescriptionSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }
@@ -437,7 +452,7 @@ func (p *pgObjDescriptionFunctionClass) getFunction(ctx sessionctx.Context, args
 	if err := p.verifyArgs(args); err != nil {
 		return nil, err
 	}
-	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt, types.ETString)
 	if err != nil {
 		return nil, err
 	}
@@ -452,11 +467,111 @@ type builtinPgObjDescriptionSig struct {
 }
 
 func (b *builtinPgObjDescriptionSig) Clone() builtinFunc {
-	newSig := &builtinPgGetUserByIDSig{}
+	newSig := &builtinPgObjDescriptionSig{}
 	newSig.cloneFrom(&b.baseBuiltinFunc)
 	return newSig
 }
 
 func (b *builtinPgObjDescriptionSig) evalString(row chunk.Row) (string, bool, error) {
 	return "[null]", false, nil
+}
+
+// PgFuncCurrentSchema
+// TODO: Since the specific schema logic is not implemented, it is tentatively designated as "public" here
+type pgCurrentSchemaFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgCurrentSchemaFunctionClass)getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error)  {
+	if err := p.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString)
+	if err != nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgCurrentSchemaSig{bf}
+	return sig, nil
+}
+
+type builtinPgCurrentSchemaSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgCurrentSchemaSig) evalString(row chunk.Row) (string, bool, error) {
+	return "public", false, nil
+}
+
+// PgFuncCurrentSchemas
+type pgCurrentSchemasFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgCurrentSchemasFunctionClass)getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error)  {
+	if err := p.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETString, types.ETInt)
+	if err != nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgCurrentSchemasSig{bf}
+	return sig, nil
+}
+
+type builtinPgCurrentSchemasSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgCurrentSchemasSig) evalString(row chunk.Row) (string, bool, error) {
+	return "{pg_catalog,public}", false, nil
+}
+
+type pgArrayPositionFunctionClass struct {
+	baseFunctionClass
+}
+
+func (p *pgArrayPositionFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := p.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf, err := newBaseBuiltinFuncWithTp(ctx, p.funcName, args, types.ETInt, types.ETString, types.ETString)
+	if err != nil {
+		return nil, err
+	}
+	bf.tp.Charset, bf.tp.Collate = ctx.GetSessionVars().GetCharsetInfo()
+	bf.tp.Flen = 64
+	sig := &builtinPgArrayPositionSig{bf}
+	return sig, nil
+}
+
+type builtinPgArrayPositionSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPgArrayPositionSig) Clone() builtinFunc {
+	newSig := &builtinPgArrayPositionSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPgArrayPositionSig) evalInt(row chunk.Row) (int64, bool, error) {
+	arrayList, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	array, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	var res int64 = 0
+	strExist := strings.Contains(arrayList, array)
+	if strExist {
+		res =1
+	}
+	return res, false, nil
 }
