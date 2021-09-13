@@ -27,6 +27,8 @@ github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210906032539-5020c84eb0ab h1
 github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210906032539-5020c84eb0ab/go.mod h1:3n404SkCabBM0pYRgCyXEKttOLdrmMyBaWMGvaRs/ns=
 github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210909034839-f401b2c4f4dd h1:kYpjLNIuJSIBS7i9tSAcTaBH+/hGfN4+PnfVj1BbCL4=
 github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210909034839-f401b2c4f4dd/go.mod h1:3n404SkCabBM0pYRgCyXEKttOLdrmMyBaWMGvaRs/ns=
+github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210913013152-bbeff4b1e131 h1:PsGgaMEO+FUkIzheFAimGQF1xBVhKzub5Y6WarRS2es=
+github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210913013152-bbeff4b1e131/go.mod h1:3n404SkCabBM0pYRgCyXEKttOLdrmMyBaWMGvaRs/ns=
 github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible h1:ICQTYSnJC7i3Ns4xXGS5DMi1wTfg44woW4eWQi2ZNTQ=
 github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible/go.mod h1:sIm2Eayjb84BFeHrWkkA+4Zdt+4CRSs1HhrlosPwRNk=
 github.com/HdrHistogram/hdrhistogram-go v0.9.0 h1:dpujRju0R4M/QZzcnR1LH1qm+TVG3UzkWdp5tH1WMcg=
