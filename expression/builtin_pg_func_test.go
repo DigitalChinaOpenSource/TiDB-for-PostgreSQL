@@ -42,7 +42,7 @@ func (s *testEvaluatorSuite) TestCurrentSchema(c *C) {
 	fc := funcs[ast.PgFuncCurrentSchema]
 	ctx := mock.NewContext()
 	f, err := fc.getFunction(ctx, nil)
-	c.Assert(err, NotNil)
+	c.Assert(err, IsNil)
 	d, err := evalBuiltinFunc(f, chunk.Row{})
 	c.Assert(err, IsNil)
 	c.Assert(d.GetString(), Equals, "public")

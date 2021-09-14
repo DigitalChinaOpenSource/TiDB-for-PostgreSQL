@@ -482,7 +482,7 @@ type pgCurrentSchemaFunctionClass struct {
 	baseFunctionClass
 }
 
-func (p *pgCurrentSchemaFunctionClass)getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error)  {
+func (p *pgCurrentSchemaFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
 	if err := p.verifyArgs(args); err != nil {
 		return nil, err
 	}
@@ -509,7 +509,7 @@ type pgCurrentSchemasFunctionClass struct {
 	baseFunctionClass
 }
 
-func (p *pgCurrentSchemasFunctionClass)getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error)  {
+func (p *pgCurrentSchemasFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
 	if err := p.verifyArgs(args); err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ func (b *builtinPgArrayPositionSig) evalInt(row chunk.Row) (int64, bool, error) 
 	var res int64 = 0
 	strExist := strings.Contains(arrayList, array)
 	if strExist {
-		res =1
+		res = 1
 	}
 	return res, false, nil
 }

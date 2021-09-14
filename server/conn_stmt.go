@@ -144,7 +144,6 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		return errors.New("the result format code parameter in the bind message is wrong")
 	}
 
-
 	stmt.SetResultFormat(bind.ResultFormatCodes)
 
 	// When create `Portal`, clients will send the portal name.
@@ -194,7 +193,7 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	}
 
 	// Get prepared stmt through stmtID.
-	stmt :=cc.ctx.GetStatement(int(stmtID))
+	stmt := cc.ctx.GetStatement(int(stmtID))
 	if stmt == nil {
 		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
 			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")

@@ -72,8 +72,8 @@ const (
 	CatalogPgDatabase = "pg_database"
 	// CatalogPgDBRoleSetting is the string constant of pg_catalog table.
 	CatalogPgDBRoleSetting = "pg_db_role_setting"
-	// CatalogPgDefaultAcl is the string constant of pg_catalog table.
-	CatalogPgDefaultAcl = "pg_default_acl"
+	// CatalogPgDefaultACL is the string constant of pg_catalog table.
+	CatalogPgDefaultACL = "pg_default_acl"
 	// CatalogPgDepend is the string constant of pg_catalog table.
 	CatalogPgDepend = "pg_depend"
 	// CatalogPgDescription is the string constant of pg_catalog table.
@@ -127,7 +127,7 @@ var catalogTableIDMap = map[string]int64{
 	CatalogPgConversion:          autoid.PgCatalogSchemaDBID + 12,
 	CatalogPgDatabase:            autoid.PgCatalogSchemaDBID + 13,
 	CatalogPgDBRoleSetting:       autoid.PgCatalogSchemaDBID + 14,
-	CatalogPgDefaultAcl:          autoid.PgCatalogSchemaDBID + 15,
+	CatalogPgDefaultACL:          autoid.PgCatalogSchemaDBID + 15,
 	CatalogPgDepend:              autoid.PgCatalogSchemaDBID + 16,
 	CatalogPgDescription:         autoid.PgCatalogSchemaDBID + 17,
 	CatalogPgEnum:                autoid.PgCatalogSchemaDBID + 18,
