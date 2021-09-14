@@ -348,3 +348,65 @@ func (s *testPrepareSuite) TestPlanCacheWithDifferentVariableTypes(c *C) {
 		}
 	}
 }
+
+type testParamType struct {
+	sql        string
+	expectType []byte
+	paramCount int
+}
+
+//
+func (s *testPrepareSuite) TestGetPrepareParamType(c *C) {
+	store, _, err := newStoreWithBootstrap()
+	c.Assert(err, IsNil)
+
+	se, err := session.CreateSession4Test(store)
+	c.Assert(err, IsNil)
+	tk := testkit.NewTestKit(c, store)
+	tk.Se = se
+
+	tk.Se.Auth(&auth.UserIdentity{Username: "root", Hostname: "localhost", CurrentUser: true, AuthUsername: "root", AuthHostname: "%"}, nil, []byte("012345678901234567890"))
+
+	sm := &mockSessionManager2{
+		se: se,
+	}
+	se.SetSessionManager(sm)
+
+	tk.MustExec("use test")
+	tk.MustExec("drop table if exists student")
+
+	tk.MustExec("create table student (id int primary key, name varchar(255), age int)")
+	tk.MustExec("insert into student values(1, \"zhangsan\", 18)")
+
+	sqlList := []*testParamType{
+		{
+			// limit and offset followed by parameters are constants,
+			// their kind be set to "0" by default.
+			sql:        "select * from student where name = $1 limit $2 offset 1",
+			paramCount: 2,
+			expectType: []byte{mysql.TypeVarchar, mysql.TypeDecimal},
+		}, {
+			// If limit and offset followed by parameters are ParamMakerExpr,
+			// TiDB-Server will generate a LogicalTableDual,
+			// We can't get any param type.
+			// todo get param type in this case.
+			sql:        "select * from student where name = $1 limit $2 offset $3",
+			paramCount: 3,
+			expectType: []byte{mysql.TypeDecimal, mysql.TypeDecimal, mysql.TypeDecimal},
+		},
+	}
+
+	for _, v1 := range sqlList {
+		stmtID, paramCount, _, err := tk.Se.PrepareStmt(v1.sql, "")
+		c.Assert(paramCount, Equals, v1.paramCount)
+		c.Assert(err, IsNil)
+
+		if cachedStmt, ok := tk.Se.GetSessionVars().PreparedStmts[stmtID].(*plannercore.CachedPrepareStmt); ok {
+			cachedParams := cachedStmt.PreparedAst.Params
+			for i, _ := range cachedParams {
+				paramType := cachedParams[i].GetType().Tp
+				c.Assert(paramType, Equals, v1.expectType[i])
+			}
+		}
+	}
+}
