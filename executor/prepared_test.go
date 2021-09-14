@@ -370,55 +370,55 @@ func newMockParamExpr(order, offset int) ast.ParamMarkerExpr {
 
 func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 	testCases := []sorterTestCase{
-		sorterTestCase{
+		{
 			query:     "INSERT INTO param_test VALUES (?)",
 			input:     []ast.ParamMarkerExpr{newMockParamExpr(0, 31)},
-			expected:  []ast.ParamMarkerExpr{newMockParamExpr(1, 31)},
+			expected:  []ast.ParamMarkerExpr{newMockParamExpr(0, 31)},
 			shouldErr: false,
 		},
-		sorterTestCase{
+		{
 			query:     "INSERT INTO param_test VALUES ($1)",
 			input:     []ast.ParamMarkerExpr{newMockParamExpr(1, 32)},
-			expected:  []ast.ParamMarkerExpr{newMockParamExpr(1, 32)},
+			expected:  []ast.ParamMarkerExpr{newMockParamExpr(0, 32)},
 			shouldErr: false,
 		},
-		sorterTestCase{
+		{
 			query: "INSERT INTO param_test VALUES (?), (?)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(0, 31),
 				newMockParamExpr(0, 36),
 			},
 			expected: []ast.ParamMarkerExpr{
-				newMockParamExpr(1, 31),
-				newMockParamExpr(2, 36),
+				newMockParamExpr(0, 31),
+				newMockParamExpr(1, 36),
 			},
 			shouldErr: false,
 		},
-		sorterTestCase{
+		{
 			query: "INSERT INTO param_test VALUES ($1), ($2)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 31),
 				newMockParamExpr(2, 36),
 			},
 			expected: []ast.ParamMarkerExpr{
-				newMockParamExpr(1, 31),
-				newMockParamExpr(2, 36),
+				newMockParamExpr(0, 31),
+				newMockParamExpr(1, 36),
 			},
 			shouldErr: false,
 		},
-		sorterTestCase{
+		{
 			query: "INSERT INTO param_test VALUES ($2), ($1)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(2, 32),
 				newMockParamExpr(1, 38),
 			},
 			expected: []ast.ParamMarkerExpr{
-				newMockParamExpr(1, 38),
-				newMockParamExpr(2, 32),
+				newMockParamExpr(0, 38),
+				newMockParamExpr(1, 32),
 			},
 			shouldErr: false,
 		},
-		sorterTestCase{
+		{
 			query: "INSERT INTO param_test VALUES ($1), ($1)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 32),
@@ -427,7 +427,7 @@ func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 			expected:  nil,
 			shouldErr: true,
 		},
-		sorterTestCase{
+		{
 			query: "INSERT INTO param_test VALUES ($1), (?)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 32),

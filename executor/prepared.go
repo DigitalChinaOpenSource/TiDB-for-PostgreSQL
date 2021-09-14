@@ -253,9 +253,6 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 }
 
 // ParamMakerSorter sort by order.
-// in the query, most situations are in order.so bubble sort and insert sort are Preferred
-// we choose insert sort here.
-// todo: According to different parameters situations, choose the most suitable sorting method
 func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
 	// nothing to sort
 	if len(markers) == 0 {
@@ -271,6 +268,7 @@ func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
 
 	// then we check for any error that might exist
 	// this checks that there's no mix use of mySQL and postgres' param notation
+	// if the first element has order 0, then the last element's order should be 0
 	if mySQLCompatibleMode && markers[len(markers)-1].(*driver.ParamMarkerExpr).Order != 0 {
 		return errors.Errorf("Mix Use of $ notation and ? notation")
 	}
@@ -278,10 +276,13 @@ func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
 	// while checking for repeated use, we change the slice to be 1 indexed (Compatibility with mysql's ?):
 	for markerIndex, marker := range markers {
 		if mySQLCompatibleMode {
-			marker.SetOrder(markerIndex + 1) // note that this is 1 indexed
-		}
-		if marker.(*driver.ParamMarkerExpr).Order != markerIndex+1 {
-			return errors.Errorf("Repeated use of same parameter expression not currently supported")
+			marker.SetOrder(markerIndex) // note that this is 0 indexed
+		} else {
+			// TODO: Add support for reusing same paramMarker and remove this check
+			if marker.(*driver.ParamMarkerExpr).Order != markerIndex+1 {
+				return errors.Errorf("Repeated use of same parameter expression not currently supported")
+			}
+			marker.SetOrder(marker.(*driver.ParamMarkerExpr).Order - 1) // make it 0 indexed
 		}
 	}
 
@@ -323,9 +324,11 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 			exprOffset := exprConst.Offset // the offset of the value expression
 			// the if the query doesn't specify order, aka 'insert into test values ...', we simply set according to insert order
 			if queryColumns == nil {
-				setParam(paramExprs, exprOrder, schemaColumns[queryOrder])
+				if exprOffset != 0 { // a non-zero offset indicates a value expression
+					setParam(paramExprs, exprOrder, schemaColumns[queryOrder])
+				}
 			} else {
-				if exprOffset != 0 { // a non-zero offset indicates a value expression, aka ?
+				if exprOffset != 0 { // a non-zero offset indicates a value expression
 					constShortName := queryColumns[queryOrder].Name.O
 					setParamByColName(schemaColumns, constShortName, paramExprs, exprOrder)
 				}
