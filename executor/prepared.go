@@ -173,7 +173,10 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 
 	//Pgsql extend query has its own order
 	//sort according to its own order
-	ParamMakerSortor(extractor.markers)
+	err = ParamMakerSorter(extractor.markers)
+	if err != nil {
+		return err
+	}
 
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
 
@@ -248,13 +251,13 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return vars.AddPreparedStmt(e.ID, preparedObj)
 }
 
-// ParamMakerSortor sort by order.
+// ParamMakerSorter sort by order.
 // in the query, most situations are in order.so bubble sort and insert sort are Preferred
 // we choose insert sort here.
 // todo: According to different parameters situations, choose the most suitable sorting method
-func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
+func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
 	if len(markers) <= 1 {
-		return
+		return nil
 	}
 
 	var val ast.ParamMarkerExpr
@@ -286,6 +289,8 @@ func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
 			markers[i].SetOrder(i)
 		}
 	}
+
+	return nil
 }
 
 //SetInsertParamType when the plan is insert, set the type of parameter expression
