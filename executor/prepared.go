@@ -44,6 +44,7 @@ import (
 	"github.com/pingcap/tidb/util/hint"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -256,37 +257,31 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 // we choose insert sort here.
 // todo: According to different parameters situations, choose the most suitable sorting method
 func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
-	if len(markers) <= 1 {
+	// nothing to sort
+	if len(markers) == 0 {
 		return nil
 	}
+	// first we sort the given markers by their original order
+	sort.Slice(markers, func(i, j int) bool {
+		return markers[i].(*driver.ParamMarkerExpr).Order < markers[j].(*driver.ParamMarkerExpr).Order
+	})
 
-	var val ast.ParamMarkerExpr
-	var index int
-	for i := 1; i < len(markers); i++ {
-		val, index = markers[i], i-1
-		for {
-			if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order ||
-				(val.(*driver.ParamMarkerExpr).Order == markers[index].(*driver.ParamMarkerExpr).Order &&
-					val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset) {
-				markers[index+1] = markers[index]
-			} else {
-				break
-			}
-			index--
-			if index < 0 {
-				break
-			}
-		}
-		markers[index+1] = val
+	// if the smallest order is 0, then we are in mySQL compatible mode
+	mySQLCompatibleMode := markers[0].(*driver.ParamMarkerExpr).Order == 0
+
+	// then we check for any error that might exist
+	// this checks that there's no mix use of mySQL and postgres' param notation
+	if mySQLCompatibleMode && markers[len(markers)-1].(*driver.ParamMarkerExpr).Order != 0 {
+		return errors.Errorf("Mix Use of $ notation and ? notation")
 	}
 
-	//todo Eliminate compatibility with "?"
-
-	// If more than two ParamMarkerExpr.Order are zero, it means that the placeholder is "?".
-	// So we need reassign order.
-	if markers[1].(*driver.ParamMarkerExpr).Order == 0 {
-		for i := 0; i < len(markers); i++ {
-			markers[i].SetOrder(i)
+	// while checking for repeated use, we change the slice to be 1 indexed (Compatibility with mysql's ?):
+	for markerIndex, marker := range markers {
+		if mySQLCompatibleMode {
+			marker.SetOrder(markerIndex + 1) // note that this is 1 indexed
+		}
+		if marker.(*driver.ParamMarkerExpr).Order != markerIndex+1 {
+			return errors.Errorf("Repeated use of same parameter expression not currently supported")
 		}
 	}
 

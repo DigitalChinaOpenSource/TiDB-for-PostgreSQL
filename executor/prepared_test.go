@@ -398,7 +398,7 @@ func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 			query: "INSERT INTO param_test VALUES ($1), ($2)",
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 31),
-				newMockParamExpr(2, 38),
+				newMockParamExpr(2, 36),
 			},
 			expected: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 31),
@@ -443,9 +443,10 @@ func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 
 func runSorterTest(c *C, testCases []sorterTestCase) {
 	for _, testCase := range testCases {
+		err := executor.ParamMakerSorter(testCase.input)
 		if testCase.shouldErr {
 			// For test case that should return error
-			c.Assert(executor.ParamMakerSorter(testCase.input), NotNil)
+			c.Assert(err, NotNil)
 		} else {
 			equalOrderOffset(c, testCase.input, testCase.expected)
 		}
