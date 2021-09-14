@@ -362,11 +362,10 @@ type sorterTestCase struct {
 // newMockParamExpr returns a mock ParamMarkerExpr with only Order and Offset set
 func newMockParamExpr(order, offset int) ast.ParamMarkerExpr {
 	// casting magic
-	expr := interface{}(driver.ParamMarkerExpr{
+	return &driver.ParamMarkerExpr{
 		Order:  order,
 		Offset: offset,
-	}).(ast.ParamMarkerExpr)
-	return expr
+	}
 }
 
 func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
