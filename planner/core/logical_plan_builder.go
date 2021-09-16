@@ -4386,6 +4386,9 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		}
 
 		del.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return del, err

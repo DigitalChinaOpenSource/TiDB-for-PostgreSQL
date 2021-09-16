@@ -3,7 +3,7 @@ module github.com/pingcap/tidb
 require (
 	cloud.google.com/go v0.51.0 // indirect
 	github.com/BurntSushi/toml v0.3.1
-	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210825054110-e3314361a5f0
+	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210916075513-3aea1f464b37
 	github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible
 	github.com/Jeffail/gabs/v2 v2.5.1
 	github.com/aws/aws-sdk-go v1.30.24 // indirect
@@ -30,7 +30,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.14.3 // indirect
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/jackc/pgio v1.0.0
-	github.com/jackc/pgproto3 v1.1.0
 	github.com/jackc/pgproto3/v2 v2.0.7
 	github.com/jackc/pgtype v1.6.2
 	github.com/klauspost/cpuid v1.2.1
@@ -50,11 +49,10 @@ require (
 	github.com/pingcap/fn v0.0.0-20200306044125-d5540d389059
 	github.com/pingcap/goleveldb v0.0.0-20191226122134-f82aafb29989
 	github.com/pingcap/kvproto v0.0.0-20201126113434-70db5fb4b0dc
-	github.com/pingcap/log v0.0.0-20201112100606-8f1e84a3abc8
+	github.com/pingcap/log v0.0.0-20210906054005-afc726e70354
 	github.com/pingcap/sysutil v0.0.0-20201130064824-f0c8aa6a6966
 	github.com/pingcap/tidb-tools v4.0.9-0.20201127090955-2707c97b3853+incompatible
 	github.com/pingcap/tipb v0.0.0-20200618092958-4fad48b4c8c3
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.9.1
@@ -70,19 +68,18 @@ require (
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20191023171146-3cf2f69b5738
-	go.uber.org/atomic v1.7.0
+	go.uber.org/atomic v1.9.0
 	go.uber.org/automaxprocs v1.2.0
-	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.16.0
+	go.uber.org/zap v1.19.1
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc
+	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	golang.org/x/sys v0.0.0-20200819171115-d785dc25833f
-	golang.org/x/text v0.3.4
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
+	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
-	golang.org/x/tools v0.0.0-20200820010801-b793a1359eac
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	golang.org/x/tools v0.1.5
 	google.golang.org/api v0.15.1 // indirect
 	google.golang.org/genproto v0.0.0-20200108215221-bd8f9a0ef82f // indirect
 	google.golang.org/grpc v1.26.0

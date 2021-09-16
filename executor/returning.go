@@ -23,6 +23,7 @@ import (
 	"github.com/pingcap/tidb/util/execdetails"
 )
 
+// ReturningExec represents Returning Executor
 type ReturningExec struct {
 	baseExecutor
 
@@ -33,19 +34,23 @@ type ReturningExec struct {
 	ResultSet *recordSet
 }
 
+// Open Returning Executor
 func (e *ReturningExec) Open(ctx context.Context) error {
 
 	return e.children[0].Open(ctx)
 }
 
+// Next Returning Executor
 func (e *ReturningExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return e.fetchRowChunks(ctx)
 }
 
+// Close Returning Executor
 func (e *ReturningExec) Close() error {
 	return e.children[0].Close()
 }
 
+// Returning Executor fetchRowChunks
 func (e *ReturningExec) fetchRowChunks(ctx context.Context) error {
 	defer func() {
 		e.fetched = true

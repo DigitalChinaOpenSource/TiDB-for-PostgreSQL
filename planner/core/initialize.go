@@ -483,11 +483,13 @@ func (p PointGetPlan) Init(ctx sessionctx.Context, stats *property.StatsInfo, of
 	return &p
 }
 
+// Init LogicalReturning
 func (p LogicalReturning) Init(ctx sessionctx.Context, offset int) *LogicalReturning {
 	p.baseLogicalPlan = newBaseLogicalPlan(ctx, plancodec.TypeReturning, &p, offset)
 	return &p
 }
 
+// Init PhysicalReturning
 func (p PhysicalReturning) Init(ctx sessionctx.Context, stats *property.StatsInfo, offset int, props ...*property.PhysicalProperty) *PhysicalReturning {
 	p.basePhysicalPlan = newBasePhysicalPlan(ctx, plancodec.TypeReturning, &p, offset)
 	p.childrenReqProps = props
