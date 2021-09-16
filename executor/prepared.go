@@ -270,14 +270,20 @@ func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
 	// this checks that there's no mix use of mySQL and postgres' param notation
 	// if the first element has order 0, then the last element's order should be 0
 	if mySQLCompatibleMode && markers[len(markers)-1].(*driver.ParamMarkerExpr).Order != 0 {
-		return errors.Errorf("Mix Use of $ notation and ? notation")
+		return errors.Errorf("Mix Use of $ notation and ? notation, or use $0")
 	}
 
 	// while checking for repeated use, we change the slice to be 1 indexed (Compatibility with mysql's ?):
-	for markerIndex, marker := range markers {
-		if mySQLCompatibleMode {
+	if mySQLCompatibleMode {
+		sort.Slice(markers, func(i, j int) bool {
+			return markers[i].(*driver.ParamMarkerExpr).Offset < markers[j].(*driver.ParamMarkerExpr).Offset
+		})
+
+		for markerIndex, marker := range markers {
 			marker.SetOrder(markerIndex) // note that this is 0 indexed
-		} else {
+		}
+	} else {
+		for markerIndex, marker := range markers {
 			// TODO: Add support for reusing same paramMarker and remove this check
 			if marker.(*driver.ParamMarkerExpr).Order != markerIndex+1 {
 				return errors.Errorf("Repeated use of same parameter expression not currently supported")

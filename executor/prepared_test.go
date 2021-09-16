@@ -385,8 +385,8 @@ func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 		{
 			query: "INSERT INTO param_test VALUES (?), (?)",
 			input: []ast.ParamMarkerExpr{
-				newMockParamExpr(0, 31),
 				newMockParamExpr(0, 36),
+				newMockParamExpr(0, 31),
 			},
 			expected: []ast.ParamMarkerExpr{
 				newMockParamExpr(0, 31),
@@ -432,6 +432,14 @@ func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
 			input: []ast.ParamMarkerExpr{
 				newMockParamExpr(1, 32),
 				newMockParamExpr(0, 37),
+			},
+			expected:  nil,
+			shouldErr: true,
+		}, {
+			query: "INSERT INTO param_test VALUES ($0), ($1)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 32),
+				newMockParamExpr(1, 38),
 			},
 			expected:  nil,
 			shouldErr: true,
