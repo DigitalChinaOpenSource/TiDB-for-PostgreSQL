@@ -37,6 +37,8 @@ type DeleteExec struct {
 	// the columns ordinals is present in ordinal range format, @see plannercore.TblColPosInfos
 	tblColPosInfos plannercore.TblColPosInfoSlice
 	memTracker     *memory.Tracker
+
+	returning Executor
 }
 
 // Next implements the Executor Next interface.
@@ -197,7 +199,19 @@ func (e *DeleteExec) Open(ctx context.Context) error {
 	e.memTracker = memory.NewTracker(e.id, -1)
 	e.memTracker.AttachTo(e.ctx.GetSessionVars().StmtCtx.MemTracker)
 
-	return e.children[0].Open(ctx)
+	err := e.children[0].Open(ctx)
+	if err != nil {
+		return err
+	}
+
+	if e.returning != nil {
+		err = e.returning.Open(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // tableRowMapType is a map for unique (Table, Row) pair. key is the tableID.

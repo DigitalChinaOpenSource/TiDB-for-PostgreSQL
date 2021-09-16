@@ -1639,7 +1639,7 @@ func (cc *clientConn) writeReturningChunks(ctx context.Context, rs ResultSet) er
 		return err
 	}
 
-	rowCount := 1
+	rowCount := len(rows)
 	data = append(data, 'D')
 	data = pgio.AppendInt32(data, -1)
 	for i := 0; i < rowCount; i++ {

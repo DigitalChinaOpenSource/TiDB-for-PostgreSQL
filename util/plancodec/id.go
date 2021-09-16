@@ -118,6 +118,8 @@ const (
 	TypeIndexFullScan = "IndexFullScan"
 	// TypeIndexRangeScan is the type of IndexRangeScan.
 	TypeIndexRangeScan = "IndexRangeScan"
+	//TypeReturning is the type of Returing
+	TypeReturning = "Returning"
 )
 
 // plan id.
@@ -169,6 +171,7 @@ const (
 	typeTableRowIDScan        int = 45
 	typeIndexFullScan         int = 46
 	typeIndexRangeScan        int = 47
+	typeReturning             int = 48
 )
 
 // TypeStringToPhysicalID converts the plan type string to plan id.
@@ -268,6 +271,8 @@ func TypeStringToPhysicalID(tp string) int {
 		return typeIndexFullScan
 	case TypeIndexRangeScan:
 		return typeIndexRangeScan
+	case TypeReturning:
+		return typeReturning
 	}
 	// Should never reach here.
 	return 0
@@ -368,6 +373,8 @@ func PhysicalIDToTypeString(id int) string {
 		return TypeIndexFullScan
 	case typeIndexRangeScan:
 		return TypeIndexRangeScan
+	case typeReturning:
+		return TypeReturning
 	}
 
 	// Should never reach here.
