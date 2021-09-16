@@ -1443,9 +1443,9 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateTablePgType)
 	// Create postgres pg_user_mapping Table
 	mustExecute(s, CreateTablePgUserMapping)
-
+	// Create postgres pg_all_settings Table
 	mustExecute(s, CreateTablePgAllSettings)
-
+	// Create postgres pg_stat_activity Table
 	mustExecute(s, CreateTablePgStatActivity)
 
 	mustExecute(s, "USE postgres;")
@@ -1457,19 +1457,12 @@ func doDDLWorks(s Session) {
 	mustExecute(s, CreateViewPgUser)
 	// Create postgres pg_group View
 	mustExecute(s, CreateViewPgGroup)
-
+	// Create postgres pg_settings View
 	mustExecute(s, CreateViewPgSettings)
-
-	// Create postgres Database
-	mustExecute(s, "CREATE DATABASE IF NOT EXISTS pg_catalog;")
-
-	mustExecute(s, CreatePgCalogViewPgRoles)
 }
 
 func doCreatePgViewsWorks(s Session) {
 	mustExecute(s, "USE postgres")
-
-	//mustExecute(s, CreateViewPgRoles)
 }
 
 // doDMLWorks executes DML statements in bootstrap stage.

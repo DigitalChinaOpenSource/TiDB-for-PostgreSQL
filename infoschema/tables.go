@@ -61,7 +61,6 @@ import (
 )
 
 // todo Table names in system tables need to be replaced with lower case
-
 const (
 	// TableSchemata is the string constant of infoschema table.
 	TableSchemata = "TIDB_SCHEMATA"

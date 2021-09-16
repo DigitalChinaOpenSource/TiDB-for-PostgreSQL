@@ -2133,7 +2133,9 @@ var builtinGlobalVariable = []string{
 	variable.TiDBMemoryUsageAlarmRatio,
 	variable.TiDBMultiStatementMode,
 
-	/* 三个Pg系统变量: */
+	/* PostgreSQL System Variable: */
+	variable.PgExtraFloatDigits,
+	variable.PgSearchPath,
 	variable.PgClientMinMessage,
 	variable.PgDateStyle,
 	variable.PgClientEncoding,

@@ -957,9 +957,9 @@ func (s *testSuite5) TestShowBuiltin(c *C) {
 	res := tk.MustQuery("show builtins;")
 	c.Assert(res, NotNil)
 	rows := res.Rows()
-	c.Assert(278, Equals, len(rows))
+	c.Assert(281, Equals, len(rows))
 	c.Assert("abs", Equals, rows[0][0].(string))
-	c.Assert("yearweek", Equals, rows[277][0].(string))
+	c.Assert("yearweek", Equals, rows[280][0].(string))
 }
 
 func (s *testSuite5) TestShowClusterConfig(c *C) {

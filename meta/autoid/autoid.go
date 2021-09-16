@@ -45,6 +45,8 @@ const (
 	PerformanceSchemaDBID int64 = SystemSchemaIDFlag | 10000
 	// MetricSchemaDBID is the metrics_schema schema id, it's exported for test.
 	MetricSchemaDBID int64 = SystemSchemaIDFlag | 20000
+	// PgCatalogSchemaDBID is the pg_catalog schema id, it's exports for test.
+	PgCatalogSchemaDBID int64 = SystemSchemaIDFlag | 30000
 )
 
 const (
