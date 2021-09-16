@@ -241,6 +241,10 @@ func (e *analyzeColumnsExec) Fields() []*ast.ResultField {
 	return e.fields
 }
 
+func (e *analyzeColumnsExec) Rows() []chunk.Row {
+	return nil
+}
+
 func (e *analyzeColumnsExec) getNext(ctx context.Context) ([]types.Datum, error) {
 	values, err := e.tblExec.Next(ctx)
 	if err != nil {

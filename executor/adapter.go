@@ -79,6 +79,11 @@ type recordSet struct {
 	stmt       *ExecStmt
 	lastErr    error
 	txnStartTS uint64
+	rows       []chunk.Row
+}
+
+func (a *recordSet) Rows() []chunk.Row {
+	return a.rows
 }
 
 func (a *recordSet) Fields() []*ast.ResultField {
@@ -363,8 +368,29 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 		return a.handlePessimisticSelectForUpdate(ctx, e)
 	}
 
+	// Do returning
+	var returningRS *recordSet
+	switch e.(type) {
+	case *DeleteExec:
+		if del, ok := e.(*DeleteExec); ok && del.returning != nil {
+			err = del.returning.Next(ctx, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			if ret, ok := del.returning.(*ReturningExec); ok {
+				returningRS = ret.ResultSet
+				returningRS.stmt = a // to fix executor.(*recordSet).Fields panic issue
+			}
+		}
+	}
+
 	if handled, result, err := a.handleNoDelay(ctx, e, isPessimistic); handled {
-		return result, err
+		if returningRS != nil {
+			return returningRS, err
+		} else {
+			return result, err
+		}
 	}
 
 	var txnStartTS uint64
@@ -437,6 +463,10 @@ type chunkRowRecordSet struct {
 	fields   []*ast.ResultField
 	e        Executor
 	execStmt *ExecStmt
+}
+
+func (c *chunkRowRecordSet) Rows() []chunk.Row {
+	return c.rows
 }
 
 func (c *chunkRowRecordSet) Fields() []*ast.ResultField {

@@ -25,7 +25,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/DigitalChinaOpenSource/DCParser"
+	parser "github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/format"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -4378,6 +4378,16 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		tblID2table[id], _ = b.is.TableByID(id)
 	}
 	del.TblColPosInfos, err = buildColumns2Handle(del.names, tblID2Handle, tblID2table, false)
+
+	if delete.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, delete, delete.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		del.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+	}
+
 	return del, err
 }
 
@@ -5163,4 +5173,26 @@ func containDifferentJoinTypes(preferJoinType uint) bool {
 		cnt++
 	}
 	return cnt > 1
+}
+
+func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt, returning *ast.ReturningClause) (p LogicalPlan, err error) {
+
+	p, err = b.buildTableRefsWithCache(ctx, delete.TableRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	returning.Fields.Fields, err = b.unfoldWildStar(p, returning.Fields.Fields)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalMap map[*ast.AggregateFuncExpr]int
+
+	p, _, err = b.buildProjection(ctx, p, returning.Fields.Fields, totalMap, nil, false, false)
+
+	ret := LogicalReturning{}.Init(b.ctx, b.getSelectOffset())
+	ret.SetChildren(p)
+
+	return ret, err
 }

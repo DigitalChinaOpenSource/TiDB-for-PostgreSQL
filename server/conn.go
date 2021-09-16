@@ -54,9 +54,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
-	"github.com/jackc/pgio"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
 	"io"
 	"io/ioutil"
 	"net"
@@ -70,7 +67,11 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/DigitalChinaOpenSource/DCParser"
+	"github.com/jackc/pgio"
+	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
+
+	parser "github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
@@ -1590,7 +1591,11 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFo
 		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
 		err = nil
 	} else {
-		err = cc.writeChunks(ctx, rs, serverStatus, resultFormat)
+		if rs.IsReturning() {
+			err = cc.writeReturningChunks(ctx, rs)
+		} else {
+			err = cc.writeChunks(ctx, rs, serverStatus, resultFormat)
+		}
 	}
 
 	return err
@@ -1610,6 +1615,53 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 		}
 	}
 	return cc.writeEOF(serverStatus)
+}
+
+func (cc *clientConn) writeReturningChunks(ctx context.Context, rs ResultSet) error {
+	data := cc.alloc.AllocWithLen(0, 1024)
+
+	var stmtDetail *execdetails.StmtExecDetails
+	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
+	if stmtDetailRaw != nil {
+		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
+	}
+
+	rows := rs.GetFetchedRows()
+	if len(rows) == 0 {
+		return nil
+	}
+	start := time.Now()
+	reg := trace.StartRegion(ctx, "WriteReturningClientConn")
+
+	columns := rs.Columns()
+	err := cc.WriteRowDescription(columns)
+	if err != nil {
+		return err
+	}
+
+	rowCount := len(rows)
+	data = append(data, 'D')
+	data = pgio.AppendInt32(data, -1)
+	for i := 0; i < rowCount; i++ {
+		data = data[0:5]
+
+		data, err := dumpTextRowData(data, rs.Columns(), rows[i])
+
+		if err != nil {
+			return err
+		}
+
+		pgio.SetInt32(data[1:], int32(len(data[1:])))
+		if err = cc.WriteData(data); err != nil {
+			return err
+		}
+	}
+	if stmtDetail != nil {
+		stmtDetail.WriteSQLRespDuration += time.Since(start)
+	}
+	reg.End()
+
+	return cc.writeCommandComplete()
 }
 
 // writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
