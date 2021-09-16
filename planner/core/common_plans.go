@@ -750,6 +750,8 @@ type Delete struct {
 
 	SelectPlan PhysicalPlan
 
+	ReturningPlan PhysicalPlan
+
 	TblColPosInfos TblColPosInfoSlice
 }
 

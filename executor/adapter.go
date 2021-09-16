@@ -368,68 +368,29 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 		return a.handlePessimisticSelectForUpdate(ctx, e)
 	}
 
-	// TODO: remove the test code
+	// Do returning
+	var returningRS *recordSet
 	switch e.(type) {
 	case *DeleteExec:
-
-		var stmtDetail *execdetails.StmtExecDetails
-		stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
-		if stmtDetailRaw != nil {
-			stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
-		}
-
-		var txnStartTS uint64
-		txn, err := sctx.Txn(false)
-		if err != nil {
-			return nil, err
-		}
-		if txn.Valid() {
-			txnStartTS = txn.StartTS()
-		}
-		rs := &recordSet{
-			executor:   e.base().children[0],
-			stmt:       a,
-			txnStartTS: txnStartTS,
-		}
-
-		rs.rows = make([]chunk.Row, 0, 1024)
-
-		for {
-			req := rs.NewChunk()
-			// Here server.tidbResultSet implements Next method.
-			err := rs.Next(ctx, req)
+		if del, ok := e.(*DeleteExec); ok && del.returning != nil {
+			err = del.returning.Next(ctx, nil)
 			if err != nil {
 				return nil, err
 			}
 
-			rowCount := req.NumRows()
-			if rowCount == 0 {
-				break
+			if ret, ok := del.returning.(*ReturningExec); ok {
+				returningRS = ret.ResultSet
+				returningRS.stmt = a // to fix executor.(*recordSet).Fields panic issue
 			}
-			start := time.Now()
-			reg := trace.StartRegion(ctx, "ProcessReturning")
-
-			for i := 0; i < rowCount; i++ {
-				row := req.GetRow(i)
-
-				row.IsNull(0)
-
-				rs.rows = append(rs.rows, row)
-			}
-
-			if stmtDetail != nil {
-				stmtDetail.WriteSQLRespDuration += time.Since(start)
-			}
-			reg.End()
-		}
-
-		if handled, _, err := a.handleNoDelay(ctx, e, isPessimistic); handled {
-			return rs, err
 		}
 	}
 
 	if handled, result, err := a.handleNoDelay(ctx, e, isPessimistic); handled {
-		return result, err
+		if returningRS != nil {
+			return returningRS, err
+		} else {
+			return result, err
+		}
 	}
 
 	var txnStartTS uint64

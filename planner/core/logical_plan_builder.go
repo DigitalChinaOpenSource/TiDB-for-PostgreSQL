@@ -4280,13 +4280,6 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		}
 	}
 
-	if delete.Returning != nil {
-		p, err = b.buildReturning(ctx, delete, p, delete.Returning)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	proj := LogicalProjection{Exprs: expression.Column2Exprs(p.Schema().Columns[:oldLen])}.Init(b.ctx, b.getSelectOffset())
 	proj.SetChildren(p)
 	proj.SetSchema(oldSchema.Clone())
@@ -4385,6 +4378,16 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		tblID2table[id], _ = b.is.TableByID(id)
 	}
 	del.TblColPosInfos, err = buildColumns2Handle(del.names, tblID2Handle, tblID2table, false)
+
+	if delete.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, delete, delete.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		del.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+	}
+
 	return del, err
 }
 
@@ -5172,7 +5175,7 @@ func containDifferentJoinTypes(preferJoinType uint) bool {
 	return cnt > 1
 }
 
-func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt, src LogicalPlan, returning *ast.ReturningClause) (p LogicalPlan, err error) {
+func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt, returning *ast.ReturningClause) (p LogicalPlan, err error) {
 
 	p, err = b.buildTableRefsWithCache(ctx, delete.TableRefs)
 	if err != nil {
@@ -5184,7 +5187,12 @@ func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt
 		return nil, err
 	}
 
-	p.SetChildren(src)
+	var totalMap map[*ast.AggregateFuncExpr]int
 
-	return p, err
+	p, _, err = b.buildProjection(ctx, p, returning.Fields.Fields, totalMap, nil, false, false)
+
+	ret := LogicalReturning{}.Init(b.ctx, b.getSelectOffset())
+	ret.SetChildren(p)
+
+	return ret, err
 }
