@@ -1265,6 +1265,7 @@ type LogicalReturning struct {
 	Count  uint64
 }
 
+// SetParamType LogicalReturning
 func (p *LogicalReturning) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }

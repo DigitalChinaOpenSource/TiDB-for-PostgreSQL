@@ -1034,6 +1034,7 @@ type PhysicalReturning struct {
 	basePhysicalPlan
 }
 
+// SetParamType of PhysicalReturning
 func (p *PhysicalReturning) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return nil
 }
