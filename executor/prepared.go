@@ -44,6 +44,7 @@ import (
 	"github.com/pingcap/tidb/util/hint"
 	"github.com/pingcap/tidb/util/sqlexec"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -173,7 +174,10 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 
 	//Pgsql extend query has its own order
 	//sort according to its own order
-	ParamMakerSortor(extractor.markers)
+	err = ParamMakerSorter(extractor.markers)
+	if err != nil {
+		return err
+	}
 
 	err = plannercore.Preprocess(e.ctx, stmt, e.is, plannercore.InPrepare)
 
@@ -250,44 +254,47 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 	return vars.AddPreparedStmt(e.ID, preparedObj)
 }
 
-// ParamMakerSortor sort by order.
-// in the query, most situations are in order.so bubble sort and insert sort are Preferred
-// we choose insert sort here.
-// todo: According to different parameters situations, choose the most suitable sorting method
-func ParamMakerSortor(markers []ast.ParamMarkerExpr) {
-	if len(markers) <= 1 {
-		return
+// ParamMakerSorter sort by order.
+func ParamMakerSorter(markers []ast.ParamMarkerExpr) error {
+	// nothing to sort
+	if len(markers) == 0 {
+		return nil
+	}
+	// first we sort the given markers by their original order
+	sort.Slice(markers, func(i, j int) bool {
+		return markers[i].(*driver.ParamMarkerExpr).Order < markers[j].(*driver.ParamMarkerExpr).Order
+	})
+
+	// if the smallest order is 0, then we are in mySQL compatible mode
+	mySQLCompatibleMode := markers[0].(*driver.ParamMarkerExpr).Order == 0
+
+	// then we check for any error that might exist
+	// this checks that there's no mix use of mySQL and postgres' param notation
+	// if the first element has order 0, then the last element's order should be 0
+	if mySQLCompatibleMode && markers[len(markers)-1].(*driver.ParamMarkerExpr).Order != 0 {
+		return errors.Errorf("Mix Use of $ notation and ? notation, or use $0")
 	}
 
-	var val ast.ParamMarkerExpr
-	var index int
-	for i := 1; i < len(markers); i++ {
-		val, index = markers[i], i-1
-		for {
-			if val.(*driver.ParamMarkerExpr).Order < markers[index].(*driver.ParamMarkerExpr).Order ||
-				(val.(*driver.ParamMarkerExpr).Order == markers[index].(*driver.ParamMarkerExpr).Order &&
-					val.(*driver.ParamMarkerExpr).Offset < markers[index].(*driver.ParamMarkerExpr).Offset) {
-				markers[index+1] = markers[index]
-			} else {
-				break
-			}
-			index--
-			if index < 0 {
-				break
-			}
+	// while checking for repeated use, we change the slice to be 1 indexed (Compatibility with mysql's ?):
+	if mySQLCompatibleMode {
+		sort.Slice(markers, func(i, j int) bool {
+			return markers[i].(*driver.ParamMarkerExpr).Offset < markers[j].(*driver.ParamMarkerExpr).Offset
+		})
+
+		for markerIndex, marker := range markers {
+			marker.SetOrder(markerIndex) // note that this is 0 indexed
 		}
-		markers[index+1] = val
-	}
-
-	//todo Eliminate compatibility with "?"
-
-	// If more than two ParamMarkerExpr.Order are zero, it means that the placeholder is "?".
-	// So we need reassign order.
-	if markers[1].(*driver.ParamMarkerExpr).Order == 0 {
-		for i := 0; i < len(markers); i++ {
-			markers[i].SetOrder(i)
+	} else {
+		for markerIndex, marker := range markers {
+			// TODO: Add support for reusing same paramMarker and remove this check
+			if marker.(*driver.ParamMarkerExpr).Order != markerIndex+1 {
+				return errors.Errorf("Repeated use of same parameter expression not currently supported")
+			}
+			marker.SetOrder(marker.(*driver.ParamMarkerExpr).Order - 1) // make it 0 indexed
 		}
 	}
+
+	return nil
 }
 
 //SetInsertParamType when the plan is insert, set the type of parameter expression
@@ -325,9 +332,11 @@ func SetInsertParamType(insertPlan *plannercore.Insert, paramExprs *[]ast.ParamM
 			exprOffset := exprConst.Offset // the offset of the value expression
 			// the if the query doesn't specify order, aka 'insert into test values ...', we simply set according to insert order
 			if queryColumns == nil {
-				setParam(paramExprs, exprOrder, schemaColumns[queryOrder])
+				if exprOffset != 0 { // a non-zero offset indicates a value expression
+					setParam(paramExprs, exprOrder, schemaColumns[queryOrder])
+				}
 			} else {
-				if exprOffset != 0 { // a non-zero offset indicates a value expression, aka ?
+				if exprOffset != 0 { // a non-zero offset indicates a value expression
 					constShortName := queryColumns[queryOrder].Name.O
 					setParamByColName(schemaColumns, constShortName, paramExprs, exprOrder)
 				}
