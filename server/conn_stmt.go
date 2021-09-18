@@ -89,11 +89,7 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parser pgproto3.Par
 
 	stmt.SetParamsType(paramTypes)
 
-	err = cc.writeParseComplete()
-	if err != nil {
-		return err
-	}
-	return cc.flush(ctx)
+	return cc.writeParseComplete()
 }
 
 // handleStmtBind handle bind messages in pgsql's extended query.
@@ -156,11 +152,7 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		vars.Portal["0"] = stmtID
 	}
 
-	err = cc.writeBindComplete()
-	if err != nil {
-		return err
-	}
-	return cc.flush(ctx)
+	return cc.writeBindComplete()
 }
 
 // handleStmtDescription handle Description messages in pgsql's extended query，
@@ -218,18 +210,11 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	// otherwise return `writeNoData`.
 	columnInfo := stmt.GetColumnInfo()
 	if columnInfo == nil || len(columnInfo) > 0 {
-		if err := cc.WriteRowDescription(columnInfo); err != nil {
-			return err
-		}
-
-		// If the row description information has been output here,
-		// it will not be output when `writeResultset` later.
-	} else {
-		if err := cc.writeNoData(); err != nil {
-			return err
-		}
+		return cc.WriteRowDescription(columnInfo)
 	}
-	return cc.flush(ctx)
+	// If the row description information has been output here,
+	// it will not be output when `writeResultset` later.
+	return cc.writeNoData()
 }
 
 // handleStmtExecute handle execute messages in pgsql's extended query.
