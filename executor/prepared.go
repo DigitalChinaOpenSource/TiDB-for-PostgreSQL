@@ -224,6 +224,8 @@ func (e *PrepareExec) Next(ctx context.Context, req *chunk.Chunk) error {
 		err = SetUpdateParamType(p.(*plannercore.Update), &prepared.Params)
 	case *plannercore.LogicalSort:
 		err = SetSortType(p.(*plannercore.LogicalSort), &prepared.Params)
+	case *plannercore.LogicalLimit:
+		err = SetLimitType(p.(*plannercore.LogicalLimit), &prepared.Params)
 	}
 	if err != nil {
 		return err
@@ -404,6 +406,11 @@ func SetUpdateParamTypes(assignmnet *expression.Assignment, paramExprs *[]ast.Pa
 // SetSortType 从根节点计划是logicalSort的计划中获取参数类型
 func SetSortType(sort *plannercore.LogicalSort, i *[]ast.ParamMarkerExpr) error {
 	return sort.SetParamType(i)
+}
+
+// SetLimitType set the parameter type of limit plan
+func SetLimitType(limit *plannercore.LogicalLimit, i *[]ast.ParamMarkerExpr) error {
+	return limit.SetParamType(i)
 }
 
 // ExecuteExec represents an EXECUTE executor.
