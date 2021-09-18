@@ -169,14 +169,17 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 
 	var stmtID uint32
 	var ok bool
+	var isPortal bool
 
-	// If it specify the prepared statement through portal,
+	// If it specifies the prepared statement through portal,
 	// here can directly find the corresponding stmtID through portal.
 	if desc.ObjectType == 'P' {
 		stmtID, ok = vars.Portal[desc.Name]
+		isPortal = true
 	} else {
 		// Or get prepared stmtID through stmtName.
 		stmtID, ok = vars.PreparedStmtNameToID[desc.Name]
+		isPortal = false
 	}
 
 	if !ok {
@@ -191,12 +194,13 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 			strconv.FormatUint(uint64(stmtID), 10), "stmt_description")
 	}
 
-	numParams := stmt.NumParams()
-	if numParams > 0 {
+	// we send parameter description only if this is statement and not a portal
+	// https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY
+	if !isPortal {
 		// Get param types that analyzed in `handleStmtBind`,
 		// And convert it to PgSQL data type and return it to the client
 		paramsType := stmt.GetParamsType()
-		pgType := make([]uint32, numParams)
+		pgType := make([]uint32, stmt.NumParams())
 		for i := range paramsType {
 			pgType[i] = convertMySQLDataTypeToPgSQLDataType(paramsType[i])
 		}
