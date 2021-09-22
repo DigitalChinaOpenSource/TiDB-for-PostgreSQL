@@ -611,7 +611,8 @@ type DataSource struct {
 	isForUpdateRead bool
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of dataSource plan
+// dataSource plan is always the last node of o plan tree and it will not contain any parameter.Just return nil
 func (ds *DataSource) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -1098,8 +1099,17 @@ type LogicalLimit struct {
 	limitHints limitHintInfo
 }
 
-// SetParamType todo 设置参数类型
-func (p *LogicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+// SetParamType set the parameter type of logicalLimit plan
+// when send "limit $1 offset $2",planbuilder will convert it to a tableDual plan.see why at /planner/core/logical_plan_builder.go buildLimit
+func (ll *LogicalLimit) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	if childs := ll.children; childs != nil {
+		for _, child := range childs {
+			err = child.SetParamType(paramExprs)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
@@ -1240,7 +1250,11 @@ type LogicalShow struct {
 	ShowContents
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of logicalShow plan
+// https://www.postgresql.org/docs/current/sql-show.html
+// According to the postgresql document, any parameter won't follow the show statement.
+// Besides, show statement won't be the sub statement of any other sql statement.
+// So, Show statement doesn't need actual implement. Just return nil.
 func (p *LogicalShow) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
@@ -1252,7 +1266,10 @@ type LogicalShowDDLJobs struct {
 	JobNumber int64
 }
 
-// SetParamType todo 设置参数类型
+// SetParamType set the parameter type of logicalShowDDLJobs plan
+// https://www.postgresql.org/docs/current/sql-show.html
+// Actually, postgresql doesn't support the syntax like "show create table tname"
+// And showddl statement won't contain parameter. Just return nil
 func (p *LogicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }

@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	_ "github.com/lib/pq"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/log"
-	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	"go.uber.org/zap"
 )
 
@@ -316,8 +316,8 @@ func execSQL(db *sql.DB, sql string) error {
 }
 
 func createDB(cfg DBConfig) (*sql.DB, error) {
-	dbDSN := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
-	db, err := sql.Open("mysql", dbDSN)
+	dbDSN := fmt.Sprintf("//postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
+	db, err := sql.Open("postgres", dbDSN)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}

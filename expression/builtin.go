@@ -921,7 +921,10 @@ var funcs = map[string]functionClass{
 	ast.PgFuncIsWalReplayPaused:    &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused, 0, 0}},
 	ast.PgFuncGetUserById:          &pgGetUserByIDFunctionClass{baseFunctionClass{ast.PgFuncGetUserById, 1, 1}},
 	ast.PgFuncShobjDescription:     &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription, 2, 2}},
-	ast.PgFuncObjDescription:       &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription, 1, 1}},
+	ast.PgFuncObjDescription:       &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription, 2, 2}},
+	ast.PgFuncCurrentSchema:        &pgCurrentSchemaFunctionClass{baseFunctionClass{ast.PgFuncCurrentSchema, 0, 0}},
+	ast.PgFuncCurrentSchemas:       &pgCurrentSchemasFunctionClass{baseFunctionClass{ast.PgFuncCurrentSchemas, 1, 1}},
+	ast.PgFuncArrayPosition:        &pgArrayPositionFunctionClass{baseFunctionClass{ast.PgFuncArrayPosition, 2, 2}},
 }
 
 // IsFunctionSupported check if given function name is a builtin sql function.
