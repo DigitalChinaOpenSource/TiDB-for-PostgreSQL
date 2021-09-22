@@ -434,6 +434,15 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 		case mysql.TypeNewDecimal:
 			// fixme decimal 待测试 待修复
 			var dec types.MyDecimal
+			if bind.ParameterFormatCodes[i] == 1 {
+				bits := binary.BigEndian.Uint64(bind.Parameters[i])
+				f64 := math.Float64frombits(bits)
+				err := sc.HandleTruncate(dec.FromFloat64(f64))
+				if err != nil {
+					return err
+				}
+				continue
+			}
 			err := sc.HandleTruncate(dec.FromString(bind.Parameters[i]))
 			if err != nil {
 				return err
