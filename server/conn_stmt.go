@@ -376,6 +376,13 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeInt24, mysql.TypeLong:
+			if bind.ParameterFormatCodes[i] == 1 { // The data passed in is in binary format
+				var b [8]byte
+				copy(b[8-len(bind.Parameters[i]):], bind.Parameters[i])
+				val := binary.BigEndian.Uint64(b[:])
+				args[i] = types.NewUintDatum(val)
+				continue
+			}
 			valInt, err := strconv.Atoi(string(bind.Parameters[i]))
 			if err != nil {
 				return err
