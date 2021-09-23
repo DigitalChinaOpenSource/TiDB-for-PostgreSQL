@@ -82,6 +82,7 @@ type TiDBStatement struct {
 	columnInfo   []*ColumnInfo
 	args         []types.Datum
 	resultFormat []int16
+	paramOIDs    []uint32
 }
 
 // ID implements PreparedStatement ID method.
@@ -229,6 +230,16 @@ func (ts *TiDBStatement) GetResultFormat() []int16 {
 // SetResultFormat 设置结果返回的格式 0 为 Text, 1 为 Binary
 func (ts *TiDBStatement) SetResultFormat(rf []int16) {
 	ts.resultFormat = rf
+}
+
+// GetOIDs return OIDs for the current statement
+func (ts *TiDBStatement) GetOIDs() []uint32 {
+	return ts.paramOIDs
+}
+
+// SetOIDs set OIDs for the current statement
+func (ts *TiDBStatement) SetOIDs(pgOIDs []uint32) {
+	ts.paramOIDs = pgOIDs
 }
 
 // OpenCtx implements IDriver.
