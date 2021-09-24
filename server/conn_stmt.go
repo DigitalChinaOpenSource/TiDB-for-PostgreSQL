@@ -129,7 +129,7 @@ func (cc *clientConn) handleStmtBind(ctx context.Context, bind pgproto3.Bind) (e
 		paramTypes := stmt.GetParamsType()
 
 		args := make([]types.Datum, numParams)
-		err = parseBindArgs(cc.ctx.GetSessionVars().StmtCtx, args, paramTypes, bind, stmt.BoundParams())
+		err = parseBindArgs(cc.ctx.GetSessionVars().StmtCtx, args, paramTypes, bind, stmt.BoundParams(), stmt.GetOIDs())
 		stmt.Reset()
 		if err != nil {
 			return errors.Annotate(err, cc.preparedStmt2String(stmtID))
@@ -337,9 +337,10 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 
 // parseBindArgs 将客户端传来的参数值解析为 Datum 结构
 // PgSQL Modified
-func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind, boundParams [][]byte) error {
+func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind, boundParams [][]byte, pgOIDs []uint32) error {
 	// todo 传参为文本 text 格式时候的处理
 
+	hasOID := len(pgOIDs) > 0
 	for i := 0; i < len(args); i++ {
 
 		// todo 使用boundParams
@@ -455,10 +456,7 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			if bind.ParameterFormatCodes[i] == 1 {
 				bits := binary.BigEndian.Uint64(bind.Parameters[i])
 				f64 := math.Float64frombits(bits)
-				err := sc.HandleTruncate(dec.FromFloat64(f64))
-				if err != nil {
-					return err
-				}
+				args[i] = types.NewFloat64Datum(f64)
 				continue
 			}
 			err := sc.HandleTruncate(dec.FromString(bind.Parameters[i]))
@@ -473,9 +471,25 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			args[i] = types.NewBytesDatum(bind.Parameters[i])
 			continue
 
-		case mysql.TypeUnspecified, mysql.TypeVarchar, mysql.TypeVarString, mysql.TypeString,
+		case mysql.TypeVarchar, mysql.TypeVarString, mysql.TypeString,
 			mysql.TypeEnum, mysql.TypeSet, mysql.TypeGeometry, mysql.TypeBit:
-			// fixme decimal 待测试 待修复
+			tmp := string(hack.String(bind.Parameters[i]))
+			args[i] = types.NewDatum(tmp)
+			continue
+		case mysql.TypeUnspecified:
+			if hasOID {
+				if bind.ParameterFormatCodes[i] == 1 && pgOIDs[i] == 23 { // The data passed in is in binary format
+					args[i] = types.NewBinaryLiteralDatum(bind.Parameters[i])
+					continue
+				}
+
+				if bind.ParameterFormatCodes[i] == 1 && pgOIDs[i] == 701 { // The data passed in is in binary format
+					bits := binary.BigEndian.Uint64(bind.Parameters[i])
+					f64 := math.Float64frombits(bits)
+					args[i] = types.NewFloat64Datum(f64)
+					continue
+				}
+			}
 			tmp := string(hack.String(bind.Parameters[i]))
 			args[i] = types.NewDatum(tmp)
 			continue
