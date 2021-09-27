@@ -60,6 +60,7 @@ import (
 	"time"
 
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	pgOID "github.com/lib/pq/oid"
 	"github.com/pingcap/errors"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
@@ -81,20 +82,56 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parse pgproto3.Pars
 
 	// Get param types in sql plan, and save it in `stmt`.
 	var paramTypes []byte
-	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
-		cachedParams := cachedStmt.PreparedAst.Params
-		for i := range cachedParams {
-			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+
+	// If frontend gives param OID, we convert it to paramTypes directly
+	if len(parse.ParameterOIDs) > 0 {
+		// first we save the oid into stmt
+		stmt.SetOIDs(parse.ParameterOIDs)
+		// then we put converted mysql type into paramTypes
+		for _, oid := range parse.ParameterOIDs {
+			paramTypes = append(paramTypes, pgOIDToMySQLType(oid))
+		}
+	} else {
+		// If frontend didn't send OID, we get it from our prepared statement
+		if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
+			cachedParams := cachedStmt.PreparedAst.Params
+			for i := range cachedParams {
+				paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+			}
 		}
 	}
 
 	stmt.SetParamsType(paramTypes)
 
-	if len(parse.ParameterOIDs) > 0 {
-		stmt.SetOIDs(parse.ParameterOIDs)
-	}
-
 	return cc.writeParseComplete()
+}
+
+// pgOIDToMySQLType converts postgres OID into mysql type
+func pgOIDToMySQLType(oid uint32) byte {
+	switch pgOID.Oid(oid) {
+	case pgOID.T_int8:
+		return mysql.TypeLonglong
+	case pgOID.T_int4:
+		return mysql.TypeLong
+	case pgOID.T_int2:
+		return mysql.TypeShort
+	case pgOID.T_float4:
+		return mysql.TypeFloat
+	case pgOID.T_float8:
+		return mysql.TypeDouble
+	case pgOID.T_timestamp:
+		return mysql.TypeTimestamp
+	case pgOID.T_date:
+		return mysql.TypeNewDate
+	case pgOID.T_numeric:
+		return mysql.TypeNewDecimal
+	case pgOID.T_bytea:
+		return mysql.TypeBlob
+	case pgOID.T_text:
+		return mysql.TypeVarchar
+	default:
+		return mysql.TypeUnspecified
+	}
 }
 
 // handleStmtBind handle bind messages in pgsql's extended query.
