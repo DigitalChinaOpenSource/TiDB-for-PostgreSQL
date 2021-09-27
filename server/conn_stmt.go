@@ -82,29 +82,32 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parse pgproto3.Pars
 
 	// Get param types in sql plan, and save it in `stmt`.
 	var paramTypes []byte
+	numberOfParams := stmt.NumParams()
 
-	// If frontend gives param OID, we convert it to paramTypes directly
-	if len(parse.ParameterOIDs) > 0 {
-		// first we save the oid into stmt
-		stmt.SetOIDs(parse.ParameterOIDs)
-		// then we put converted mysql type into paramTypes
-		for i, oid := range parse.ParameterOIDs {
-			if oid == 0 {
-				// if oid is 0, we get param type from plan
-				cacheStmt := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt)
-				cacheParam := cacheStmt.PreparedAst.Params[i].GetType().Tp
-				paramTypes = append(paramTypes, cacheParam)
-			} else {
-				paramTypes = append(paramTypes, pgOIDToMySQLType(oid))
-			}
-		}
-	} else {
-		// If frontend didn't send OID, we get it from our prepared statement
-		if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
-			cachedParams := cachedStmt.PreparedAst.Params
-			for i := range cachedParams {
-				paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
-			}
+	// parameters' oid sent in by frontend
+	oids := parse.ParameterOIDs
+
+	// here we get cacheParams from our prepared plan.
+	// if oid is not available, we use our prepared plan.
+	cacheStmt := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt)
+	cacheParams := cacheStmt.PreparedAst.Params
+
+	// If frontend send in OIDs, we save them into stmt
+	if len(oids) > 0 {
+		stmt.SetOIDs(oids)
+	}
+
+	for i := 0; i < numberOfParams; i++ {
+		// check if oids are available, there are three situations in which oid is not available:
+		// 1. Frontend didn't send them, since it's optional
+		// 2. Frontend didn't send enough of them
+		// 3. Frontend send in oid of 0, indicate unspecified
+		if len(oids) > i && oids[i] != 0 {
+			// If frontend gives param OID, we convert it to paramTypes directly
+			paramTypes = append(paramTypes, pgOIDToMySQLType(oids[i]))
+		} else {
+			// If OID is not available, we get it from our prepared statement
+			paramTypes = append(paramTypes, cacheParams[i].GetType().Tp)
 		}
 	}
 
