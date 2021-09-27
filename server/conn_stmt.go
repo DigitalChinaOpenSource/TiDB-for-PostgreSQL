@@ -88,8 +88,15 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parse pgproto3.Pars
 		// first we save the oid into stmt
 		stmt.SetOIDs(parse.ParameterOIDs)
 		// then we put converted mysql type into paramTypes
-		for _, oid := range parse.ParameterOIDs {
-			paramTypes = append(paramTypes, pgOIDToMySQLType(oid))
+		for i, oid := range parse.ParameterOIDs {
+			if oid == 0 {
+				// if oid is 0, we get param type from plan
+				cacheStmt := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt)
+				cacheParam := cacheStmt.PreparedAst.Params[i].GetType().Tp
+				paramTypes = append(paramTypes, cacheParam)
+			} else {
+				paramTypes = append(paramTypes, pgOIDToMySQLType(oid))
+			}
 		}
 	} else {
 		// If frontend didn't send OID, we get it from our prepared statement
@@ -127,7 +134,7 @@ func pgOIDToMySQLType(oid uint32) byte {
 		return mysql.TypeNewDecimal
 	case pgOID.T_bytea:
 		return mysql.TypeBlob
-	case pgOID.T_text:
+	case pgOID.T_text, pgOID.T_varchar:
 		return mysql.TypeVarchar
 	default:
 		return mysql.TypeUnspecified
@@ -490,6 +497,12 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeFloat:
+			if formatCode == 1 {
+				bits := binary.BigEndian.Uint32(bind.Parameters[i])
+				f32 := math.Float32frombits(bits)
+				args[i] = types.NewFloat32Datum(f32)
+				continue
+			}
 			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 32)
 			if err != nil {
 				return err
@@ -498,6 +511,12 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeDouble:
+			if formatCode == 1 {
+				bits := binary.BigEndian.Uint64(bind.Parameters[i])
+				f64 := math.Float64frombits(bits)
+				args[i] = types.NewFloat64Datum(f64)
+				continue
+			}
 			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 64)
 			if err != nil {
 				return err
