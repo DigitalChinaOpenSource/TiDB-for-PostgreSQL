@@ -60,6 +60,7 @@ import (
 	"time"
 
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	pgOID "github.com/lib/pq/oid"
 	"github.com/pingcap/errors"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
@@ -81,20 +82,66 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parse pgproto3.Pars
 
 	// Get param types in sql plan, and save it in `stmt`.
 	var paramTypes []byte
-	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
-		cachedParams := cachedStmt.PreparedAst.Params
-		for i := range cachedParams {
-			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+	numberOfParams := stmt.NumParams()
+
+	// parameters' oid sent in by frontend
+	oids := parse.ParameterOIDs
+
+	// here we get cacheParams from our prepared plan.
+	// if oid is not available, we use our prepared plan.
+	cacheStmt := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt)
+	cacheParams := cacheStmt.PreparedAst.Params
+
+	// If frontend send in OIDs, we save them into stmt
+	if len(oids) > 0 {
+		stmt.SetOIDs(oids)
+	}
+
+	for i := 0; i < numberOfParams; i++ {
+		// check if oids are available, there are three situations in which oid is not available:
+		// 1. Frontend didn't send them, since it's optional
+		// 2. Frontend didn't send enough of them
+		// 3. Frontend send in oid of 0, indicate unspecified
+		if len(oids) > i && oids[i] != 0 {
+			// If frontend gives param OID, we convert it to paramTypes directly
+			paramTypes = append(paramTypes, pgOIDToMySQLType(oids[i]))
+		} else {
+			// If OID is not available, we get it from our prepared statement
+			paramTypes = append(paramTypes, cacheParams[i].GetType().Tp)
 		}
 	}
 
 	stmt.SetParamsType(paramTypes)
 
-	if len(parse.ParameterOIDs) > 0 {
-		stmt.SetOIDs(parse.ParameterOIDs)
-	}
-
 	return cc.writeParseComplete()
+}
+
+// pgOIDToMySQLType converts postgres OID into mysql type
+func pgOIDToMySQLType(oid uint32) byte {
+	switch pgOID.Oid(oid) {
+	case pgOID.T_int8:
+		return mysql.TypeLonglong
+	case pgOID.T_int4:
+		return mysql.TypeLong
+	case pgOID.T_int2:
+		return mysql.TypeShort
+	case pgOID.T_float4:
+		return mysql.TypeFloat
+	case pgOID.T_float8:
+		return mysql.TypeDouble
+	case pgOID.T_timestamp:
+		return mysql.TypeTimestamp
+	case pgOID.T_date:
+		return mysql.TypeNewDate
+	case pgOID.T_numeric:
+		return mysql.TypeNewDecimal
+	case pgOID.T_bytea:
+		return mysql.TypeBlob
+	case pgOID.T_text, pgOID.T_varchar:
+		return mysql.TypeVarchar
+	default:
+		return mysql.TypeUnspecified
+	}
 }
 
 // handleStmtBind handle bind messages in pgsql's extended query.
@@ -335,15 +382,38 @@ func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 	return stmtID, fetchSize, nil
 }
 
+// getFormatCode decode the formatCodes passed in from Bind struct
+// it will return 0 if the format is Text, 1 if Binary
+// Note that this will handle empty formatCodes and single format Codes gracefully
+func getFormatCode(formatCodes []int16, index int) int16 {
+	// default format is Text
+	if len(formatCodes) == 0 {
+		return 0
+	}
+
+	// if length is one, use that for all arguments
+	if len(formatCodes) == 1 {
+		return formatCodes[0]
+	}
+
+	return formatCodes[index]
+}
+
 // parseBindArgs 将客户端传来的参数值解析为 Datum 结构
 // PgSQL Modified
 func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes []byte, bind pgproto3.Bind, boundParams [][]byte, pgOIDs []uint32) error {
-	// todo 传参为文本 text 格式时候的处理
 
-	hasOID := len(pgOIDs) > 0
+	var (
+		formatCode int16
+		isUnsigned bool
+	)
+
 	for i := 0; i < len(args); i++ {
 
-		// todo 使用boundParams
+		// todo BoundParams
+		formatCode = getFormatCode(bind.ParameterFormatCodes, i)
+		// todo Check If variable should be signed, currently we are assuming all signed
+		isUnsigned = false
 
 		if bind.Parameters[i] == nil {
 			var nilDatum types.Datum
@@ -351,10 +421,6 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			args[i] = nilDatum
 			continue
 		}
-
-		// todo isUnsigned
-		// isUnsigned 暂时Pg无法判断, 默认为有符号
-		isUnsigned := false
 
 		switch paramTypes[i] {
 		case mysql.TypeNull:
@@ -385,7 +451,7 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeInt24, mysql.TypeLong:
-			if bind.ParameterFormatCodes[i] == 1 { // The data passed in is in binary format
+			if formatCode == 1 { // The data passed in is in binary format
 				var b [8]byte
 				copy(b[8-len(bind.Parameters[i]):], bind.Parameters[i])
 				val := binary.BigEndian.Uint64(b[:])
@@ -416,6 +482,12 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeFloat:
+			if formatCode == 1 {
+				bits := binary.BigEndian.Uint32(bind.Parameters[i])
+				f32 := math.Float32frombits(bits)
+				args[i] = types.NewFloat32Datum(f32)
+				continue
+			}
 			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 32)
 			if err != nil {
 				return err
@@ -424,6 +496,12 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			continue
 
 		case mysql.TypeDouble:
+			if formatCode == 1 {
+				bits := binary.BigEndian.Uint64(bind.Parameters[i])
+				f64 := math.Float64frombits(bits)
+				args[i] = types.NewFloat64Datum(f64)
+				continue
+			}
 			valFloat, err := strconv.ParseFloat(string(bind.Parameters[i]), 64)
 			if err != nil {
 				return err
@@ -453,7 +531,7 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 		case mysql.TypeNewDecimal:
 			// fixme decimal 待测试 待修复
 			var dec types.MyDecimal
-			if bind.ParameterFormatCodes[i] == 1 {
+			if formatCode == 1 {
 				bits := binary.BigEndian.Uint64(bind.Parameters[i])
 				f64 := math.Float64frombits(bits)
 				args[i] = types.NewFloat64Datum(f64)
@@ -477,19 +555,6 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 			args[i] = types.NewDatum(tmp)
 			continue
 		case mysql.TypeUnspecified:
-			if hasOID {
-				if bind.ParameterFormatCodes[i] == 1 && pgOIDs[i] == 23 { // The data passed in is in binary format
-					args[i] = types.NewBinaryLiteralDatum(bind.Parameters[i])
-					continue
-				}
-
-				if bind.ParameterFormatCodes[i] == 1 && pgOIDs[i] == 701 { // The data passed in is in binary format
-					bits := binary.BigEndian.Uint64(bind.Parameters[i])
-					f64 := math.Float64frombits(bits)
-					args[i] = types.NewFloat64Datum(f64)
-					continue
-				}
-			}
 			tmp := string(hack.String(bind.Parameters[i]))
 			args[i] = types.NewDatum(tmp)
 			continue
