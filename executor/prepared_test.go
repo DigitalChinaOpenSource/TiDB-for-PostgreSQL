@@ -19,13 +19,16 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
 	"github.com/DigitalChinaOpenSource/DCParser/mysql"
 	. "github.com/pingcap/check"
 	"github.com/pingcap/tidb/domain"
+	"github.com/pingcap/tidb/executor"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/session"
+	driver "github.com/pingcap/tidb/types/parser_driver"
 	"github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/testkit"
 	"github.com/pingcap/tidb/util/testleak"
@@ -349,6 +352,127 @@ func (s *testPrepareSuite) TestPlanCacheWithDifferentVariableTypes(c *C) {
 	}
 }
 
+type sorterTestCase struct {
+	query     string // the sql responsible for creating this test case
+	input     []ast.ParamMarkerExpr
+	expected  []ast.ParamMarkerExpr
+	shouldErr bool // true if this should raise an error
+}
+
+// newMockParamExpr returns a mock ParamMarkerExpr with only Order and Offset set
+func newMockParamExpr(order, offset int) ast.ParamMarkerExpr {
+	// casting magic
+	return &driver.ParamMarkerExpr{
+		Order:  order,
+		Offset: offset,
+	}
+}
+
+func (s *testPrepareSuite) TestParamMakerSorter(c *C) {
+	testCases := []sorterTestCase{
+		{
+			query:     "INSERT INTO param_test VALUES (?)",
+			input:     []ast.ParamMarkerExpr{newMockParamExpr(0, 31)},
+			expected:  []ast.ParamMarkerExpr{newMockParamExpr(0, 31)},
+			shouldErr: false,
+		},
+		{
+			query:     "INSERT INTO param_test VALUES ($1)",
+			input:     []ast.ParamMarkerExpr{newMockParamExpr(1, 32)},
+			expected:  []ast.ParamMarkerExpr{newMockParamExpr(0, 32)},
+			shouldErr: false,
+		},
+		{
+			query: "INSERT INTO param_test VALUES (?), (?)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 36),
+				newMockParamExpr(0, 31),
+			},
+			expected: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 31),
+				newMockParamExpr(1, 36),
+			},
+			shouldErr: false,
+		},
+		{
+			query: "INSERT INTO param_test VALUES ($1), ($2)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(1, 31),
+				newMockParamExpr(2, 36),
+			},
+			expected: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 31),
+				newMockParamExpr(1, 36),
+			},
+			shouldErr: false,
+		},
+		{
+			query: "INSERT INTO param_test VALUES ($2), ($1)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(2, 32),
+				newMockParamExpr(1, 38),
+			},
+			expected: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 38),
+				newMockParamExpr(1, 32),
+			},
+			shouldErr: false,
+		},
+		{
+			query: "INSERT INTO param_test VALUES ($1), ($1)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(1, 32),
+				newMockParamExpr(1, 38),
+			},
+			expected:  nil,
+			shouldErr: true,
+		},
+		{
+			query: "INSERT INTO param_test VALUES ($1), (?)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(1, 32),
+				newMockParamExpr(0, 37),
+			},
+			expected:  nil,
+			shouldErr: true,
+		}, {
+			query: "INSERT INTO param_test VALUES ($0), ($1)",
+			input: []ast.ParamMarkerExpr{
+				newMockParamExpr(0, 32),
+				newMockParamExpr(1, 38),
+			},
+			expected:  nil,
+			shouldErr: true,
+		},
+	}
+
+	runSorterTest(c, testCases)
+}
+
+func runSorterTest(c *C, testCases []sorterTestCase) {
+	for _, testCase := range testCases {
+		err := executor.ParamMakerSorter(testCase.input)
+		if testCase.shouldErr {
+			// For test case that should return error
+			c.Assert(err, NotNil)
+		} else {
+			equalOrderOffset(c, testCase.input, testCase.expected)
+		}
+	}
+}
+
+// equalOrderOffset checks that every pair of ParamMarkerExpr from source and target has the same Offset and Order
+func equalOrderOffset(c *C, source, target []ast.ParamMarkerExpr) {
+	// source and target must have same length
+	c.Assert(len(source), Equals, len(target))
+
+	// loop through source input and compare Order and Offset for each case
+	for index, sourceCase := range source {
+		c.Assert(sourceCase.(*driver.ParamMarkerExpr).Order, Equals, target[index].(*driver.ParamMarkerExpr).Order)
+		c.Assert(sourceCase.(*driver.ParamMarkerExpr).Offset, Equals, target[index].(*driver.ParamMarkerExpr).Offset)
+	}
+}
+
 type testParamType struct {
 	sql        string
 	expectType []byte
@@ -403,7 +527,7 @@ func (s *testPrepareSuite) TestGetPrepareParamType(c *C) {
 
 		if cachedStmt, ok := tk.Se.GetSessionVars().PreparedStmts[stmtID].(*plannercore.CachedPrepareStmt); ok {
 			cachedParams := cachedStmt.PreparedAst.Params
-			for i, _ := range cachedParams {
+			for i := range cachedParams {
 				paramType := cachedParams[i].GetType().Tp
 				c.Assert(paramType, Equals, v1.expectType[i])
 			}

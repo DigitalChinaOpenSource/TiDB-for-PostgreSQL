@@ -173,6 +173,12 @@ type PreparedStatement interface {
 
 	// SetResultFormat 设置结果返回的格式 0 为 Text, 1 为 Binary
 	SetResultFormat(rf []int16)
+
+	// GetOIDs returns the postgres OIDs
+	GetOIDs() []uint32
+
+	// SetOIDs set the postgres OIDs
+	SetOIDs(pgOIDs []uint32)
 }
 
 // ResultSet is the result set of an query.
