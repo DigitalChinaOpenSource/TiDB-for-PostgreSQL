@@ -472,7 +472,6 @@ func equalOrderOffset(c *C, source, target []ast.ParamMarkerExpr) {
 		c.Assert(sourceCase.(*driver.ParamMarkerExpr).Offset, Equals, target[index].(*driver.ParamMarkerExpr).Offset)
 	}
 }
-
 type testParamType struct {
 	sql        string
 	expectType []byte

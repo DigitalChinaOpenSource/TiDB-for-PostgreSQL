@@ -1,0 +1,237 @@
+// Copyright 2021 Digital China Group Co.,Ltd
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package dc
+
+import (
+	"context"
+	"runtime"
+	"runtime/trace"
+	"strings"
+	"time"
+
+	"github.com/DigitalChinaOpenSource/DCParser/mysql"
+	"github.com/DigitalChinaOpenSource/DCParser/terror"
+	"github.com/jackc/pgio"
+	"github.com/jackc/pgproto3"
+	"github.com/jackc/pgtype"
+	"github.com/pingcap/tidb/server"
+	"github.com/pingcap/tidb/util/execdetails"
+	"github.com/pingcap/tidb/util/logutil"
+	"github.com/pingcap/tidb/util/memory"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+)
+
+// writeResultset writes data into a resultset and uses rs.Next to get row data back.
+// If resultFormat is nil, the data would be encoded in Text format.
+// If resultFormat just one value, the data would be encoded in Text(0) or Binary(1) format
+// If resultFormat have many values, each column would be encoded in Text(0) or Binary(1) format.
+// serverStatus, a flag bit represents server information.
+// fetchSize, the desired number of rows to be fetched each time when client uses cursor.
+func WriteResultset(ctx context.Context, rs server.ResultSet, resultFormat []int16, serverStatus uint16, fetchSize int) (runErr error) {
+	defer func() {
+		// close ResultSet when cursor doesn't exist
+		r := recover()
+		if r == nil {
+			return
+		}
+		if str, ok := r.(string); !ok || !strings.HasPrefix(str, memory.PanicMemoryExceed) {
+			panic(r)
+		}
+		// TODO(jianzhang.zj: add metrics here)
+		runErr = errors.Errorf("%v", r)
+		buf := make([]byte, 4096)
+		stackSize := runtime.Stack(buf, false)
+		buf = buf[:stackSize]
+		logutil.Logger(ctx).Error("write query result panic", zap.Stringer("lastSQL", getLastStmtInConn{cc}), zap.String("stack", string(buf)))
+	}()
+	var err error
+	if mysql.HasCursorExistsFlag(serverStatus) {
+		// todo writeChunksWithFetchSize
+		//err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
+		err = nil
+	} else {
+		err = writeChunks(ctx, rs, serverStatus, resultFormat)
+	}
+
+	return err
+}
+
+func writeChunks(ctx context.Context, rs server.ResultSet, serverStatus uint16, rf []int16) error {
+	data := cc.alloc.AllocWithLen(0, 1024)
+	req := rs.NewChunk()
+
+	// 当为预处理查询执行时，在执行完成后不需要返回 RowDescription
+	gotColumnInfo := rs.IsPrepareStmt()
+
+	var stmtDetail *execdetails.StmtExecDetails
+	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
+	if stmtDetailRaw != nil {
+		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
+	}
+	for {
+		// Here server.tidbResultSet implements Next method.
+		err := rs.Next(ctx, req)
+		if err != nil {
+			return err
+		}
+		if !gotColumnInfo {
+			// We need to call Next before we get columns.
+			// Otherwise, we will get incorrect columns info.
+			columns := rs.Columns()
+			// err = cc.writeColumnInfo(columns, serverStatus)
+			err = cc.WriteRowDescription(columns)
+			if err != nil {
+				return err
+			}
+			gotColumnInfo = true
+		}
+		rowCount := req.NumRows()
+		if rowCount == 0 {
+			break
+		}
+		start := time.Now()
+		reg := trace.StartRegion(ctx, "WriteClientConn")
+
+		// rowdata : 'D' + len(msg) + len(columns) + for(len(val) + val)
+		data = append(data, 'D')
+		data = pgio.AppendInt32(data, -1)
+		for i := 0; i < rowCount; i++ {
+			data = data[0:5]
+			if len(rf) > 0 {
+				data, err = dumpRowData(data, rs.Columns(), req.GetRow(i), rf)
+			} else {
+				data, err = dumpTextRowData(data, rs.Columns(), req.GetRow(i))
+			}
+			if err != nil {
+				return err
+			}
+
+			pgio.SetInt32(data[1:], int32(len(data[1:])))
+			if err = cc.WriteData(data); err != nil {
+				return err
+			}
+		}
+		if stmtDetail != nil {
+			stmtDetail.WriteSQLRespDuration += time.Since(start)
+		}
+		reg.End()
+	}
+
+	return cc.writeCommandComplete()
+}
+
+func WriteRowDescription(columns []*server.ColumnInfo) error {
+	if len(columns) <= 0 || columns == nil {
+		return errors.New("columnInfos is empty")
+	}
+	rowDescription := convertColumnInfoToRowDescription(columns)
+
+	return WriteData(rowDescription.Encode(nil))
+}
+
+func writeRowDescription(columns []*server.ColumnInfo) error {
+	if len(columns) <= 0 || columns == nil {
+		return errors.New("columnInfos is empty")
+	}
+	rowDescription := convertColumnInfoToRowDescription(columns)
+
+	return WriteData(rowDescription.Encode(nil))
+}
+
+func convertColumnInfoToRowDescription(columns []*server.ColumnInfo) pgproto3.RowDescription {
+	// todo 完善两者字段结构信息的转换
+
+	if strings.Contains(columns[0].Name, "(") {
+		columns[0].Name = strings.Split(columns[0].Name, "(")[0]
+	}
+	fieldDescriptions := make([]pgproto3.FieldDescription, len(columns))
+	for index := range columns {
+		fieldDescriptions[index] = pgproto3.FieldDescription{
+			Name:                 []byte(columns[index].Name),
+			TableOID:             0,
+			TableAttributeNumber: 0,
+			DataTypeOID:          convertMySQLDataTypeToPgSQLDataType(columns[index].Type),
+			DataTypeSize:         int16(columns[index].ColumnLength),
+			TypeModifier:         0,
+			Format:               0,
+		}
+	}
+
+	return pgproto3.RowDescription{Fields: fieldDescriptions}
+}
+
+func convertMySQLDataTypeToPgSQLDataType(mysqlType uint8) uint32 {
+	// todo 完善 mysql 和 pgsql 对应的数据类型
+
+	switch mysqlType {
+	case mysql.TypeUnspecified:
+		return pgtype.UnknownOID
+	case mysql.TypeTiny, mysql.TypeShort:
+		return pgtype.Int2OID
+	case mysql.TypeLong, mysql.TypeInt24:
+		return pgtype.Int4OID
+	case mysql.TypeFloat:
+		return pgtype.Float4OID
+	case mysql.TypeDouble:
+		return pgtype.Float8OID
+	case mysql.TypeNull: //未找到对应类型
+		return pgtype.UnknownOID
+	case mysql.TypeTimestamp:
+		return pgtype.TimestampOID
+	case mysql.TypeLonglong:
+		return pgtype.Int8OID
+	case mysql.TypeDate:
+		return pgtype.DateOID
+	case mysql.TypeDuration:
+		return pgtype.TimeOID //与Time并不完全想对应
+	case mysql.TypeDatetime:
+		return pgtype.TimestampOID
+	case mysql.TypeYear:
+		return pgtype.UnknownOID //未找到对应类型
+	case mysql.TypeNewDate:
+		return pgtype.DateOID
+	case mysql.TypeVarchar:
+		return pgtype.VarcharOID
+	case mysql.TypeBit:
+		return pgtype.BitOID
+	case mysql.TypeJSON:
+		return pgtype.JSONOID
+	case mysql.TypeNewDecimal:
+		return pgtype.NumericOID
+	case mysql.TypeEnum:
+		return pgtype.UnknownOID //未找到对应类型dumpLengthEncodedStringByEndian
+	case mysql.TypeSet:
+		return pgtype.UnknownOID //未找到对应类型
+	case mysql.TypeTinyBlob, mysql.TypeMediumBlob, mysql.TypeLongBlob, mysql.TypeBlob:
+		return pgtype.ByteaOID
+	case mysql.TypeVarString, mysql.TypeString:
+		return pgtype.TextOID
+	case mysql.TypeGeometry:
+		return pgtype.UnknownOID //未找到对应类型
+	default:
+		return pgtype.UnknownOID
+	}
+}
+
+func WriteData(data []byte) error {
+	if n, err := cc.pkt.bufWriter.Write(data); err != nil {
+		terror.Log(errors.Trace(err))
+		return errors.Trace(mysql.ErrBadConn)
+	} else if n != len(data) {
+		return errors.Trace(mysql.ErrBadConn)
+	} else {
+		return nil
+	}
+}

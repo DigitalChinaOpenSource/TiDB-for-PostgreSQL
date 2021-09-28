@@ -27,8 +27,9 @@
 package core
 
 import (
-	driver "github.com/pingcap/tidb/types/parser_driver"
 	"unsafe"
+
+	driver "github.com/pingcap/tidb/types/parser_driver"
 
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -74,6 +75,7 @@ var (
 	_ PhysicalPlan = &PhysicalShuffle{}
 	_ PhysicalPlan = &PhysicalShuffleDataSourceStub{}
 	_ PhysicalPlan = &BatchPointGetPlan{}
+	_ PhysicalPlan = &PhysicalReturning{}
 )
 
 // PhysicalTableReader is the table reader in tidb.
@@ -1030,4 +1032,14 @@ func CheckParamFullySeted(paramExprs *[]ast.ParamMarkerExpr) bool {
 		}
 	}
 	return true
+}
+
+// PhysicalReturning presents a returning plan
+type PhysicalReturning struct {
+	basePhysicalPlan
+}
+
+// SetParamType of PhysicalReturning
+func (p *PhysicalReturning) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return nil
 }

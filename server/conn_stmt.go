@@ -223,7 +223,7 @@ func (cc *clientConn) handleStmtDescription(ctx context.Context, desc pgproto3.D
 	var ok bool
 	var isPortal bool
 
-	// If it specifies the prepared statement through portal,
+	// If it specify the prepared statement through portal,
 	// here can directly find the corresponding stmtID through portal.
 	if desc.ObjectType == 'P' {
 		stmtID, ok = vars.Portal[desc.Name]
