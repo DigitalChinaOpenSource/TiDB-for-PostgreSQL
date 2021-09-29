@@ -511,14 +511,24 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 		case mysql.TypeTimestamp:
 			// we ignore timezone here
 			timeStr := string(bind.Parameters[i])
-			tzIndex := strings.Index(timeStr, " +")
-			if tzIndex == -1 {
-				args[i] = types.NewDatum(timeStr)
+			// some timezone start with +, for example +08:00:00, or -, like -04:00:00
+			pluesIndex := strings.Index(timeStr, " +")
+			if pluesIndex > 0 {
+				noTzStr := timeStr[:pluesIndex]
+				args[i] = types.NewDatum(noTzStr)
 				continue
 			}
-			noTzStr := timeStr[:tzIndex]
-			args[i] = types.NewDatum(noTzStr)
+
+			minusIndex := strings.Index(timeStr, " -")
+			if minusIndex > 0 {
+				noTzStr := timeStr[:minusIndex]
+				args[i] = types.NewDatum(noTzStr)
+				continue
+			}
+
+			args[i] = types.NewDatum(timeStr)
 			continue
+
 		case mysql.TypeDate, mysql.TypeDatetime:
 			// fixme 日期待测试 待修复
 			args[i] = types.NewDatum(string(bind.Parameters[i]))
