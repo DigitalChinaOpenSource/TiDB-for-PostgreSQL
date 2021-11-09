@@ -723,6 +723,8 @@ type Insert struct {
 	NeedFillDefaultValue bool
 
 	AllAssignmentsAreConstant bool
+
+	ReturningPlan PhysicalPlan
 }
 
 // Update represents Update plan.
@@ -734,6 +736,8 @@ type Update struct {
 	AllAssignmentsAreConstant bool
 
 	SelectPlan PhysicalPlan
+
+	ReturningPlan PhysicalPlan
 
 	TblColPosInfos TblColPosInfoSlice
 

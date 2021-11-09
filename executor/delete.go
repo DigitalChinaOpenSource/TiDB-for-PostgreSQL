@@ -37,6 +37,7 @@ type DeleteExec struct {
 	// the columns ordinals is present in ordinal range format, @see plannercore.TblColPosInfos
 	tblColPosInfos plannercore.TblColPosInfoSlice
 	memTracker     *memory.Tracker
+	affectedRow    *chunk.Chunk
 
 	returning Executor
 }
@@ -114,6 +115,7 @@ func (e *DeleteExec) deleteSingleTableByChunk(ctx context.Context) error {
 			}
 			rowCount++
 		}
+		e.AddAffectedRows(chk)
 		chk = chunk.Renew(chk, e.maxChunkSize)
 	}
 
@@ -218,3 +220,13 @@ func (e *DeleteExec) Open(ctx context.Context) error {
 // the key in map[int64]Row is the joined table handle, which represent a unique reference row.
 // the value in map[int64]Row is the deleting row.
 type tableRowMapType map[int64]map[int64][]types.Datum
+
+// AffectedRows get affected rows.
+func (e *DeleteExec) AffectedRows() *chunk.Chunk {
+	return e.affectedRow
+}
+
+// AddAffectedRows adds affected row.
+func (e *DeleteExec) AddAffectedRows(chk *chunk.Chunk) {
+	e.affectedRow = chk
+}

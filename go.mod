@@ -3,7 +3,7 @@ module github.com/pingcap/tidb
 require (
 	cloud.google.com/go v0.51.0 // indirect
 	github.com/BurntSushi/toml v0.3.1
-	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210916075513-3aea1f464b37
+	github.com/DigitalChinaOpenSource/DCParser v0.0.0-20210926085539-2a09948998e3
 	github.com/DigitalChinaOpenSource/dcbr v4.0.11+incompatible
 	github.com/Jeffail/gabs/v2 v2.5.1
 	github.com/aws/aws-sdk-go v1.30.24 // indirect

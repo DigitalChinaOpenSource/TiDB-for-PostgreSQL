@@ -1710,6 +1710,11 @@ func (b *executorBuilder) buildUpdate(v *plannercore.Update) Executor {
 		tblID2table:               tblID2table,
 		tblColPosInfos:            v.TblColPosInfos,
 	}
+
+	if v.ReturningPlan != nil {
+		updateExec.returning = b.build(v.ReturningPlan)
+	}
+
 	return updateExec
 }
 

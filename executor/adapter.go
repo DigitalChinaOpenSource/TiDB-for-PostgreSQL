@@ -368,28 +368,10 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 		return a.handlePessimisticSelectForUpdate(ctx, e)
 	}
 
-	// Do returning
-	var returningRS *recordSet
-	switch e.(type) {
-	case *DeleteExec:
-		if del, ok := e.(*DeleteExec); ok && del.returning != nil {
-			err = del.returning.Next(ctx, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			if ret, ok := del.returning.(*ReturningExec); ok {
-				returningRS = ret.ResultSet
-				returningRS.stmt = a // to fix executor.(*recordSet).Fields panic issue
-			}
-		}
-	}
-
 	if handled, result, err := a.handleNoDelay(ctx, e, isPessimistic); handled {
-		if returningRS != nil {
-			return returningRS, err
-		}
-
+		//if returningRS != nil {
+		//	return returningRS, err
+		//}
 		return result, err
 	}
 
@@ -537,7 +519,7 @@ func (a *ExecStmt) handleNoDelayExecutor(ctx context.Context, e Executor) (sqlex
 		defer span1.Finish()
 		ctx = opentracing.ContextWithSpan(ctx, span1)
 	}
-
+	var returningRS *recordSet
 	// Check if "tidb_snapshot" is set for the write executors.
 	// In history read mode, we can not do write operations.
 	switch e.(type) {
@@ -562,7 +544,42 @@ func (a *ExecStmt) handleNoDelayExecutor(ctx context.Context, e Executor) (sqlex
 	if err != nil {
 		return nil, err
 	}
+
+	// Do returning
+	returningRS = getReturningRecordSet(ctx, e, a)
+
+	if returningRS != nil {
+		return returningRS, err
+	}
 	return nil, err
+}
+
+func getReturningRecordSet(ctx context.Context, e Executor, a *ExecStmt) *recordSet {
+	var rs *recordSet
+	if del, ok := e.(*DeleteExec); ok && del.returning != nil {
+		err := del.returning.Next(ctx, del.AffectedRows())
+		if err != nil {
+			return rs
+		}
+
+		if ret, ok := del.returning.(*ReturningExec); ok {
+			rs = ret.ResultSet
+			rs.stmt = a
+		}
+	}
+
+	if updt, ok := e.(*UpdateExec); ok && updt.returning != nil {
+		err := updt.returning.Next(ctx, updt.AffectedRows())
+		if err != nil {
+			return rs
+		}
+
+		if ret, ok := updt.returning.(*ReturningExec); ok {
+			rs = ret.ResultSet
+			rs.stmt = a
+		}
+	}
+	return rs
 }
 
 func (a *ExecStmt) handlePessimisticDML(ctx context.Context, e Executor) error {

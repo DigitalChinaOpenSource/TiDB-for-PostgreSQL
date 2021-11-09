@@ -4033,6 +4033,17 @@ func (b *PlanBuilder) buildUpdate(ctx context.Context, update *ast.UpdateStmt) (
 		err = checkUpdateList(b.ctx, tblID2table, updt)
 	}
 	updt.PartitionedTable = b.partitionedTable
+	if update.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, update, update.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		updt.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return updt, err
 }
 
@@ -5178,9 +5189,17 @@ func containDifferentJoinTypes(preferJoinType uint) bool {
 	return cnt > 1
 }
 
-func (b *PlanBuilder) buildReturning(ctx context.Context, delete *ast.DeleteStmt, returning *ast.ReturningClause) (p LogicalPlan, err error) {
+func (b *PlanBuilder) buildReturning(ctx context.Context, node ast.Node, returning *ast.ReturningClause) (p LogicalPlan, err error) {
 
-	p, err = b.buildTableRefsWithCache(ctx, delete.TableRefs)
+	switch x := node.(type) {
+	case *ast.DeleteStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.TableRefs)
+	case *ast.UpdateStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.TableRefs)
+	case *ast.InsertStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.Table)
+	}
+
 	if err != nil {
 		return nil, err
 	}

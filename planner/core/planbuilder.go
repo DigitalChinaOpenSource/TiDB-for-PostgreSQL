@@ -2300,6 +2300,17 @@ func (b *PlanBuilder) buildInsert(ctx context.Context, insert *ast.InsertStmt) (
 		return nil, err
 	}
 
+	if insert.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, insert, insert.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		insertPlan.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+		if err != nil {
+			return nil, err
+		}
+	}
 	err = insertPlan.ResolveIndices()
 	return insertPlan, err
 }

@@ -42,7 +42,7 @@ func (e *ReturningExec) Open(ctx context.Context) error {
 
 // Next Returning Executor
 func (e *ReturningExec) Next(ctx context.Context, req *chunk.Chunk) error {
-	return e.fetchRowChunks(ctx)
+	return e.fetchRowChunks(ctx, req)
 }
 
 // Close Returning Executor
@@ -51,7 +51,7 @@ func (e *ReturningExec) Close() error {
 }
 
 // Returning Executor fetchRowChunks
-func (e *ReturningExec) fetchRowChunks(ctx context.Context) error {
+func (e *ReturningExec) fetchRowChunks(ctx context.Context, req *chunk.Chunk) error {
 	defer func() {
 		e.fetched = true
 	}()
@@ -65,39 +65,27 @@ func (e *ReturningExec) fetchRowChunks(ctx context.Context) error {
 	rs := &recordSet{
 		executor: e.base().children[0],
 	}
-
-	rs.rows = make([]chunk.Row, 0, 1024)
-
-	for {
-		req := rs.NewChunk()
-		// Here server.tidbResultSet implements Next method.
-		err := rs.Next(ctx, req)
-		if err != nil {
-			return err
-		}
-
-		rowCount := req.NumRows()
-		if rowCount == 0 {
-			break
-		}
-		start := time.Now()
-		reg := trace.StartRegion(ctx, "ProcessReturning")
-
-		for i := 0; i < rowCount; i++ {
-			row := req.GetRow(i)
-
-			row.IsNull(0)
-
-			rs.rows = append(rs.rows, row)
-		}
-
-		if stmtDetail != nil {
-			stmtDetail.WriteSQLRespDuration += time.Since(start)
-		}
-		reg.End()
+	e.ResultSet = rs
+	rs.NewChunk()
+	if req == nil {
+		return nil
 	}
 
+	rowCount := req.NumRows()
+	if rowCount == 0 {
+		return nil
+	}
+	start := time.Now()
+	reg := trace.StartRegion(ctx, "ProcessReturning")
+	iter := chunk.NewIterator4Chunk(req)
+	for chunkRow := iter.Begin(); chunkRow != iter.End(); chunkRow = iter.Next() {
+		rs.rows = append(rs.rows, chunkRow)
+	}
 	e.ResultSet = rs
+	if stmtDetail != nil {
+		stmtDetail.WriteSQLRespDuration += time.Since(start)
+	}
+	reg.End()
 
 	return nil
 }
