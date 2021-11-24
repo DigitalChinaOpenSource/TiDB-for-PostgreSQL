@@ -15,6 +15,7 @@ package executor
 
 import (
 	"context"
+	"github.com/pingcap/tidb/types"
 	"runtime/trace"
 	"time"
 
@@ -27,11 +28,11 @@ import (
 type ReturningExec struct {
 	baseExecutor
 
-	Idx     int
-	fetched bool
-	schema  *expression.Schema
-
-	ResultSet *recordSet
+	Idx             int
+	fetched         bool
+	schema          *expression.Schema
+	ReturningFields types.NameSlice
+	ResultSet       *recordSet
 }
 
 // Open Returning Executor

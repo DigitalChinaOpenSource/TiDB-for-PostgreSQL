@@ -579,6 +579,19 @@ func getReturningRecordSet(ctx context.Context, e Executor, a *ExecStmt) *record
 			rs.stmt = a
 		}
 	}
+
+	if insert, ok := e.(*InsertExec); ok && insert.returning != nil {
+		err := insert.returning.Next(ctx, insert.evalBuffer4Return.ToRow().Chunk())
+		if err != nil {
+			return rs
+		}
+
+		if ret, ok := insert.returning.(*ReturningExec); ok {
+			rs = ret.ResultSet
+			rs.stmt = a
+			rs.stmt.OutputNames = ret.ReturningFields
+		}
+	}
 	return rs
 }
 

@@ -429,6 +429,7 @@ type PlanBuilder struct {
 	windowSpecs  map[string]*ast.WindowSpec
 	inUpdateStmt bool
 	inDeleteStmt bool
+	inInsertStmt bool
 	// inStraightJoin represents whether the current "SELECT" statement has
 	// "STRAIGHT_JOIN" option.
 	inStraightJoin bool
@@ -2184,6 +2185,7 @@ func (b *PlanBuilder) resolveGeneratedColumns(ctx context.Context, columns []*ta
 }
 
 func (b *PlanBuilder) buildInsert(ctx context.Context, insert *ast.InsertStmt) (Plan, error) {
+	b.inInsertStmt = true
 	ts, ok := insert.Table.TableRefs.Left.(*ast.TableSource)
 	if !ok {
 		return nil, infoschema.ErrTableNotExists.GenWithStackByArgs()
@@ -2311,6 +2313,7 @@ func (b *PlanBuilder) buildInsert(ctx context.Context, insert *ast.InsertStmt) (
 			return nil, err
 		}
 	}
+	insertPlan.SetOutputNames(names)
 	err = insertPlan.ResolveIndices()
 	return insertPlan, err
 }

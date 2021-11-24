@@ -37,10 +37,12 @@ import (
 // InsertExec represents an insert executor.
 type InsertExec struct {
 	*InsertValues
-	OnDuplicate    []*expression.Assignment
-	evalBuffer4Dup chunk.MutRow
-	curInsertVals  chunk.MutRow
-	row4Update     []types.Datum
+	OnDuplicate       []*expression.Assignment
+	evalBuffer4Dup    chunk.MutRow
+	evalBuffer4Return chunk.MutRow
+	curInsertVals     chunk.MutRow
+	row4Update        []types.Datum
+	returning         Executor
 
 	Priority mysql.PriorityEnum
 }
@@ -312,6 +314,10 @@ func (e *InsertExec) Open(ctx context.Context) error {
 	if !e.allAssignmentsAreConstant {
 		e.initEvalBuffer()
 	}
+	if e.returning != nil {
+		e.initEvalBuffer4Return()
+	}
+
 	return nil
 }
 
@@ -336,6 +342,27 @@ func (e *InsertExec) initEvalBuffer4Dup() {
 	e.evalBuffer4Dup = chunk.MutRowFromTypes(evalBufferTypes)
 	e.curInsertVals = chunk.MutRowFromTypes(evalBufferTypes[numWritableCols:])
 	e.row4Update = make([]types.Datum, 0, len(evalBufferTypes))
+}
+
+func (e *InsertExec) initEvalBuffer4Return() {
+	// Use public columns for new row.
+	numCols := len(e.Table.Cols())
+	// Use writable columns for old row for update.
+	numWritableCols := len(e.Table.WritableCols())
+
+	evalBufferTypes := make([]*types.FieldType, 0, numCols+numWritableCols)
+
+	// Append the old row before the new row, to be consistent with "Schema4OnDuplicate" in the "Insert" PhysicalPlan.
+	for _, col := range e.Table.WritableCols() {
+		evalBufferTypes = append(evalBufferTypes, &col.FieldType)
+	}
+	for _, col := range e.Table.Cols() {
+		evalBufferTypes = append(evalBufferTypes, &col.FieldType)
+	}
+	if e.hasExtraHandle {
+		evalBufferTypes = append(evalBufferTypes, types.NewFieldType(mysql.TypeLonglong))
+	}
+	e.evalBuffer4Return = chunk.MutRowFromTypes(evalBufferTypes[numWritableCols:])
 }
 
 // doDupRowUpdate updates the duplicate row.

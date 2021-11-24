@@ -725,6 +725,12 @@ func (b *executorBuilder) buildInsert(v *plannercore.Insert) Executor {
 		InsertValues: ivs,
 		OnDuplicate:  append(v.OnDuplicate, v.GenCols.OnDuplicates...),
 	}
+
+	if v.ReturningPlan != nil {
+		insert.returning = b.build(v.ReturningPlan)
+		insert.returning.(*ReturningExec).ReturningFields = v.OutputNames()
+	}
+
 	return insert
 }
 

@@ -3408,13 +3408,13 @@ func (b *PlanBuilder) buildDataSource(ctx context.Context, tn *ast.TableName, as
 		}
 	}
 	ds := DataSource{
-		DBName:              dbName,
-		TableAsName:         asName,
-		table:               tbl,
-		tableInfo:           tableInfo,
-		statisticTable:      statisticTable,
-		astIndexHints:       tn.IndexHints,
-		IndexHints:          b.TableHints().indexHintList,
+		DBName:         dbName,
+		TableAsName:    asName,
+		table:          tbl,
+		tableInfo:      tableInfo,
+		statisticTable: statisticTable,
+		astIndexHints:  tn.IndexHints,
+		//IndexHints:          b.TableHints().indexHintList,
 		indexMergeHints:     indexMergeHints,
 		possibleAccessPaths: possiblePaths,
 		Columns:             make([]*model.ColumnInfo, 0, len(columns)),
@@ -3424,7 +3424,9 @@ func (b *PlanBuilder) buildDataSource(ctx context.Context, tn *ast.TableName, as
 		is:                  b.is,
 		isForUpdateRead:     b.isForUpdateRead,
 	}.Init(b.ctx, b.getSelectOffset())
-
+	if !b.inInsertStmt {
+		ds.IndexHints = b.TableHints().indexHintList
+	}
 	var handleCol *expression.Column
 	schema := expression.NewSchema(make([]*expression.Column, 0, len(columns))...)
 	names := make([]*types.FieldName, 0, len(columns))
