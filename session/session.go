@@ -43,7 +43,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/DigitalChinaOpenSource/DCParser"
+	parser "github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/auth"
 	"github.com/DigitalChinaOpenSource/DCParser/charset"

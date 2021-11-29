@@ -37,6 +37,9 @@ type DeleteExec struct {
 	// the columns ordinals is present in ordinal range format, @see plannercore.TblColPosInfos
 	tblColPosInfos plannercore.TblColPosInfoSlice
 	memTracker     *memory.Tracker
+	affectedRow    *chunk.Chunk
+
+	returning Executor
 }
 
 // Next implements the Executor Next interface.
@@ -112,6 +115,7 @@ func (e *DeleteExec) deleteSingleTableByChunk(ctx context.Context) error {
 			}
 			rowCount++
 		}
+		e.AddAffectedRows(chk)
 		chk = chunk.Renew(chk, e.maxChunkSize)
 	}
 
@@ -197,10 +201,32 @@ func (e *DeleteExec) Open(ctx context.Context) error {
 	e.memTracker = memory.NewTracker(e.id, -1)
 	e.memTracker.AttachTo(e.ctx.GetSessionVars().StmtCtx.MemTracker)
 
-	return e.children[0].Open(ctx)
+	err := e.children[0].Open(ctx)
+	if err != nil {
+		return err
+	}
+
+	if e.returning != nil {
+		err = e.returning.Open(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // tableRowMapType is a map for unique (Table, Row) pair. key is the tableID.
 // the key in map[int64]Row is the joined table handle, which represent a unique reference row.
 // the value in map[int64]Row is the deleting row.
 type tableRowMapType map[int64]map[int64][]types.Datum
+
+// AffectedRows get affected rows.
+func (e *DeleteExec) AffectedRows() *chunk.Chunk {
+	return e.affectedRow
+}
+
+// AddAffectedRows adds affected row.
+func (e *DeleteExec) AddAffectedRows(chk *chunk.Chunk) {
+	e.affectedRow = chk
+}
