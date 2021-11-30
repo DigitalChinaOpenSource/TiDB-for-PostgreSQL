@@ -230,6 +230,8 @@ func (b *executorBuilder) build(p plannercore.Plan) Executor {
 		return b.buildAdminShowTelemetry(v)
 	case *plannercore.AdminResetTelemetryID:
 		return b.buildAdminResetTelemetryID(v)
+	case *plannercore.PhysicalReturning:
+		return b.buildReturning(v)
 	default:
 		if mp, ok := p.(MockPhysicalPlan); ok {
 			return mp.GetExecutor()
@@ -723,6 +725,12 @@ func (b *executorBuilder) buildInsert(v *plannercore.Insert) Executor {
 		InsertValues: ivs,
 		OnDuplicate:  append(v.OnDuplicate, v.GenCols.OnDuplicates...),
 	}
+
+	if v.ReturningPlan != nil {
+		insert.returning = b.build(v.ReturningPlan)
+		insert.returning.(*ReturningExec).ReturningFields = v.OutputNames()
+	}
+
 	return insert
 }
 
@@ -1708,6 +1716,11 @@ func (b *executorBuilder) buildUpdate(v *plannercore.Update) Executor {
 		tblID2table:               tblID2table,
 		tblColPosInfos:            v.TblColPosInfos,
 	}
+
+	if v.ReturningPlan != nil {
+		updateExec.returning = b.build(v.ReturningPlan)
+	}
+
 	return updateExec
 }
 
@@ -1721,6 +1734,7 @@ func (b *executorBuilder) buildDelete(v *plannercore.Delete) Executor {
 	}
 	b.snapshotTS = b.ctx.GetSessionVars().TxnCtx.GetForUpdateTS()
 	selExec := b.build(v.SelectPlan)
+
 	if b.err != nil {
 		return nil
 	}
@@ -1732,6 +1746,11 @@ func (b *executorBuilder) buildDelete(v *plannercore.Delete) Executor {
 		IsMultiTable:   v.IsMultiTable,
 		tblColPosInfos: v.TblColPosInfos,
 	}
+
+	if v.ReturningPlan != nil {
+		deleteExec.returning = b.build(v.ReturningPlan)
+	}
+
 	return deleteExec
 }
 
@@ -3143,4 +3162,19 @@ func (b *executorBuilder) buildAdminShowTelemetry(v *plannercore.AdminShowTeleme
 
 func (b *executorBuilder) buildAdminResetTelemetryID(v *plannercore.AdminResetTelemetryID) Executor {
 	return &AdminResetTelemetryIDExec{baseExecutor: newBaseExecutor(b.ctx, v.Schema(), v.ID())}
+}
+
+func (b *executorBuilder) buildReturning(v *plannercore.PhysicalReturning) Executor {
+	childExec := b.build(v.Children()[0])
+	if b.err != nil {
+		return nil
+	}
+
+	returningExec := ReturningExec{
+		baseExecutor: newBaseExecutor(b.ctx, v.Schema(), v.ID(), childExec),
+		schema:       v.Schema(),
+	}
+	executorCounterSortExec.Inc()
+
+	return &returningExec
 }

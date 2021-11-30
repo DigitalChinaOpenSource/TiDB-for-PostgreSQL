@@ -25,7 +25,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/DigitalChinaOpenSource/DCParser"
+	parser "github.com/DigitalChinaOpenSource/DCParser"
 	"github.com/DigitalChinaOpenSource/DCParser/ast"
 	"github.com/DigitalChinaOpenSource/DCParser/format"
 	"github.com/DigitalChinaOpenSource/DCParser/model"
@@ -3408,13 +3408,13 @@ func (b *PlanBuilder) buildDataSource(ctx context.Context, tn *ast.TableName, as
 		}
 	}
 	ds := DataSource{
-		DBName:              dbName,
-		TableAsName:         asName,
-		table:               tbl,
-		tableInfo:           tableInfo,
-		statisticTable:      statisticTable,
-		astIndexHints:       tn.IndexHints,
-		IndexHints:          b.TableHints().indexHintList,
+		DBName:         dbName,
+		TableAsName:    asName,
+		table:          tbl,
+		tableInfo:      tableInfo,
+		statisticTable: statisticTable,
+		astIndexHints:  tn.IndexHints,
+		//IndexHints:          b.TableHints().indexHintList,
 		indexMergeHints:     indexMergeHints,
 		possibleAccessPaths: possiblePaths,
 		Columns:             make([]*model.ColumnInfo, 0, len(columns)),
@@ -3424,7 +3424,9 @@ func (b *PlanBuilder) buildDataSource(ctx context.Context, tn *ast.TableName, as
 		is:                  b.is,
 		isForUpdateRead:     b.isForUpdateRead,
 	}.Init(b.ctx, b.getSelectOffset())
-
+	if !b.inInsertStmt {
+		ds.IndexHints = b.TableHints().indexHintList
+	}
 	var handleCol *expression.Column
 	schema := expression.NewSchema(make([]*expression.Column, 0, len(columns))...)
 	names := make([]*types.FieldName, 0, len(columns))
@@ -4033,6 +4035,17 @@ func (b *PlanBuilder) buildUpdate(ctx context.Context, update *ast.UpdateStmt) (
 		err = checkUpdateList(b.ctx, tblID2table, updt)
 	}
 	updt.PartitionedTable = b.partitionedTable
+	if update.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, update, update.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		updt.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return updt, err
 }
 
@@ -4378,6 +4391,19 @@ func (b *PlanBuilder) buildDelete(ctx context.Context, delete *ast.DeleteStmt) (
 		tblID2table[id], _ = b.is.TableByID(id)
 	}
 	del.TblColPosInfos, err = buildColumns2Handle(del.names, tblID2Handle, tblID2table, false)
+
+	if delete.Returning != nil {
+		retPlan, err := b.buildReturning(ctx, delete, delete.Returning)
+		if err != nil {
+			return nil, err
+		}
+
+		del.ReturningPlan, _, err = DoOptimize(ctx, b.ctx, b.optFlag, retPlan)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return del, err
 }
 
@@ -5163,4 +5189,34 @@ func containDifferentJoinTypes(preferJoinType uint) bool {
 		cnt++
 	}
 	return cnt > 1
+}
+
+func (b *PlanBuilder) buildReturning(ctx context.Context, node ast.Node, returning *ast.ReturningClause) (p LogicalPlan, err error) {
+
+	switch x := node.(type) {
+	case *ast.DeleteStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.TableRefs)
+	case *ast.UpdateStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.TableRefs)
+	case *ast.InsertStmt:
+		p, err = b.buildTableRefsWithCache(ctx, x.Table)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	returning.Fields.Fields, err = b.unfoldWildStar(p, returning.Fields.Fields)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalMap map[*ast.AggregateFuncExpr]int
+
+	p, _, err = b.buildProjection(ctx, p, returning.Fields.Fields, totalMap, nil, false, false)
+
+	ret := LogicalReturning{}.Init(b.ctx, b.getSelectOffset())
+	ret.SetChildren(p)
+
+	return ret, err
 }

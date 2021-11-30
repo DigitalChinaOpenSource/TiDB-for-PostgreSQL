@@ -483,6 +483,20 @@ func (p PointGetPlan) Init(ctx sessionctx.Context, stats *property.StatsInfo, of
 	return &p
 }
 
+// Init LogicalReturning
+func (p LogicalReturning) Init(ctx sessionctx.Context, offset int) *LogicalReturning {
+	p.baseLogicalPlan = newBaseLogicalPlan(ctx, plancodec.TypeReturning, &p, offset)
+	return &p
+}
+
+// Init PhysicalReturning
+func (p PhysicalReturning) Init(ctx sessionctx.Context, stats *property.StatsInfo, offset int, props ...*property.PhysicalProperty) *PhysicalReturning {
+	p.basePhysicalPlan = newBasePhysicalPlan(ctx, plancodec.TypeReturning, &p, offset)
+	p.childrenReqProps = props
+	p.stats = stats
+	return &p
+}
+
 func flattenTreePlan(plan PhysicalPlan, plans []PhysicalPlan) []PhysicalPlan {
 	plans = append(plans, plan)
 	for _, child := range plan.Children() {

@@ -1273,3 +1273,16 @@ type LogicalShowDDLJobs struct {
 func (p *LogicalShowDDLJobs) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
 	return err
 }
+
+// LogicalReturning represents returning plan.
+type LogicalReturning struct {
+	baseLogicalPlan
+
+	Offset uint64
+	Count  uint64
+}
+
+// SetParamType LogicalReturning
+func (p *LogicalReturning) SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error) {
+	return err
+}

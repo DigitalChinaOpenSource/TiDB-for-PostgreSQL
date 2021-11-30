@@ -92,6 +92,9 @@ type RecordSet interface {
 	// Fields gets result fields.
 	Fields() []*ast.ResultField
 
+	// Returning rows
+	Rows() []chunk.Row
+
 	// Next reads records into chunk.
 	Next(ctx context.Context, req *chunk.Chunk) error
 
