@@ -88,6 +88,10 @@ type Manager interface {
 
 	// Get the authentication plugin for a user
 	GetAuthPlugin(user, host string) (string, error)
+
+	// NeedPassword Determine whether the user needs a password for authentication
+	// PgSQL Need
+	NeedPassword(user, host string) bool
 }
 
 const key keyType = 0

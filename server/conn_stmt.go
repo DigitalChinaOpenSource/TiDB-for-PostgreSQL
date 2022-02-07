@@ -39,263 +39,252 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math"
-	"runtime/trace"
-	"strconv"
-	"time"
-
-	"github.com/pingcap/errors"
-	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/parser/mysql"
-	"github.com/pingcap/tidb/parser/terror"
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
-	"github.com/pingcap/tidb/sessionctx/variable"
-	storeerr "github.com/pingcap/tidb/store/driver/error"
 	"github.com/pingcap/tidb/types"
-	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/hack"
-	"github.com/pingcap/tidb/util/topsql"
-	"github.com/tikv/client-go/v2/util"
+	"math"
+	"strconv"
 )
 
-func (cc *clientConn) handleStmtPrepare(ctx context.Context, sql string) error {
-	stmt, columns, params, err := cc.ctx.Prepare(sql)
-	if err != nil {
-		return err
-	}
-	data := make([]byte, 4, 128)
+//func (cc *clientConn) handleStmtPrepare(ctx context.Context, sql string) error {
+//	stmt, columns, params, err := cc.ctx.Prepare(sql)
+//	if err != nil {
+//		return err
+//	}
+//	data := make([]byte, 4, 128)
+//
+//	// status ok
+//	data = append(data, 0)
+//	// stmt id
+//	data = dumpUint32(data, uint32(stmt.ID()))
+//	// number columns
+//	data = dumpUint16(data, uint16(len(columns)))
+//	// number params
+//	data = dumpUint16(data, uint16(len(params)))
+//	// filter [00]
+//	data = append(data, 0)
+//	// warning count
+//	data = append(data, 0, 0) // TODO support warning count
+//
+//	if err := cc.writePacket(data); err != nil {
+//		return err
+//	}
+//
+//	cc.initResultEncoder(ctx)
+//	defer cc.rsEncoder.clean()
+//	if len(params) > 0 {
+//		for i := 0; i < len(params); i++ {
+//			data = data[0:4]
+//			data = params[i].Dump(data, cc.rsEncoder)
+//
+//			if err := cc.writePacket(data); err != nil {
+//				return err
+//			}
+//		}
+//
+//		if err := cc.writeEOF(0); err != nil {
+//			return err
+//		}
+//	}
+//
+//	if len(columns) > 0 {
+//		for i := 0; i < len(columns); i++ {
+//			data = data[0:4]
+//			data = columns[i].Dump(data, cc.rsEncoder)
+//
+//			if err := cc.writePacket(data); err != nil {
+//				return err
+//			}
+//		}
+//
+//		if err := cc.writeEOF(0); err != nil {
+//			return err
+//		}
+//
+//	}
+//	return cc.flush(ctx)
+//}
 
-	// status ok
-	data = append(data, 0)
-	// stmt id
-	data = dumpUint32(data, uint32(stmt.ID()))
-	// number columns
-	data = dumpUint16(data, uint16(len(columns)))
-	// number params
-	data = dumpUint16(data, uint16(len(params)))
-	// filter [00]
-	data = append(data, 0)
-	// warning count
-	data = append(data, 0, 0) // TODO support warning count
+//func (cc *clientConn) handleStmtExecute(ctx context.Context, data []byte) (err error) {
+//	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
+//	if len(data) < 9 {
+//		return mysql.ErrMalformPacket
+//	}
+//	pos := 0
+//	stmtID := binary.LittleEndian.Uint32(data[0:4])
+//	pos += 4
+//
+//	if variable.TopSQLEnabled() {
+//		preparedStmt, _ := cc.preparedStmtID2CachePreparedStmt(stmtID)
+//		if preparedStmt != nil && preparedStmt.SQLDigest != nil {
+//			ctx = topsql.AttachSQLInfo(ctx, preparedStmt.NormalizedSQL, preparedStmt.SQLDigest, "", nil, false)
+//		}
+//	}
+//
+//	stmt := cc.ctx.GetStatement(int(stmtID))
+//	if stmt == nil {
+//		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
+//			strconv.FormatUint(uint64(stmtID), 10), "stmt_execute")
+//	}
+//
+//	flag := data[pos]
+//	pos++
+//	// Please refer to https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
+//	// The client indicates that it wants to use cursor by setting this flag.
+//	// 0x00 CURSOR_TYPE_NO_CURSOR
+//	// 0x01 CURSOR_TYPE_READ_ONLY
+//	// 0x02 CURSOR_TYPE_FOR_UPDATE
+//	// 0x04 CURSOR_TYPE_SCROLLABLE
+//	// Now we only support forward-only, read-only cursor.
+//	var useCursor bool
+//	switch flag {
+//	case 0:
+//		useCursor = false
+//	case 1:
+//		useCursor = true
+//	default:
+//		return mysql.NewErrf(mysql.ErrUnknown, "unsupported flag %d", nil, flag)
+//	}
+//
+//	// skip iteration-count, always 1
+//	pos += 4
+//
+//	var (
+//		nullBitmaps []byte
+//		paramTypes  []byte
+//		paramValues []byte
+//	)
+//	numParams := stmt.NumParams()
+//	args := make([]types.Datum, numParams)
+//	if numParams > 0 {
+//		nullBitmapLen := (numParams + 7) >> 3
+//		if len(data) < (pos + nullBitmapLen + 1) {
+//			return mysql.ErrMalformPacket
+//		}
+//		nullBitmaps = data[pos : pos+nullBitmapLen]
+//		pos += nullBitmapLen
+//
+//		// new param bound flag
+//		if data[pos] == 1 {
+//			pos++
+//			if len(data) < (pos + (numParams << 1)) {
+//				return mysql.ErrMalformPacket
+//			}
+//
+//			paramTypes = data[pos : pos+(numParams<<1)]
+//			pos += numParams << 1
+//			paramValues = data[pos:]
+//			// Just the first StmtExecute packet contain parameters type,
+//			// we need save it for further use.
+//			stmt.SetParamsType(paramTypes)
+//		} else {
+//			paramValues = data[pos+1:]
+//		}
+//
+//		err = parseExecArgs(cc.ctx.GetSessionVars().StmtCtx, args, stmt.BoundParams(), nullBitmaps, stmt.GetParamsType(), paramValues)
+//		stmt.Reset()
+//		if err != nil {
+//			return errors.Annotate(err, cc.preparedStmt2String(stmtID))
+//		}
+//	}
+//	ctx = context.WithValue(ctx, execdetails.StmtExecDetailKey, &execdetails.StmtExecDetails{})
+//	ctx = context.WithValue(ctx, util.ExecDetailsKey, &util.ExecDetails{})
+//	retryable, err := cc.executePreparedStmtAndWriteResult(ctx, stmt, args, useCursor)
+//	_, allowTiFlashFallback := cc.ctx.GetSessionVars().AllowFallbackToTiKV[kv.TiFlash]
+//	if allowTiFlashFallback && err != nil && errors.ErrorEqual(err, storeerr.ErrTiFlashServerTimeout) && retryable {
+//		// When the TiFlash server seems down, we append a warning to remind the user to check the status of the TiFlash
+//		// server and fallback to TiKV.
+//		prevErr := err
+//		delete(cc.ctx.GetSessionVars().IsolationReadEngines, kv.TiFlash)
+//		defer func() {
+//			cc.ctx.GetSessionVars().IsolationReadEngines[kv.TiFlash] = struct{}{}
+//		}()
+//		_, err = cc.executePreparedStmtAndWriteResult(ctx, stmt, args, useCursor)
+//		// We append warning after the retry because `ResetContextOfStmt` may be called during the retry, which clears warnings.
+//		cc.ctx.GetSessionVars().StmtCtx.AppendError(prevErr)
+//	}
+//	return err
+//}
 
-	if err := cc.writePacket(data); err != nil {
-		return err
-	}
-
-	cc.initResultEncoder(ctx)
-	defer cc.rsEncoder.clean()
-	if len(params) > 0 {
-		for i := 0; i < len(params); i++ {
-			data = data[0:4]
-			data = params[i].Dump(data, cc.rsEncoder)
-
-			if err := cc.writePacket(data); err != nil {
-				return err
-			}
-		}
-
-		if err := cc.writeEOF(0); err != nil {
-			return err
-		}
-	}
-
-	if len(columns) > 0 {
-		for i := 0; i < len(columns); i++ {
-			data = data[0:4]
-			data = columns[i].Dump(data, cc.rsEncoder)
-
-			if err := cc.writePacket(data); err != nil {
-				return err
-			}
-		}
-
-		if err := cc.writeEOF(0); err != nil {
-			return err
-		}
-
-	}
-	return cc.flush(ctx)
-}
-
-func (cc *clientConn) handleStmtExecute(ctx context.Context, data []byte) (err error) {
-	defer trace.StartRegion(ctx, "HandleStmtExecute").End()
-	if len(data) < 9 {
-		return mysql.ErrMalformPacket
-	}
-	pos := 0
-	stmtID := binary.LittleEndian.Uint32(data[0:4])
-	pos += 4
-
-	if variable.TopSQLEnabled() {
-		preparedStmt, _ := cc.preparedStmtID2CachePreparedStmt(stmtID)
-		if preparedStmt != nil && preparedStmt.SQLDigest != nil {
-			ctx = topsql.AttachSQLInfo(ctx, preparedStmt.NormalizedSQL, preparedStmt.SQLDigest, "", nil, false)
-		}
-	}
-
-	stmt := cc.ctx.GetStatement(int(stmtID))
-	if stmt == nil {
-		return mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_execute")
-	}
-
-	flag := data[pos]
-	pos++
-	// Please refer to https://dev.mysql.com/doc/internals/en/com-stmt-execute.html
-	// The client indicates that it wants to use cursor by setting this flag.
-	// 0x00 CURSOR_TYPE_NO_CURSOR
-	// 0x01 CURSOR_TYPE_READ_ONLY
-	// 0x02 CURSOR_TYPE_FOR_UPDATE
-	// 0x04 CURSOR_TYPE_SCROLLABLE
-	// Now we only support forward-only, read-only cursor.
-	var useCursor bool
-	switch flag {
-	case 0:
-		useCursor = false
-	case 1:
-		useCursor = true
-	default:
-		return mysql.NewErrf(mysql.ErrUnknown, "unsupported flag %d", nil, flag)
-	}
-
-	// skip iteration-count, always 1
-	pos += 4
-
-	var (
-		nullBitmaps []byte
-		paramTypes  []byte
-		paramValues []byte
-	)
-	numParams := stmt.NumParams()
-	args := make([]types.Datum, numParams)
-	if numParams > 0 {
-		nullBitmapLen := (numParams + 7) >> 3
-		if len(data) < (pos + nullBitmapLen + 1) {
-			return mysql.ErrMalformPacket
-		}
-		nullBitmaps = data[pos : pos+nullBitmapLen]
-		pos += nullBitmapLen
-
-		// new param bound flag
-		if data[pos] == 1 {
-			pos++
-			if len(data) < (pos + (numParams << 1)) {
-				return mysql.ErrMalformPacket
-			}
-
-			paramTypes = data[pos : pos+(numParams<<1)]
-			pos += numParams << 1
-			paramValues = data[pos:]
-			// Just the first StmtExecute packet contain parameters type,
-			// we need save it for further use.
-			stmt.SetParamsType(paramTypes)
-		} else {
-			paramValues = data[pos+1:]
-		}
-
-		err = parseExecArgs(cc.ctx.GetSessionVars().StmtCtx, args, stmt.BoundParams(), nullBitmaps, stmt.GetParamsType(), paramValues)
-		stmt.Reset()
-		if err != nil {
-			return errors.Annotate(err, cc.preparedStmt2String(stmtID))
-		}
-	}
-	ctx = context.WithValue(ctx, execdetails.StmtExecDetailKey, &execdetails.StmtExecDetails{})
-	ctx = context.WithValue(ctx, util.ExecDetailsKey, &util.ExecDetails{})
-	retryable, err := cc.executePreparedStmtAndWriteResult(ctx, stmt, args, useCursor)
-	_, allowTiFlashFallback := cc.ctx.GetSessionVars().AllowFallbackToTiKV[kv.TiFlash]
-	if allowTiFlashFallback && err != nil && errors.ErrorEqual(err, storeerr.ErrTiFlashServerTimeout) && retryable {
-		// When the TiFlash server seems down, we append a warning to remind the user to check the status of the TiFlash
-		// server and fallback to TiKV.
-		prevErr := err
-		delete(cc.ctx.GetSessionVars().IsolationReadEngines, kv.TiFlash)
-		defer func() {
-			cc.ctx.GetSessionVars().IsolationReadEngines[kv.TiFlash] = struct{}{}
-		}()
-		_, err = cc.executePreparedStmtAndWriteResult(ctx, stmt, args, useCursor)
-		// We append warning after the retry because `ResetContextOfStmt` may be called during the retry, which clears warnings.
-		cc.ctx.GetSessionVars().StmtCtx.AppendError(prevErr)
-	}
-	return err
-}
-
-// The first return value indicates whether the call of executePreparedStmtAndWriteResult has no side effect and can be retried.
-// Currently the first return value is used to fallback to TiKV when TiFlash is down.
-func (cc *clientConn) executePreparedStmtAndWriteResult(ctx context.Context, stmt PreparedStatement, args []types.Datum, useCursor bool) (bool, error) {
-	rs, err := stmt.Execute(ctx, args)
-	if err != nil {
-		return true, errors.Annotate(err, cc.preparedStmt2String(uint32(stmt.ID())))
-	}
-	if rs == nil {
-		return false, cc.writeOK(ctx)
-	}
-
-	// if the client wants to use cursor
-	// we should hold the ResultSet in PreparedStatement for next stmt_fetch, and only send back ColumnInfo.
-	// Tell the client cursor exists in server by setting proper serverStatus.
-	if useCursor {
-		cc.initResultEncoder(ctx)
-		defer cc.rsEncoder.clean()
-		stmt.StoreResultSet(rs)
-		err = cc.writeColumnInfo(rs.Columns(), mysql.ServerStatusCursorExists)
-		if err != nil {
-			return false, err
-		}
-		if cl, ok := rs.(fetchNotifier); ok {
-			cl.OnFetchReturned()
-		}
-		// explicitly flush columnInfo to client.
-		return false, cc.flush(ctx)
-	}
-	defer terror.Call(rs.Close)
-	retryable, err := cc.writeResultset(ctx, rs, true, 0, 0)
-	if err != nil {
-		return retryable, errors.Annotate(err, cc.preparedStmt2String(uint32(stmt.ID())))
-	}
-	return false, nil
-}
+//// The first return value indicates whether the call of executePreparedStmtAndWriteResult has no side effect and can be retried.
+//// Currently the first return value is used to fallback to TiKV when TiFlash is down.
+//func (cc *clientConn) executePreparedStmtAndWriteResult(ctx context.Context, stmt PreparedStatement, args []types.Datum, useCursor bool) (bool, error) {
+//	rs, err := stmt.Execute(ctx, args)
+//	if err != nil {
+//		return true, errors.Annotate(err, cc.preparedStmt2String(uint32(stmt.ID())))
+//	}
+//	if rs == nil {
+//		return false, cc.writeOK(ctx)
+//	}
+//
+//	// if the client wants to use cursor
+//	// we should hold the ResultSet in PreparedStatement for next stmt_fetch, and only send back ColumnInfo.
+//	// Tell the client cursor exists in server by setting proper serverStatus.
+//	if useCursor {
+//		cc.initResultEncoder(ctx)
+//		defer cc.rsEncoder.clean()
+//		stmt.StoreResultSet(rs)
+//		err = cc.writeColumnInfo(rs.Columns(), mysql.ServerStatusCursorExists)
+//		if err != nil {
+//			return false, err
+//		}
+//		if cl, ok := rs.(fetchNotifier); ok {
+//			cl.OnFetchReturned()
+//		}
+//		// explicitly flush columnInfo to client.
+//		return false, cc.flush(ctx)
+//	}
+//	defer terror.Call(rs.Close)
+//	retryable, err := cc.writeResultset(ctx, rs, true, 0, 0)
+//	if err != nil {
+//		return retryable, errors.Annotate(err, cc.preparedStmt2String(uint32(stmt.ID())))
+//	}
+//	return false, nil
+//}
 
 // maxFetchSize constants
 const (
 	maxFetchSize = 1024
 )
 
-func (cc *clientConn) handleStmtFetch(ctx context.Context, data []byte) (err error) {
-	cc.ctx.GetSessionVars().StartTime = time.Now()
-
-	stmtID, fetchSize, err := parseStmtFetchCmd(data)
-	if err != nil {
-		return err
-	}
-
-	stmt := cc.ctx.GetStatement(int(stmtID))
-	if stmt == nil {
-		return errors.Annotate(mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_fetch"), cc.preparedStmt2String(stmtID))
-	}
-	if variable.TopSQLEnabled() {
-		prepareObj, _ := cc.preparedStmtID2CachePreparedStmt(stmtID)
-		if prepareObj != nil && prepareObj.SQLDigest != nil {
-			ctx = topsql.AttachSQLInfo(ctx, prepareObj.NormalizedSQL, prepareObj.SQLDigest, "", nil, false)
-		}
-	}
-	sql := ""
-	if prepared, ok := cc.ctx.GetStatement(int(stmtID)).(*TiDBStatement); ok {
-		sql = prepared.sql
-	}
-	cc.ctx.SetProcessInfo(sql, time.Now(), mysql.ComStmtExecute, 0)
-	rs := stmt.GetResultSet()
-	if rs == nil {
-		return errors.Annotate(mysql.NewErr(mysql.ErrUnknownStmtHandler,
-			strconv.FormatUint(uint64(stmtID), 10), "stmt_fetch_rs"), cc.preparedStmt2String(stmtID))
-	}
-
-	_, err = cc.writeResultset(ctx, rs, true, mysql.ServerStatusCursorExists, int(fetchSize))
-	if err != nil {
-		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
-	}
-	return nil
-}
+//func (cc *clientConn) handleStmtFetch(ctx context.Context, data []byte) (err error) {
+//	cc.ctx.GetSessionVars().StartTime = time.Now()
+//
+//	stmtID, fetchSize, err := parseStmtFetchCmd(data)
+//	if err != nil {
+//		return err
+//	}
+//
+//	stmt := cc.ctx.GetStatement(int(stmtID))
+//	if stmt == nil {
+//		return errors.Annotate(mysql.NewErr(mysql.ErrUnknownStmtHandler,
+//			strconv.FormatUint(uint64(stmtID), 10), "stmt_fetch"), cc.preparedStmt2String(stmtID))
+//	}
+//	if variable.TopSQLEnabled() {
+//		prepareObj, _ := cc.preparedStmtID2CachePreparedStmt(stmtID)
+//		if prepareObj != nil && prepareObj.SQLDigest != nil {
+//			ctx = topsql.AttachSQLInfo(ctx, prepareObj.NormalizedSQL, prepareObj.SQLDigest, "", nil, false)
+//		}
+//	}
+//	sql := ""
+//	if prepared, ok := cc.ctx.GetStatement(int(stmtID)).(*TiDBStatement); ok {
+//		sql = prepared.sql
+//	}
+//	cc.ctx.SetProcessInfo(sql, time.Now(), mysql.ComStmtExecute, 0)
+//	rs := stmt.GetResultSet()
+//	if rs == nil {
+//		return errors.Annotate(mysql.NewErr(mysql.ErrUnknownStmtHandler,
+//			strconv.FormatUint(uint64(stmtID), 10), "stmt_fetch_rs"), cc.preparedStmt2String(stmtID))
+//	}
+//
+//	_, err = cc.writeResultset(ctx, rs, true, mysql.ServerStatusCursorExists, int(fetchSize))
+//	if err != nil {
+//		return errors.Annotate(err, cc.preparedStmt2String(stmtID))
+//	}
+//	return nil
+//}
 
 func parseStmtFetchCmd(data []byte) (uint32, uint32, error) {
 	if len(data) != 8 {
@@ -609,18 +598,18 @@ func parseBinaryDurationWithMS(pos int, paramValues []byte,
 	return pos, fmt.Sprintf("%s.%06d", dur, microSecond)
 }
 
-func (cc *clientConn) handleStmtClose(data []byte) (err error) {
-	if len(data) < 4 {
-		return
-	}
-
-	stmtID := int(binary.LittleEndian.Uint32(data[0:4]))
-	stmt := cc.ctx.GetStatement(stmtID)
-	if stmt != nil {
-		return stmt.Close()
-	}
-	return
-}
+//func (cc *clientConn) handleStmtClose(data []byte) (err error) {
+//	if len(data) < 4 {
+//		return
+//	}
+//
+//	stmtID := int(binary.LittleEndian.Uint32(data[0:4]))
+//	stmt := cc.ctx.GetStatement(stmtID)
+//	if stmt != nil {
+//		return stmt.Close()
+//	}
+//	return
+//}
 
 func (cc *clientConn) handleStmtSendLongData(data []byte) (err error) {
 	if len(data) < 6 {

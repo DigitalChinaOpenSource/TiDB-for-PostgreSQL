@@ -54,15 +54,15 @@ type TiDBContext struct {
 }
 
 // TiDBStatement implements PreparedStatement.
-type TiDBStatement struct {
-	id          uint32
-	numParams   int
-	boundParams [][]byte
-	paramsType  []byte
-	ctx         *TiDBContext
-	rs          ResultSet
-	sql         string
-}
+//type TiDBStatement struct {
+//	id          uint32
+//	numParams   int
+//	boundParams [][]byte
+//	paramsType  []byte
+//	ctx         *TiDBContext
+//	rs          ResultSet
+//	sql         string
+//}
 
 // ID implements PreparedStatement ID method.
 func (ts *TiDBStatement) ID() int {
@@ -263,32 +263,32 @@ func (tc *TiDBContext) GetStatement(stmtID int) PreparedStatement {
 }
 
 // Prepare implements QueryCtx Prepare method.
-func (tc *TiDBContext) Prepare(sql string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
-	stmtID, paramCount, fields, err := tc.Session.PrepareStmt(sql)
-	if err != nil {
-		return
-	}
-	stmt := &TiDBStatement{
-		sql:         sql,
-		id:          stmtID,
-		numParams:   paramCount,
-		boundParams: make([][]byte, paramCount),
-		ctx:         tc,
-	}
-	statement = stmt
-	columns = make([]*ColumnInfo, len(fields))
-	for i := range fields {
-		columns[i] = convertColumnInfo(fields[i])
-	}
-	params = make([]*ColumnInfo, paramCount)
-	for i := range params {
-		params[i] = &ColumnInfo{
-			Type: mysql.TypeBlob,
-		}
-	}
-	tc.stmts[int(stmtID)] = stmt
-	return
-}
+//func (tc *TiDBContext) Prepare(sql string) (statement PreparedStatement, columns, params []*ColumnInfo, err error) {
+//	stmtID, paramCount, fields, err := tc.Session.PrepareStmt(sql)
+//	if err != nil {
+//		return
+//	}
+//	stmt := &TiDBStatement{
+//		sql:         sql,
+//		id:          stmtID,
+//		numParams:   paramCount,
+//		boundParams: make([][]byte, paramCount),
+//		ctx:         tc,
+//	}
+//	statement = stmt
+//	columns = make([]*ColumnInfo, len(fields))
+//	for i := range fields {
+//		columns[i] = convertColumnInfo(fields[i])
+//	}
+//	params = make([]*ColumnInfo, paramCount)
+//	for i := range params {
+//		params[i] = &ColumnInfo{
+//			Type: mysql.TypeBlob,
+//		}
+//	}
+//	tc.stmts[int(stmtID)] = stmt
+//	return
+//}
 
 type tidbResultSet struct {
 	recordSet    sqlexec.RecordSet

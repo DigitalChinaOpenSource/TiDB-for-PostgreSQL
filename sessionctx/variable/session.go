@@ -955,6 +955,11 @@ type SessionVars struct {
 		curr int8
 		data [2]stmtctx.StatementContext
 	}
+
+	// Portal pgsql will create portal after bind cmd in extended query
+	// portal will save the name and its corresponding statement ID
+	// PgSQL Modified
+	Portal map[string]uint32
 }
 
 // InitStatementContext initializes a StatementContext, the object is reused to reduce allocation.
@@ -1107,6 +1112,9 @@ func NewSessionVars() *SessionVars {
 		stmtVars:                    make(map[string]string),
 		PreparedStmts:               make(map[uint32]interface{}),
 		PreparedStmtNameToID:        make(map[string]uint32),
+		// PgSQL Modified
+		Portal: 					 make(map[string]uint32),
+
 		PreparedParams:              make([]types.Datum, 0, 10),
 		TxnCtx:                      &TransactionContext{},
 		RetryInfo:                   &RetryInfo{},

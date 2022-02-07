@@ -42,20 +42,6 @@ import (
 	"encoding/binary"
 	goerr "errors"
 	"fmt"
-	"io"
-	"net"
-	"os/user"
-	"runtime"
-	"runtime/pprof"
-	"runtime/trace"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
-	"unsafe"
-
-	"github.com/opentracing/opentracing-go"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/config"
@@ -72,7 +58,6 @@ import (
 	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/plugin"
 	"github.com/pingcap/tidb/privilege"
-	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/sessionctx/variable"
@@ -84,10 +69,18 @@ import (
 	"github.com/pingcap/tidb/util/execdetails"
 	"github.com/pingcap/tidb/util/hack"
 	"github.com/pingcap/tidb/util/logutil"
-	"github.com/pingcap/tidb/util/memory"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/tikv/client-go/v2/util"
 	"go.uber.org/zap"
+	"io"
+	"net"
+	"os/user"
+	"runtime"
+	"runtime/trace"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 const (
@@ -245,58 +238,58 @@ func (cc *clientConn) authSwitchRequest(ctx context.Context, plugin string) ([]b
 // handshake works like TCP handshake, but in a higher level, it first writes initial packet to client,
 // during handshake, client and server negotiate compatible features and do authentication.
 // After handshake, client can send sql query to server.
-func (cc *clientConn) handshake(ctx context.Context) error {
-	if err := cc.writeInitialHandshake(ctx); err != nil {
-		if errors.Cause(err) == io.EOF {
-			logutil.Logger(ctx).Debug("Could not send handshake due to connection has be closed by client-side")
-		} else {
-			logutil.Logger(ctx).Debug("Write init handshake to client fail", zap.Error(errors.SuspendStack(err)))
-		}
-		return err
-	}
-	if err := cc.readOptionalSSLRequestAndHandshakeResponse(ctx); err != nil {
-		err1 := cc.writeError(ctx, err)
-		if err1 != nil {
-			logutil.Logger(ctx).Debug("writeError failed", zap.Error(err1))
-		}
-		return err
-	}
-
-	// MySQL supports an "init_connect" query, which can be run on initial connection.
-	// The query must return a non-error or the client is disconnected.
-	if err := cc.initConnect(ctx); err != nil {
-		logutil.Logger(ctx).Warn("init_connect failed", zap.Error(err))
-		initErr := errNewAbortingConnection.FastGenByArgs(cc.connectionID, "unconnected", cc.user, cc.peerHost, "init_connect command failed")
-		if err1 := cc.writeError(ctx, initErr); err1 != nil {
-			terror.Log(err1)
-		}
-		return initErr
-	}
-
-	data := cc.alloc.AllocWithLen(4, 32)
-	data = append(data, mysql.OKHeader)
-	data = append(data, 0, 0)
-	if cc.capability&mysql.ClientProtocol41 > 0 {
-		data = dumpUint16(data, mysql.ServerStatusAutocommit)
-		data = append(data, 0, 0)
-	}
-
-	err := cc.writePacket(data)
-	cc.pkt.sequence = 0
-	if err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("write response to client failed", zap.Error(err))
-		return err
-	}
-
-	err = cc.flush(ctx)
-	if err != nil {
-		err = errors.SuspendStack(err)
-		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
-		return err
-	}
-	return err
-}
+//func (cc *clientConn) handshake(ctx context.Context) error {
+//	if err := cc.writeInitialHandshake(ctx); err != nil {
+//		if errors.Cause(err) == io.EOF {
+//			logutil.Logger(ctx).Debug("Could not send handshake due to connection has be closed by client-side")
+//		} else {
+//			logutil.Logger(ctx).Debug("Write init handshake to client fail", zap.Error(errors.SuspendStack(err)))
+//		}
+//		return err
+//	}
+//	if err := cc.readOptionalSSLRequestAndHandshakeResponse(ctx); err != nil {
+//		err1 := cc.writeError(ctx, err)
+//		if err1 != nil {
+//			logutil.Logger(ctx).Debug("writeError failed", zap.Error(err1))
+//		}
+//		return err
+//	}
+//
+//	// MySQL supports an "init_connect" query, which can be run on initial connection.
+//	// The query must return a non-error or the client is disconnected.
+//	if err := cc.initConnect(ctx); err != nil {
+//		logutil.Logger(ctx).Warn("init_connect failed", zap.Error(err))
+//		initErr := errNewAbortingConnection.FastGenByArgs(cc.connectionID, "unconnected", cc.user, cc.peerHost, "init_connect command failed")
+//		if err1 := cc.writeError(ctx, initErr); err1 != nil {
+//			terror.Log(err1)
+//		}
+//		return initErr
+//	}
+//
+//	data := cc.alloc.AllocWithLen(4, 32)
+//	data = append(data, mysql.OKHeader)
+//	data = append(data, 0, 0)
+//	if cc.capability&mysql.ClientProtocol41 > 0 {
+//		data = dumpUint16(data, mysql.ServerStatusAutocommit)
+//		data = append(data, 0, 0)
+//	}
+//
+//	err := cc.writePacket(data)
+//	cc.pkt.sequence = 0
+//	if err != nil {
+//		err = errors.SuspendStack(err)
+//		logutil.Logger(ctx).Debug("write response to client failed", zap.Error(err))
+//		return err
+//	}
+//
+//	err = cc.flush(ctx)
+//	if err != nil {
+//		err = errors.SuspendStack(err)
+//		logutil.Logger(ctx).Debug("flush response to client failed", zap.Error(err))
+//		return err
+//	}
+//	return err
+//}
 
 func (cc *clientConn) Close() error {
 	cc.server.rwlock.Lock()
@@ -1183,152 +1176,152 @@ func (cc *clientConn) addMetrics(cmd byte, startTime time.Time, err error) {
 // dispatch handles client request based on command which is the first byte of the data.
 // It also gets a token from server which is used to limit the concurrently handling clients.
 // The most frequently used command is ComQuery.
-func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
-	defer func() {
-		// reset killed for each request
-		atomic.StoreUint32(&cc.ctx.GetSessionVars().Killed, 0)
-	}()
-	t := time.Now()
-	if (cc.ctx.Status() & mysql.ServerStatusInTrans) > 0 {
-		connIdleDurationHistogramInTxn.Observe(t.Sub(cc.lastActive).Seconds())
-	} else {
-		connIdleDurationHistogramNotInTxn.Observe(t.Sub(cc.lastActive).Seconds())
-	}
-
-	span := opentracing.StartSpan("server.dispatch")
-	cfg := config.GetGlobalConfig()
-	if cfg.OpenTracing.Enable {
-		ctx = opentracing.ContextWithSpan(ctx, span)
-	}
-
-	var cancelFunc context.CancelFunc
-	ctx, cancelFunc = context.WithCancel(ctx)
-	cc.mu.Lock()
-	cc.mu.cancelFunc = cancelFunc
-	cc.mu.Unlock()
-
-	cc.lastPacket = data
-	cmd := data[0]
-	data = data[1:]
-	if variable.TopSQLEnabled() {
-		defer pprof.SetGoroutineLabels(ctx)
-	}
-	if variable.EnablePProfSQLCPU.Load() {
-		label := getLastStmtInConn{cc}.PProfLabel()
-		if len(label) > 0 {
-			defer pprof.SetGoroutineLabels(ctx)
-			ctx = pprof.WithLabels(ctx, pprof.Labels("sql", label))
-			pprof.SetGoroutineLabels(ctx)
-		}
-	}
-	if trace.IsEnabled() {
-		lc := getLastStmtInConn{cc}
-		sqlType := lc.PProfLabel()
-		if len(sqlType) > 0 {
-			var task *trace.Task
-			ctx, task = trace.NewTask(ctx, sqlType)
-			defer task.End()
-
-			trace.Log(ctx, "sql", lc.String())
-			ctx = logutil.WithTraceLogger(ctx, cc.connectionID)
-
-			taskID := *(*uint64)(unsafe.Pointer(task))
-			ctx = pprof.WithLabels(ctx, pprof.Labels("trace", strconv.FormatUint(taskID, 10)))
-			pprof.SetGoroutineLabels(ctx)
-		}
-	}
-	token := cc.server.getToken()
-	defer func() {
-		// if handleChangeUser failed, cc.ctx may be nil
-		if cc.ctx != nil {
-			cc.ctx.SetProcessInfo("", t, mysql.ComSleep, 0)
-		}
-
-		cc.server.releaseToken(token)
-		span.Finish()
-		cc.lastActive = time.Now()
-	}()
-
-	vars := cc.ctx.GetSessionVars()
-	// reset killed for each request
-	atomic.StoreUint32(&vars.Killed, 0)
-	if cmd < mysql.ComEnd {
-		cc.ctx.SetCommandValue(cmd)
-	}
-
-	dataStr := string(hack.String(data))
-	switch cmd {
-	case mysql.ComPing, mysql.ComStmtClose, mysql.ComStmtSendLongData, mysql.ComStmtReset,
-		mysql.ComSetOption, mysql.ComChangeUser:
-		cc.ctx.SetProcessInfo("", t, cmd, 0)
-	case mysql.ComInitDB:
-		cc.ctx.SetProcessInfo("use "+dataStr, t, cmd, 0)
-	}
-
-	switch cmd {
-	case mysql.ComSleep:
-		// TODO: According to mysql document, this command is supposed to be used only internally.
-		// So it's just a temp fix, not sure if it's done right.
-		// Investigate this command and write test case later.
-		return nil
-	case mysql.ComQuit:
-		return io.EOF
-	case mysql.ComInitDB:
-		if err := cc.useDB(ctx, dataStr); err != nil {
-			return err
-		}
-		return cc.writeOK(ctx)
-	case mysql.ComQuery: // Most frequently used command.
-		// For issue 1989
-		// Input payload may end with byte '\0', we didn't find related mysql document about it, but mysql
-		// implementation accept that case. So trim the last '\0' here as if the payload an EOF string.
-		// See http://dev.mysql.com/doc/internals/en/com-query.html
-		if len(data) > 0 && data[len(data)-1] == 0 {
-			data = data[:len(data)-1]
-			dataStr = string(hack.String(data))
-		}
-		return cc.handleQuery(ctx, dataStr)
-	case mysql.ComFieldList:
-		return cc.handleFieldList(ctx, dataStr)
-	// ComCreateDB, ComDropDB
-	case mysql.ComRefresh:
-		return cc.handleRefresh(ctx, data[0])
-	case mysql.ComShutdown: // redirect to SQL
-		if err := cc.handleQuery(ctx, "SHUTDOWN"); err != nil {
-			return err
-		}
-		return cc.writeOK(ctx)
-	case mysql.ComStatistics:
-		return cc.writeStats(ctx)
-	// ComProcessInfo, ComConnect, ComProcessKill, ComDebug
-	case mysql.ComPing:
-		return cc.writeOK(ctx)
-	// ComTime, ComDelayedInsert
-	case mysql.ComChangeUser:
-		return cc.handleChangeUser(ctx, data)
-	// ComBinlogDump, ComTableDump, ComConnectOut, ComRegisterSlave
-	case mysql.ComStmtPrepare:
-		return cc.handleStmtPrepare(ctx, dataStr)
-	case mysql.ComStmtExecute:
-		return cc.handleStmtExecute(ctx, data)
-	case mysql.ComStmtSendLongData:
-		return cc.handleStmtSendLongData(data)
-	case mysql.ComStmtClose:
-		return cc.handleStmtClose(data)
-	case mysql.ComStmtReset:
-		return cc.handleStmtReset(ctx, data)
-	case mysql.ComSetOption:
-		return cc.handleSetOption(ctx, data)
-	case mysql.ComStmtFetch:
-		return cc.handleStmtFetch(ctx, data)
-	// ComDaemon, ComBinlogDumpGtid
-	case mysql.ComResetConnection:
-		return cc.handleResetConnection(ctx)
-	// ComEnd
-	default:
-		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
-	}
-}
+//func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
+//	defer func() {
+//		// reset killed for each request
+//		atomic.StoreUint32(&cc.ctx.GetSessionVars().Killed, 0)
+//	}()
+//	t := time.Now()
+//	if (cc.ctx.Status() & mysql.ServerStatusInTrans) > 0 {
+//		connIdleDurationHistogramInTxn.Observe(t.Sub(cc.lastActive).Seconds())
+//	} else {
+//		connIdleDurationHistogramNotInTxn.Observe(t.Sub(cc.lastActive).Seconds())
+//	}
+//
+//	span := opentracing.StartSpan("server.dispatch")
+//	cfg := config.GetGlobalConfig()
+//	if cfg.OpenTracing.Enable {
+//		ctx = opentracing.ContextWithSpan(ctx, span)
+//	}
+//
+//	var cancelFunc context.CancelFunc
+//	ctx, cancelFunc = context.WithCancel(ctx)
+//	cc.mu.Lock()
+//	cc.mu.cancelFunc = cancelFunc
+//	cc.mu.Unlock()
+//
+//	cc.lastPacket = data
+//	cmd := data[0]
+//	data = data[1:]
+//	if variable.TopSQLEnabled() {
+//		defer pprof.SetGoroutineLabels(ctx)
+//	}
+//	if variable.EnablePProfSQLCPU.Load() {
+//		label := getLastStmtInConn{cc}.PProfLabel()
+//		if len(label) > 0 {
+//			defer pprof.SetGoroutineLabels(ctx)
+//			ctx = pprof.WithLabels(ctx, pprof.Labels("sql", label))
+//			pprof.SetGoroutineLabels(ctx)
+//		}
+//	}
+//	if trace.IsEnabled() {
+//		lc := getLastStmtInConn{cc}
+//		sqlType := lc.PProfLabel()
+//		if len(sqlType) > 0 {
+//			var task *trace.Task
+//			ctx, task = trace.NewTask(ctx, sqlType)
+//			defer task.End()
+//
+//			trace.Log(ctx, "sql", lc.String())
+//			ctx = logutil.WithTraceLogger(ctx, cc.connectionID)
+//
+//			taskID := *(*uint64)(unsafe.Pointer(task))
+//			ctx = pprof.WithLabels(ctx, pprof.Labels("trace", strconv.FormatUint(taskID, 10)))
+//			pprof.SetGoroutineLabels(ctx)
+//		}
+//	}
+//	token := cc.server.getToken()
+//	defer func() {
+//		// if handleChangeUser failed, cc.ctx may be nil
+//		if cc.ctx != nil {
+//			cc.ctx.SetProcessInfo("", t, mysql.ComSleep, 0)
+//		}
+//
+//		cc.server.releaseToken(token)
+//		span.Finish()
+//		cc.lastActive = time.Now()
+//	}()
+//
+//	vars := cc.ctx.GetSessionVars()
+//	// reset killed for each request
+//	atomic.StoreUint32(&vars.Killed, 0)
+//	if cmd < mysql.ComEnd {
+//		cc.ctx.SetCommandValue(cmd)
+//	}
+//
+//	dataStr := string(hack.String(data))
+//	switch cmd {
+//	case mysql.ComPing, mysql.ComStmtClose, mysql.ComStmtSendLongData, mysql.ComStmtReset,
+//		mysql.ComSetOption, mysql.ComChangeUser:
+//		cc.ctx.SetProcessInfo("", t, cmd, 0)
+//	case mysql.ComInitDB:
+//		cc.ctx.SetProcessInfo("use "+dataStr, t, cmd, 0)
+//	}
+//
+//	switch cmd {
+//	case mysql.ComSleep:
+//		// TODO: According to mysql document, this command is supposed to be used only internally.
+//		// So it's just a temp fix, not sure if it's done right.
+//		// Investigate this command and write test case later.
+//		return nil
+//	case mysql.ComQuit:
+//		return io.EOF
+//	case mysql.ComInitDB:
+//		if err := cc.useDB(ctx, dataStr); err != nil {
+//			return err
+//		}
+//		return cc.writeOK(ctx)
+//	case mysql.ComQuery: // Most frequently used command.
+//		// For issue 1989
+//		// Input payload may end with byte '\0', we didn't find related mysql document about it, but mysql
+//		// implementation accept that case. So trim the last '\0' here as if the payload an EOF string.
+//		// See http://dev.mysql.com/doc/internals/en/com-query.html
+//		if len(data) > 0 && data[len(data)-1] == 0 {
+//			data = data[:len(data)-1]
+//			dataStr = string(hack.String(data))
+//		}
+//		return cc.handleQuery(ctx, dataStr)
+//	case mysql.ComFieldList:
+//		return cc.handleFieldList(ctx, dataStr)
+//	// ComCreateDB, ComDropDB
+//	case mysql.ComRefresh:
+//		return cc.handleRefresh(ctx, data[0])
+//	case mysql.ComShutdown: // redirect to SQL
+//		if err := cc.handleQuery(ctx, "SHUTDOWN"); err != nil {
+//			return err
+//		}
+//		return cc.writeOK(ctx)
+//	case mysql.ComStatistics:
+//		return cc.writeStats(ctx)
+//	// ComProcessInfo, ComConnect, ComProcessKill, ComDebug
+//	case mysql.ComPing:
+//		return cc.writeOK(ctx)
+//	// ComTime, ComDelayedInsert
+//	case mysql.ComChangeUser:
+//		return cc.handleChangeUser(ctx, data)
+//	// ComBinlogDump, ComTableDump, ComConnectOut, ComRegisterSlave
+//	case mysql.ComStmtPrepare:
+//		return cc.handleStmtPrepare(ctx, dataStr)
+//	case mysql.ComStmtExecute:
+//		return cc.handleStmtExecute(ctx, data)
+//	case mysql.ComStmtSendLongData:
+//		return cc.handleStmtSendLongData(data)
+//	case mysql.ComStmtClose:
+//		return cc.handleStmtClose(data)
+//	case mysql.ComStmtReset:
+//		return cc.handleStmtReset(ctx, data)
+//	case mysql.ComSetOption:
+//		return cc.handleSetOption(ctx, data)
+//	case mysql.ComStmtFetch:
+//		return cc.handleStmtFetch(ctx, data)
+//	// ComDaemon, ComBinlogDumpGtid
+//	case mysql.ComResetConnection:
+//		return cc.handleResetConnection(ctx)
+//	// ComEnd
+//	default:
+//		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
+//	}
+//}
 
 func (cc *clientConn) writeStats(ctx context.Context) error {
 	msg := []byte("Uptime: 0  Threads: 0  Questions: 0  Slow queries: 0  Opens: 0  Flush tables: 0  Open tables: 0  Queries per second avg: 0.000")
@@ -1907,57 +1900,57 @@ func (cc *clientConn) prefetchPointPlanKeys(ctx context.Context, stmts []ast.Stm
 	return pointPlans, nil
 }
 
-// The first return value indicates whether the call of handleStmt has no side effect and can be retried.
-// Currently the first return value is used to fallback to TiKV when TiFlash is down.
-func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, warns []stmtctx.SQLWarn, lastStmt bool) (bool, error) {
-	ctx = context.WithValue(ctx, execdetails.StmtExecDetailKey, &execdetails.StmtExecDetails{})
-	ctx = context.WithValue(ctx, util.ExecDetailsKey, &util.ExecDetails{})
-	reg := trace.StartRegion(ctx, "ExecuteStmt")
-	cc.audit(plugin.Starting)
-	rs, err := cc.ctx.ExecuteStmt(ctx, stmt)
-	reg.End()
-	// The session tracker detachment from global tracker is solved in the `rs.Close` in most cases.
-	// If the rs is nil, the detachment will be done in the `handleNoDelay`.
-	if rs != nil {
-		defer terror.Call(rs.Close)
-	}
-	if err != nil {
-		return true, err
-	}
-
-	if lastStmt {
-		cc.ctx.GetSessionVars().StmtCtx.AppendWarnings(warns)
-	}
-
-	status := cc.ctx.Status()
-	if !lastStmt {
-		status |= mysql.ServerMoreResultsExists
-	}
-
-	if rs != nil {
-		connStatus := atomic.LoadInt32(&cc.status)
-		if connStatus == connStatusShutdown {
-			return false, executor.ErrQueryInterrupted
-		}
-
-		retryable, err := cc.writeResultset(ctx, rs, false, status, 0)
-		if err != nil {
-			return retryable, err
-		}
-	} else {
-		handled, err := cc.handleQuerySpecial(ctx, status)
-		if handled {
-			execStmt := cc.ctx.Value(session.ExecStmtVarKey)
-			if execStmt != nil {
-				execStmt.(*executor.ExecStmt).FinishExecuteStmt(0, err, false)
-			}
-		}
-		if err != nil {
-			return false, err
-		}
-	}
-	return false, nil
-}
+//// The first return value indicates whether the call of handleStmt has no side effect and can be retried.
+//// Currently the first return value is used to fallback to TiKV when TiFlash is down.
+//func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, warns []stmtctx.SQLWarn, lastStmt bool) (bool, error) {
+//	ctx = context.WithValue(ctx, execdetails.StmtExecDetailKey, &execdetails.StmtExecDetails{})
+//	ctx = context.WithValue(ctx, util.ExecDetailsKey, &util.ExecDetails{})
+//	reg := trace.StartRegion(ctx, "ExecuteStmt")
+//	cc.audit(plugin.Starting)
+//	rs, err := cc.ctx.ExecuteStmt(ctx, stmt)
+//	reg.End()
+//	// The session tracker detachment from global tracker is solved in the `rs.Close` in most cases.
+//	// If the rs is nil, the detachment will be done in the `handleNoDelay`.
+//	if rs != nil {
+//		defer terror.Call(rs.Close)
+//	}
+//	if err != nil {
+//		return true, err
+//	}
+//
+//	if lastStmt {
+//		cc.ctx.GetSessionVars().StmtCtx.AppendWarnings(warns)
+//	}
+//
+//	status := cc.ctx.Status()
+//	if !lastStmt {
+//		status |= mysql.ServerMoreResultsExists
+//	}
+//
+//	if rs != nil {
+//		connStatus := atomic.LoadInt32(&cc.status)
+//		if connStatus == connStatusShutdown {
+//			return false, executor.ErrQueryInterrupted
+//		}
+//
+//		retryable, err := cc.writeResultset(ctx, rs, false, status, 0)
+//		if err != nil {
+//			return retryable, err
+//		}
+//	} else {
+//		handled, err := cc.handleQuerySpecial(ctx, status)
+//		if handled {
+//			execStmt := cc.ctx.Value(session.ExecStmtVarKey)
+//			if execStmt != nil {
+//				execStmt.(*executor.ExecStmt).FinishExecuteStmt(0, err, false)
+//			}
+//		}
+//		if err != nil {
+//			return false, err
+//		}
+//	}
+//	return false, nil
+//}
 
 func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bool, error) {
 	handled := false
@@ -2030,44 +2023,44 @@ func (cc *clientConn) handleFieldList(ctx context.Context, sql string) (err erro
 	return cc.flush(ctx)
 }
 
-// writeResultset writes data into a resultset and uses rs.Next to get row data back.
-// If binary is true, the data would be encoded in BINARY format.
-// serverStatus, a flag bit represents server information.
-// fetchSize, the desired number of rows to be fetched each time when client uses cursor.
-// retryable indicates whether the call of writeResultset has no side effect and can be retried to correct error. The call
-// has side effect in cursor mode or once data has been sent to client. Currently retryable is used to fallback to TiKV when
-// TiFlash is down.
-func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16, fetchSize int) (retryable bool, runErr error) {
-	defer func() {
-		// close ResultSet when cursor doesn't exist
-		r := recover()
-		if r == nil {
-			return
-		}
-		if str, ok := r.(string); !ok || !strings.HasPrefix(str, memory.PanicMemoryExceed) {
-			panic(r)
-		}
-		// TODO(jianzhang.zj: add metrics here)
-		runErr = errors.Errorf("%v", r)
-		buf := make([]byte, 4096)
-		stackSize := runtime.Stack(buf, false)
-		buf = buf[:stackSize]
-		logutil.Logger(ctx).Error("write query result panic", zap.Stringer("lastSQL", getLastStmtInConn{cc}), zap.String("stack", string(buf)))
-	}()
-	cc.initResultEncoder(ctx)
-	defer cc.rsEncoder.clean()
-	var err error
-	if mysql.HasCursorExistsFlag(serverStatus) {
-		err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
-	} else {
-		retryable, err = cc.writeChunks(ctx, rs, binary, serverStatus)
-	}
-	if err != nil {
-		return retryable, err
-	}
-
-	return false, cc.flush(ctx)
-}
+//// writeResultset writes data into a resultset and uses rs.Next to get row data back.
+//// If binary is true, the data would be encoded in BINARY format.
+//// serverStatus, a flag bit represents server information.
+//// fetchSize, the desired number of rows to be fetched each time when client uses cursor.
+//// retryable indicates whether the call of writeResultset has no side effect and can be retried to correct error. The call
+//// has side effect in cursor mode or once data has been sent to client. Currently retryable is used to fallback to TiKV when
+//// TiFlash is down.
+//func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16, fetchSize int) (retryable bool, runErr error) {
+//	defer func() {
+//		// close ResultSet when cursor doesn't exist
+//		r := recover()
+//		if r == nil {
+//			return
+//		}
+//		if str, ok := r.(string); !ok || !strings.HasPrefix(str, memory.PanicMemoryExceed) {
+//			panic(r)
+//		}
+//		// TODO(jianzhang.zj: add metrics here)
+//		runErr = errors.Errorf("%v", r)
+//		buf := make([]byte, 4096)
+//		stackSize := runtime.Stack(buf, false)
+//		buf = buf[:stackSize]
+//		logutil.Logger(ctx).Error("write query result panic", zap.Stringer("lastSQL", getLastStmtInConn{cc}), zap.String("stack", string(buf)))
+//	}()
+//	cc.initResultEncoder(ctx)
+//	defer cc.rsEncoder.clean()
+//	var err error
+//	if mysql.HasCursorExistsFlag(serverStatus) {
+//		err = cc.writeChunksWithFetchSize(ctx, rs, serverStatus, fetchSize)
+//	} else {
+//		retryable, err = cc.writeChunks(ctx, rs, binary, serverStatus)
+//	}
+//	if err != nil {
+//		return retryable, err
+//	}
+//
+//	return false, cc.flush(ctx)
+//}
 
 func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16) error {
 	data := cc.alloc.AllocWithLen(4, 1024)
@@ -2085,76 +2078,76 @@ func (cc *clientConn) writeColumnInfo(columns []*ColumnInfo, serverStatus uint16
 	return cc.writeEOF(serverStatus)
 }
 
-// writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
-// binary specifies the way to dump data. It throws any error while dumping data.
-// serverStatus, a flag bit represents server information
-// The first return value indicates whether error occurs at the first call of ResultSet.Next.
-func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) (bool, error) {
-	data := cc.alloc.AllocWithLen(4, 1024)
-	req := rs.NewChunk()
-	gotColumnInfo := false
-	firstNext := true
-	var stmtDetail *execdetails.StmtExecDetails
-	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
-	if stmtDetailRaw != nil {
-		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
-	}
-	for {
-		failpoint.Inject("fetchNextErr", func(value failpoint.Value) {
-			switch value.(string) {
-			case "firstNext":
-				failpoint.Return(firstNext, storeerr.ErrTiFlashServerTimeout)
-			case "secondNext":
-				if !firstNext {
-					failpoint.Return(firstNext, storeerr.ErrTiFlashServerTimeout)
-				}
-			}
-		})
-		// Here server.tidbResultSet implements Next method.
-		err := rs.Next(ctx, req)
-		if err != nil {
-			return firstNext, err
-		}
-		firstNext = false
-		if !gotColumnInfo {
-			// We need to call Next before we get columns.
-			// Otherwise, we will get incorrect columns info.
-			columns := rs.Columns()
-			err = cc.writeColumnInfo(columns, serverStatus)
-			if err != nil {
-				return false, err
-			}
-			gotColumnInfo = true
-		}
-		rowCount := req.NumRows()
-		if rowCount == 0 {
-			break
-		}
-		reg := trace.StartRegion(ctx, "WriteClientConn")
-		start := time.Now()
-		for i := 0; i < rowCount; i++ {
-			data = data[0:4]
-			if binary {
-				data, err = dumpBinaryRow(data, rs.Columns(), req.GetRow(i), cc.rsEncoder)
-			} else {
-				data, err = dumpTextRow(data, rs.Columns(), req.GetRow(i), cc.rsEncoder)
-			}
-			if err != nil {
-				reg.End()
-				return false, err
-			}
-			if err = cc.writePacket(data); err != nil {
-				reg.End()
-				return false, err
-			}
-		}
-		reg.End()
-		if stmtDetail != nil {
-			stmtDetail.WriteSQLRespDuration += time.Since(start)
-		}
-	}
-	return false, cc.writeEOF(serverStatus)
-}
+//// writeChunks writes data from a Chunk, which filled data by a ResultSet, into a connection.
+//// binary specifies the way to dump data. It throws any error while dumping data.
+//// serverStatus, a flag bit represents server information
+//// The first return value indicates whether error occurs at the first call of ResultSet.Next.
+//func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16) (bool, error) {
+//	data := cc.alloc.AllocWithLen(4, 1024)
+//	req := rs.NewChunk()
+//	gotColumnInfo := false
+//	firstNext := true
+//	var stmtDetail *execdetails.StmtExecDetails
+//	stmtDetailRaw := ctx.Value(execdetails.StmtExecDetailKey)
+//	if stmtDetailRaw != nil {
+//		stmtDetail = stmtDetailRaw.(*execdetails.StmtExecDetails)
+//	}
+//	for {
+//		failpoint.Inject("fetchNextErr", func(value failpoint.Value) {
+//			switch value.(string) {
+//			case "firstNext":
+//				failpoint.Return(firstNext, storeerr.ErrTiFlashServerTimeout)
+//			case "secondNext":
+//				if !firstNext {
+//					failpoint.Return(firstNext, storeerr.ErrTiFlashServerTimeout)
+//				}
+//			}
+//		})
+//		// Here server.tidbResultSet implements Next method.
+//		err := rs.Next(ctx, req)
+//		if err != nil {
+//			return firstNext, err
+//		}
+//		firstNext = false
+//		if !gotColumnInfo {
+//			// We need to call Next before we get columns.
+//			// Otherwise, we will get incorrect columns info.
+//			columns := rs.Columns()
+//			err = cc.writeColumnInfo(columns, serverStatus)
+//			if err != nil {
+//				return false, err
+//			}
+//			gotColumnInfo = true
+//		}
+//		rowCount := req.NumRows()
+//		if rowCount == 0 {
+//			break
+//		}
+//		reg := trace.StartRegion(ctx, "WriteClientConn")
+//		start := time.Now()
+//		for i := 0; i < rowCount; i++ {
+//			data = data[0:4]
+//			if binary {
+//				data, err = dumpBinaryRow(data, rs.Columns(), req.GetRow(i), cc.rsEncoder)
+//			} else {
+//				data, err = dumpTextRow(data, rs.Columns(), req.GetRow(i), cc.rsEncoder)
+//			}
+//			if err != nil {
+//				reg.End()
+//				return false, err
+//			}
+//			if err = cc.writePacket(data); err != nil {
+//				reg.End()
+//				return false, err
+//			}
+//		}
+//		reg.End()
+//		if stmtDetail != nil {
+//			stmtDetail.WriteSQLRespDuration += time.Since(start)
+//		}
+//	}
+//	return false, cc.writeEOF(serverStatus)
+//}
 
 // writeChunksWithFetchSize writes data from a Chunk, which filled data by a ResultSet, into a connection.
 // binary specifies the way to dump data. It throws any error while dumping data.
