@@ -13,10 +13,13 @@ import (
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/executor"
+	"github.com/pingcap/tidb/kv"
+	"github.com/pingcap/tidb/metrics"
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/auth"
 	"github.com/pingcap/tidb/parser/mysql"
 	"github.com/pingcap/tidb/parser/terror"
+	plannercore "github.com/pingcap/tidb/planner/core"
 	"github.com/pingcap/tidb/plugin"
 	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/sessionctx/stmtctx"
@@ -30,6 +33,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
+	"net"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -45,6 +49,118 @@ const sslRequestNumber = 80877103
 const cancelRequestCode = 80877102
 const gssEncReqNumber = 80877104
 const protocolSSL = false
+
+
+// Run reads client query and writes query result to client in for loop, if there is a panic during query handling,
+// it will be recovered and log the panic error.
+// This function returns and the connection is closed if there is an IO error or there is a panic.
+func (cc *clientConn) Run(ctx context.Context) {
+	const size = 4096
+	defer func() {
+		r := recover()
+		if r != nil {
+			buf := make([]byte, size)
+			stackSize := runtime.Stack(buf, false)
+			buf = buf[:stackSize]
+			logutil.Logger(ctx).Error("connection running loop panic",
+				zap.Stringer("lastSQL", getLastStmtInConn{cc}),
+				zap.String("err", fmt.Sprintf("%v", r)),
+				zap.String("stack", string(buf)),
+			)
+			err := cc.writeError(ctx, errors.New(fmt.Sprintf("%v", r)))
+			terror.Log(err)
+			metrics.PanicCounter.WithLabelValues(metrics.LabelSession).Inc()
+		}
+		if atomic.LoadInt32(&cc.status) != connStatusShutdown {
+			err := cc.Close()
+			terror.Log(err)
+		}
+	}()
+
+	// Usually, client connection status changes between [dispatching] <=> [reading].
+	// When some event happens, server may notify this client connection by setting
+	// the status to special values, for example: kill or graceful shutdown.
+	// The client connection would detect the events when it fails to change status
+	// by CAS operation, it would then take some actions accordingly.
+	for {
+		if !atomic.CompareAndSwapInt32(&cc.status, connStatusDispatching, connStatusReading) ||
+			// The judge below will not be hit by all means,
+			// But keep it stayed as a reminder and for the code reference for connStatusWaitShutdown.
+			atomic.LoadInt32(&cc.status) == connStatusWaitShutdown {
+			return
+		}
+
+		cc.alloc.Reset()
+		// close connection when idle time is more than wait_timeout
+		waitTimeout := cc.getSessionVarsWaitTimeout(ctx)
+		cc.pkt.setReadTimeout(time.Duration(waitTimeout) * time.Second)
+		start := time.Now()
+		data, err := cc.readPacket()
+		if err != nil {
+			if terror.ErrorNotEqual(err, io.EOF) {
+				if netErr, isNetErr := errors.Cause(err).(net.Error); isNetErr && netErr.Timeout() {
+					idleTime := time.Since(start)
+					logutil.Logger(ctx).Info("read packet timeout, close this connection",
+						zap.Duration("idle", idleTime),
+						zap.Uint64("waitTimeout", waitTimeout),
+						zap.Error(err),
+					)
+				} else {
+					errStack := errors.ErrorStack(err)
+					if !strings.Contains(errStack, "use of closed network connection") {
+						logutil.Logger(ctx).Warn("read packet failed, close this connection",
+							zap.Error(errors.SuspendStack(err)))
+					}
+				}
+			}
+			disconnectByClientWithError.Inc()
+			return
+		}
+
+		if !atomic.CompareAndSwapInt32(&cc.status, connStatusReading, connStatusDispatching) {
+			return
+		}
+
+		startTime := time.Now()
+		err = cc.dispatch(ctx, data)
+		if err != nil {
+			cc.audit(plugin.Error) // tell the plugin API there was a dispatch error
+			if terror.ErrorEqual(err, io.EOF) {
+				cc.addMetrics(data[0], startTime, nil)
+				disconnectNormal.Inc()
+				return
+			} else if terror.ErrResultUndetermined.Equal(err) {
+				logutil.Logger(ctx).Error("result undetermined, close this connection", zap.Error(err))
+				disconnectErrorUndetermined.Inc()
+				return
+			} else if terror.ErrCritical.Equal(err) {
+				metrics.CriticalErrorCounter.Add(1)
+				logutil.Logger(ctx).Fatal("critical error, stop the server", zap.Error(err))
+			}
+			var txnMode string
+			if cc.ctx != nil {
+				txnMode = cc.ctx.GetSessionVars().GetReadableTxnMode()
+			}
+			metrics.ExecuteErrorCounter.WithLabelValues(metrics.ExecuteErrorToLabel(err)).Inc()
+			if storeerr.ErrLockAcquireFailAndNoWaitSet.Equal(err) {
+				logutil.Logger(ctx).Debug("Expected error for FOR UPDATE NOWAIT", zap.Error(err))
+			} else {
+				logutil.Logger(ctx).Info("command dispatched failed",
+					zap.String("connInfo", cc.String()),
+					zap.String("command", mysql.Command2Str[data[0]]),
+					zap.String("status", cc.SessionStatusToString()),
+					zap.Stringer("sql", getLastStmtInConn{cc}),
+					zap.String("txn_mode", txnMode),
+					zap.String("err", errStrForLog(err, cc.ctx.GetSessionVars().EnableRedactLog)),
+				)
+			}
+			err1 := cc.writeError(ctx, err)
+			terror.Log(err1)
+		}
+		cc.addMetrics(data[0], startTime, err)
+		cc.pkt.sequence = 0
+	}
+}
 
 // dispatch handles client request based on command which is the first byte of the data.
 // It also gets a token from server which is used to limit the concurrently handling clients.
@@ -168,6 +284,33 @@ func (cc *clientConn) dispatch(ctx context.Context, data []byte) error {
 		return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
 	}
 	return mysql.NewErrf(mysql.ErrUnknown, "command %d not supported now", nil, cmd)
+}
+
+// readPacket Read general messages of postgresql protocol
+func (cc *clientConn) readPacket() ([]byte, error) {
+	msgType := make([]byte, 1)
+	if _, err := io.ReadFull(cc.bufReadConn, msgType); err != nil {
+		return nil, err
+	}
+
+	// 后面四个字节为长度，包括自己
+	msgLength := make([]byte, 4)
+
+	if _, err := io.ReadFull(cc.bufReadConn, msgLength); err != nil {
+		return nil, err
+	}
+
+	msgLen := binary.BigEndian.Uint32(msgLength)
+
+	// 获取请求的具体信息
+	msg := make([]byte, msgLen-4)
+
+	if _, err := io.ReadFull(cc.bufReadConn, msg); err != nil {
+		return nil, err
+	}
+
+	data := append(msgType, msg...)
+	return data, nil
 }
 
 //-----------------------------------------------------------------
@@ -305,7 +448,7 @@ func (cc *clientConn) handleStartupMessage(ctx context.Context, startupMessage *
 		"integer_datetimes": "on",
 		"is_superuser":      "on",
 		"server_encoding":   "UTF8",
-		"server_version":    "version: TiDB-v4.0.11 TiDB Server (Apache License 2.0) Community Edition, PostgreSQL 12 compatible",
+		"server_version":    "version: TiDB-v5.3.0 TiDB Server (Apache License 2.0) Community Edition, PostgreSQL 12 compatible",
 		"TimeZone":          "PRC",
 	}
 
@@ -484,6 +627,88 @@ func (cc *clientConn) DoAuth(ctx context.Context, user *auth.UserIdentity, auth 
 	return nil
 }
 
+// handleQuery executes the sql query string and writes result set or result ok to the client.
+// As the execution time of this function represents the performance of TiDB, we do time log and metrics here.
+// There is a special query `load data` that does not return result, which is handled differently.
+// Query `load stats` does not return result either.
+func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
+	defer trace.StartRegion(ctx, "handleQuery").End()
+	sc := cc.ctx.GetSessionVars().StmtCtx
+	prevWarns := sc.GetWarnings()
+	stmts, err := cc.ctx.Parse(ctx, sql)
+	if err != nil {
+		return err
+	}
+
+	if len(stmts) == 0 {
+		return cc.writeOK(ctx)
+	}
+
+	warns := sc.GetWarnings()
+	parserWarns := warns[len(prevWarns):]
+
+	var pointPlans []plannercore.Plan
+	if len(stmts) > 1 {
+
+		// The client gets to choose if it allows multi-statements, and
+		// probably defaults OFF. This helps prevent against SQL injection attacks
+		// by early terminating the first statement, and then running an entirely
+		// new statement.
+
+		capabilities := cc.ctx.GetSessionVars().ClientCapability
+		if capabilities&mysql.ClientMultiStatements < 1 {
+			// The client does not have multi-statement enabled. We now need to determine
+			// how to handle an unsafe situation based on the multiStmt sysvar.
+			switch cc.ctx.GetSessionVars().MultiStatementMode {
+			case variable.OffInt:
+				err = errMultiStatementDisabled
+				return err
+			case variable.OnInt:
+				// multi statement is fully permitted, do nothing
+			default:
+				warn := stmtctx.SQLWarn{Level: stmtctx.WarnLevelWarning, Err: errMultiStatementDisabled}
+				parserWarns = append(parserWarns, warn)
+			}
+		}
+
+		// Only pre-build point plans for multi-statement query
+		pointPlans, err = cc.prefetchPointPlanKeys(ctx, stmts)
+		if err != nil {
+			return err
+		}
+	}
+	if len(pointPlans) > 0 {
+		defer cc.ctx.ClearValue(plannercore.PointPlanKey)
+	}
+	var retryable bool
+	for i, stmt := range stmts {
+		if len(pointPlans) > 0 {
+			// Save the point plan in Session so we don't need to build the point plan again.
+			cc.ctx.SetValue(plannercore.PointPlanKey, plannercore.PointPlanVal{Plan: pointPlans[i]})
+		}
+		retryable, err = cc.handleStmt(ctx, stmt, parserWarns, i == len(stmts)-1)
+		if err != nil {
+			if !retryable || !errors.ErrorEqual(err, storeerr.ErrTiFlashServerTimeout) {
+				break
+			}
+			_, allowTiFlashFallback := cc.ctx.GetSessionVars().AllowFallbackToTiKV[kv.TiFlash]
+			if !allowTiFlashFallback {
+				break
+			}
+			// When the TiFlash server seems down, we append a warning to remind the user to check the status of the TiFlash
+			// server and fallback to TiKV.
+			warns := append(parserWarns, stmtctx.SQLWarn{Level: stmtctx.WarnLevelError, Err: err})
+			delete(cc.ctx.GetSessionVars().IsolationReadEngines, kv.TiFlash)
+			_, err = cc.handleStmt(ctx, stmt, warns, i == len(stmts)-1)
+			cc.ctx.GetSessionVars().IsolationReadEngines[kv.TiFlash] = struct{}{}
+			if err != nil {
+				break
+			}
+		}
+	}
+	return err
+}
+
 // The first return value indicates whether the call of handleStmt has no side effect and can be retried.
 // Currently the first return value is used to fallback to TiKV when TiFlash is down.
 func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, warns []stmtctx.SQLWarn, lastStmt bool) (bool, error) {
@@ -521,8 +746,22 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, warns [
 		if err != nil {
 			return retryable, err
 		}
+
+		// if handle prepared stmt,here do not need to return ReadyForQuery
+		isPrepareStmt := rs.IsPrepareStmt()
+		if isPrepareStmt {
+			return retryable, nil
+		}
 	} else {
+
+		// 对stmt做一个特殊的处理
+		err = cc.handleQueryWithStmt(stmt)
+		if err != nil {
+			return false, err
+		}
+
 		handled, err := cc.handleQuerySpecial(ctx, status)
+
 		if handled {
 			execStmt := cc.ctx.Value(session.ExecStmtVarKey)
 			if execStmt != nil {
@@ -533,9 +772,73 @@ func (cc *clientConn) handleStmt(ctx context.Context, stmt ast.StmtNode, warns [
 			return false, err
 		}
 	}
+
+	// 如果是最后一个查询,则需要返回ReadyForQuery
+	if lastStmt {
+		if err := cc.writeReadyForQuery(ctx, status); err != nil {
+			return false, err
+		}
+	}
 	return false, nil
 }
 
+func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bool, error) {
+	handled := false
+	loadDataInfo := cc.ctx.Value(executor.LoadDataVarKey)
+	if loadDataInfo != nil {
+		handled = true
+		defer cc.ctx.SetValue(executor.LoadDataVarKey, nil)
+		if err := cc.handleLoadData(ctx, loadDataInfo.(*executor.LoadDataInfo)); err != nil {
+			return handled, err
+		}
+	}
+
+	loadStats := cc.ctx.Value(executor.LoadStatsVarKey)
+	if loadStats != nil {
+		handled = true
+		defer cc.ctx.SetValue(executor.LoadStatsVarKey, nil)
+		if err := cc.handleLoadStats(ctx, loadStats.(*executor.LoadStatsInfo)); err != nil {
+			return handled, err
+		}
+	}
+
+	indexAdvise := cc.ctx.Value(executor.IndexAdviseVarKey)
+	if indexAdvise != nil {
+		handled = true
+		defer cc.ctx.SetValue(executor.IndexAdviseVarKey, nil)
+		if err := cc.handleIndexAdvise(ctx, indexAdvise.(*executor.IndexAdviseInfo)); err != nil {
+			return handled, err
+		}
+	}
+
+	planReplayerLoad := cc.ctx.Value(executor.PlanReplayerLoadVarKey)
+	if planReplayerLoad != nil {
+		handled = true
+		defer cc.ctx.SetValue(executor.PlanReplayerLoadVarKey, nil)
+		if err := cc.handlePlanReplayerLoad(ctx, planReplayerLoad.(*executor.PlanReplayerLoadInfo)); err != nil {
+			return handled, err
+		}
+	}
+
+	return handled, cc.writeCommandComplete()
+}
+
+func (cc *clientConn) handleQueryWithStmt(stmt ast.StmtNode) error {
+	// 判断 stmt 的类型
+	// 如果是 SET 类型的语句
+	// 其余的暂不做处理
+	if set, OK := stmt.(*ast.SetStmt); OK {
+		key := set.Variables[0].Name
+		value := set.Variables[0].Value.(ast.ValueExpr).GetDatumString()
+		par := make(map[string]string)
+		par[key] = value
+		if err := cc.writeParameterStatus(par); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 // writeSSLRequest
 // 服务端回复 'S'，表示同意SSL握手
@@ -669,6 +972,57 @@ func (cc *clientConn) WriteData(data []byte) error {
 	}
 }
 
+// writeError 向客户端写回错误信息
+// 这里需要将MySQL错误信息转换为PgSQL格式
+// PgSQL 错误信息报文格式: https://www.postgresql.org/docs/13/protocol-error-fields.html
+// MySLQ 错误信息报文格式: https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html
+// PostgreSQL Modified
+func (cc *clientConn) writeError(ctx context.Context, e error) error {
+	var (
+		m  *mysql.SQLError
+		te *terror.Error
+		ok bool
+	)
+	originErr := errors.Cause(e)
+	if te, ok = originErr.(*terror.Error); ok {
+		m = terror.ToSQLError(te)
+	} else {
+		e := errors.Cause(originErr)
+		switch y := e.(type) {
+		case *terror.Error:
+			m = terror.ToSQLError(y)
+		default:
+			m = mysql.NewErrf(mysql.ErrUnknown, "%s", nil, e.Error())
+		}
+	}
+
+	// todo 处理某些情况下从lastPacket获取不到sql的情况，比如命令行prepare语句， 它是分段提交的，第一阶段prepare不出错，第二阶段绑定出错，此时获取packet中的数据不是sql语句
+
+	//读包获取sql，去除第一位的类型，
+	var sql string
+	if cc.lastPacket != nil {
+		sql = string(cc.lastPacket)[1:]
+	}
+
+	// todo 完成MySQL错误与PgSQL错误的转换和返回
+	// https://www.postgresql.org/docs/13/errcodes-appendix.html
+	errorResponse, err := convertMysqlErrorToPgError(m, te, sql)
+	if err != nil {
+		return err
+	}
+	cc.lastCode = m.Code
+
+	if err := cc.WriteData(errorResponse.Encode(nil)); err != nil {
+		return err
+	}
+
+	// 发送错误后需要发送 ReadyForQuery 通知客户端可以继续执行命令
+	// 所以这里需要获取到事务状态是否处于空闲阶段
+	// todo 获取事务状态
+
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
+}
+
 // writeResultset writes data into a resultset and uses rs.Next to get row data back.
 // If binary is true, the data would be encoded in BINARY format.
 // serverStatus, a flag bit represents server information.
@@ -715,7 +1069,7 @@ func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, resultFo
 // serverStatus, a flag bit represents server information
 // The first return value indicates whether error occurs at the first call of ResultSet.Next.
 func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet,  rf []int16, serverStatus uint16) (bool, error) {
-	data := cc.alloc.AllocWithLen(4, 1024)
+	data := cc.alloc.AllocWithLen(0, 1024)
 	req := rs.NewChunk()
 
 	// 当为预处理查询执行时，在执行完成后不需要返回 RowDescription
@@ -787,7 +1141,7 @@ func (cc *clientConn) writeChunks(ctx context.Context, rs ResultSet,  rf []int16
 			stmtDetail.WriteSQLRespDuration += time.Since(start)
 		}
 	}
-	return false, cc.writeEOF(serverStatus)
+	return false, cc.writeCommandComplete()
 }
 
 // convertColumnInfoToRowDescription 将 MySQL 的字段结构信息 转换为 PgSQL 的字段结构信息

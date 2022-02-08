@@ -59,9 +59,7 @@ import (
 	"github.com/pingcap/tidb/plugin"
 	"github.com/pingcap/tidb/privilege"
 	"github.com/pingcap/tidb/sessionctx"
-	"github.com/pingcap/tidb/sessionctx/stmtctx"
 	"github.com/pingcap/tidb/sessionctx/variable"
-	storeerr "github.com/pingcap/tidb/store/driver/error"
 	"github.com/pingcap/tidb/tablecodec"
 	tidbutil "github.com/pingcap/tidb/util"
 	"github.com/pingcap/tidb/util/arena"
@@ -74,7 +72,6 @@ import (
 	"io"
 	"net"
 	"os/user"
-	"runtime"
 	"runtime/trace"
 	"strconv"
 	"strings"
@@ -379,9 +376,9 @@ func (cc *clientConn) writeInitialHandshake(ctx context.Context) error {
 	return cc.flush(ctx)
 }
 
-func (cc *clientConn) readPacket() ([]byte, error) {
-	return cc.pkt.readPacket()
-}
+//func (cc *clientConn) readPacket() ([]byte, error) {
+//	return cc.pkt.readPacket()
+//}
 
 func (cc *clientConn) writePacket(data []byte) error {
 	failpoint.Inject("FakeClientConn", func() {
@@ -965,116 +962,116 @@ func (cc *clientConn) initConnect(ctx context.Context) error {
 	return nil
 }
 
-// Run reads client query and writes query result to client in for loop, if there is a panic during query handling,
-// it will be recovered and log the panic error.
-// This function returns and the connection is closed if there is an IO error or there is a panic.
-func (cc *clientConn) Run(ctx context.Context) {
-	const size = 4096
-	defer func() {
-		r := recover()
-		if r != nil {
-			buf := make([]byte, size)
-			stackSize := runtime.Stack(buf, false)
-			buf = buf[:stackSize]
-			logutil.Logger(ctx).Error("connection running loop panic",
-				zap.Stringer("lastSQL", getLastStmtInConn{cc}),
-				zap.String("err", fmt.Sprintf("%v", r)),
-				zap.String("stack", string(buf)),
-			)
-			err := cc.writeError(ctx, errors.New(fmt.Sprintf("%v", r)))
-			terror.Log(err)
-			metrics.PanicCounter.WithLabelValues(metrics.LabelSession).Inc()
-		}
-		if atomic.LoadInt32(&cc.status) != connStatusShutdown {
-			err := cc.Close()
-			terror.Log(err)
-		}
-	}()
-
-	// Usually, client connection status changes between [dispatching] <=> [reading].
-	// When some event happens, server may notify this client connection by setting
-	// the status to special values, for example: kill or graceful shutdown.
-	// The client connection would detect the events when it fails to change status
-	// by CAS operation, it would then take some actions accordingly.
-	for {
-		if !atomic.CompareAndSwapInt32(&cc.status, connStatusDispatching, connStatusReading) ||
-			// The judge below will not be hit by all means,
-			// But keep it stayed as a reminder and for the code reference for connStatusWaitShutdown.
-			atomic.LoadInt32(&cc.status) == connStatusWaitShutdown {
-			return
-		}
-
-		cc.alloc.Reset()
-		// close connection when idle time is more than wait_timeout
-		waitTimeout := cc.getSessionVarsWaitTimeout(ctx)
-		cc.pkt.setReadTimeout(time.Duration(waitTimeout) * time.Second)
-		start := time.Now()
-		data, err := cc.readPacket()
-		if err != nil {
-			if terror.ErrorNotEqual(err, io.EOF) {
-				if netErr, isNetErr := errors.Cause(err).(net.Error); isNetErr && netErr.Timeout() {
-					idleTime := time.Since(start)
-					logutil.Logger(ctx).Info("read packet timeout, close this connection",
-						zap.Duration("idle", idleTime),
-						zap.Uint64("waitTimeout", waitTimeout),
-						zap.Error(err),
-					)
-				} else {
-					errStack := errors.ErrorStack(err)
-					if !strings.Contains(errStack, "use of closed network connection") {
-						logutil.Logger(ctx).Warn("read packet failed, close this connection",
-							zap.Error(errors.SuspendStack(err)))
-					}
-				}
-			}
-			disconnectByClientWithError.Inc()
-			return
-		}
-
-		if !atomic.CompareAndSwapInt32(&cc.status, connStatusReading, connStatusDispatching) {
-			return
-		}
-
-		startTime := time.Now()
-		err = cc.dispatch(ctx, data)
-		if err != nil {
-			cc.audit(plugin.Error) // tell the plugin API there was a dispatch error
-			if terror.ErrorEqual(err, io.EOF) {
-				cc.addMetrics(data[0], startTime, nil)
-				disconnectNormal.Inc()
-				return
-			} else if terror.ErrResultUndetermined.Equal(err) {
-				logutil.Logger(ctx).Error("result undetermined, close this connection", zap.Error(err))
-				disconnectErrorUndetermined.Inc()
-				return
-			} else if terror.ErrCritical.Equal(err) {
-				metrics.CriticalErrorCounter.Add(1)
-				logutil.Logger(ctx).Fatal("critical error, stop the server", zap.Error(err))
-			}
-			var txnMode string
-			if cc.ctx != nil {
-				txnMode = cc.ctx.GetSessionVars().GetReadableTxnMode()
-			}
-			metrics.ExecuteErrorCounter.WithLabelValues(metrics.ExecuteErrorToLabel(err)).Inc()
-			if storeerr.ErrLockAcquireFailAndNoWaitSet.Equal(err) {
-				logutil.Logger(ctx).Debug("Expected error for FOR UPDATE NOWAIT", zap.Error(err))
-			} else {
-				logutil.Logger(ctx).Info("command dispatched failed",
-					zap.String("connInfo", cc.String()),
-					zap.String("command", mysql.Command2Str[data[0]]),
-					zap.String("status", cc.SessionStatusToString()),
-					zap.Stringer("sql", getLastStmtInConn{cc}),
-					zap.String("txn_mode", txnMode),
-					zap.String("err", errStrForLog(err, cc.ctx.GetSessionVars().EnableRedactLog)),
-				)
-			}
-			err1 := cc.writeError(ctx, err)
-			terror.Log(err1)
-		}
-		cc.addMetrics(data[0], startTime, err)
-		cc.pkt.sequence = 0
-	}
-}
+//// Run reads client query and writes query result to client in for loop, if there is a panic during query handling,
+//// it will be recovered and log the panic error.
+//// This function returns and the connection is closed if there is an IO error or there is a panic.
+//func (cc *clientConn) Run(ctx context.Context) {
+//	const size = 4096
+//	defer func() {
+//		r := recover()
+//		if r != nil {
+//			buf := make([]byte, size)
+//			stackSize := runtime.Stack(buf, false)
+//			buf = buf[:stackSize]
+//			logutil.Logger(ctx).Error("connection running loop panic",
+//				zap.Stringer("lastSQL", getLastStmtInConn{cc}),
+//				zap.String("err", fmt.Sprintf("%v", r)),
+//				zap.String("stack", string(buf)),
+//			)
+//			err := cc.writeError(ctx, errors.New(fmt.Sprintf("%v", r)))
+//			terror.Log(err)
+//			metrics.PanicCounter.WithLabelValues(metrics.LabelSession).Inc()
+//		}
+//		if atomic.LoadInt32(&cc.status) != connStatusShutdown {
+//			err := cc.Close()
+//			terror.Log(err)
+//		}
+//	}()
+//
+//	// Usually, client connection status changes between [dispatching] <=> [reading].
+//	// When some event happens, server may notify this client connection by setting
+//	// the status to special values, for example: kill or graceful shutdown.
+//	// The client connection would detect the events when it fails to change status
+//	// by CAS operation, it would then take some actions accordingly.
+//	for {
+//		if !atomic.CompareAndSwapInt32(&cc.status, connStatusDispatching, connStatusReading) ||
+//			// The judge below will not be hit by all means,
+//			// But keep it stayed as a reminder and for the code reference for connStatusWaitShutdown.
+//			atomic.LoadInt32(&cc.status) == connStatusWaitShutdown {
+//			return
+//		}
+//
+//		cc.alloc.Reset()
+//		// close connection when idle time is more than wait_timeout
+//		waitTimeout := cc.getSessionVarsWaitTimeout(ctx)
+//		cc.pkt.setReadTimeout(time.Duration(waitTimeout) * time.Second)
+//		start := time.Now()
+//		data, err := cc.readPacket()
+//		if err != nil {
+//			if terror.ErrorNotEqual(err, io.EOF) {
+//				if netErr, isNetErr := errors.Cause(err).(net.Error); isNetErr && netErr.Timeout() {
+//					idleTime := time.Since(start)
+//					logutil.Logger(ctx).Info("read packet timeout, close this connection",
+//						zap.Duration("idle", idleTime),
+//						zap.Uint64("waitTimeout", waitTimeout),
+//						zap.Error(err),
+//					)
+//				} else {
+//					errStack := errors.ErrorStack(err)
+//					if !strings.Contains(errStack, "use of closed network connection") {
+//						logutil.Logger(ctx).Warn("read packet failed, close this connection",
+//							zap.Error(errors.SuspendStack(err)))
+//					}
+//				}
+//			}
+//			disconnectByClientWithError.Inc()
+//			return
+//		}
+//
+//		if !atomic.CompareAndSwapInt32(&cc.status, connStatusReading, connStatusDispatching) {
+//			return
+//		}
+//
+//		startTime := time.Now()
+//		err = cc.dispatch(ctx, data)
+//		if err != nil {
+//			cc.audit(plugin.Error) // tell the plugin API there was a dispatch error
+//			if terror.ErrorEqual(err, io.EOF) {
+//				cc.addMetrics(data[0], startTime, nil)
+//				disconnectNormal.Inc()
+//				return
+//			} else if terror.ErrResultUndetermined.Equal(err) {
+//				logutil.Logger(ctx).Error("result undetermined, close this connection", zap.Error(err))
+//				disconnectErrorUndetermined.Inc()
+//				return
+//			} else if terror.ErrCritical.Equal(err) {
+//				metrics.CriticalErrorCounter.Add(1)
+//				logutil.Logger(ctx).Fatal("critical error, stop the server", zap.Error(err))
+//			}
+//			var txnMode string
+//			if cc.ctx != nil {
+//				txnMode = cc.ctx.GetSessionVars().GetReadableTxnMode()
+//			}
+//			metrics.ExecuteErrorCounter.WithLabelValues(metrics.ExecuteErrorToLabel(err)).Inc()
+//			if storeerr.ErrLockAcquireFailAndNoWaitSet.Equal(err) {
+//				logutil.Logger(ctx).Debug("Expected error for FOR UPDATE NOWAIT", zap.Error(err))
+//			} else {
+//				logutil.Logger(ctx).Info("command dispatched failed",
+//					zap.String("connInfo", cc.String()),
+//					zap.String("command", mysql.Command2Str[data[0]]),
+//					zap.String("status", cc.SessionStatusToString()),
+//					zap.Stringer("sql", getLastStmtInConn{cc}),
+//					zap.String("txn_mode", txnMode),
+//					zap.String("err", errStrForLog(err, cc.ctx.GetSessionVars().EnableRedactLog)),
+//				)
+//			}
+//			err1 := cc.writeError(ctx, err)
+//			terror.Log(err1)
+//		}
+//		cc.addMetrics(data[0], startTime, err)
+//		cc.pkt.sequence = 0
+//	}
+//}
 
 // ShutdownOrNotify will Shutdown this client connection, or do its best to notify.
 func (cc *clientConn) ShutdownOrNotify() bool {
@@ -1405,43 +1402,43 @@ func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows,
 	return cc.flush(ctx)
 }
 
-func (cc *clientConn) writeError(ctx context.Context, e error) error {
-	var (
-		m  *mysql.SQLError
-		te *terror.Error
-		ok bool
-	)
-	originErr := errors.Cause(e)
-	if te, ok = originErr.(*terror.Error); ok {
-		m = terror.ToSQLError(te)
-	} else {
-		e := errors.Cause(originErr)
-		switch y := e.(type) {
-		case *terror.Error:
-			m = terror.ToSQLError(y)
-		default:
-			m = mysql.NewErrf(mysql.ErrUnknown, "%s", nil, e.Error())
-		}
-	}
-
-	cc.lastCode = m.Code
-	defer errno.IncrementError(m.Code, cc.user, cc.peerHost)
-	data := cc.alloc.AllocWithLen(4, 16+len(m.Message))
-	data = append(data, mysql.ErrHeader)
-	data = append(data, byte(m.Code), byte(m.Code>>8))
-	if cc.capability&mysql.ClientProtocol41 > 0 {
-		data = append(data, '#')
-		data = append(data, m.State...)
-	}
-
-	data = append(data, m.Message...)
-
-	err := cc.writePacket(data)
-	if err != nil {
-		return err
-	}
-	return cc.flush(ctx)
-}
+//func (cc *clientConn) writeError(ctx context.Context, e error) error {
+//	var (
+//		m  *mysql.SQLError
+//		te *terror.Error
+//		ok bool
+//	)
+//	originErr := errors.Cause(e)
+//	if te, ok = originErr.(*terror.Error); ok {
+//		m = terror.ToSQLError(te)
+//	} else {
+//		e := errors.Cause(originErr)
+//		switch y := e.(type) {
+//		case *terror.Error:
+//			m = terror.ToSQLError(y)
+//		default:
+//			m = mysql.NewErrf(mysql.ErrUnknown, "%s", nil, e.Error())
+//		}
+//	}
+//
+//	cc.lastCode = m.Code
+//	defer errno.IncrementError(m.Code, cc.user, cc.peerHost)
+//	data := cc.alloc.AllocWithLen(4, 16+len(m.Message))
+//	data = append(data, mysql.ErrHeader)
+//	data = append(data, byte(m.Code), byte(m.Code>>8))
+//	if cc.capability&mysql.ClientProtocol41 > 0 {
+//		data = append(data, '#')
+//		data = append(data, m.State...)
+//	}
+//
+//	data = append(data, m.Message...)
+//
+//	err := cc.writePacket(data)
+//	if err != nil {
+//		return err
+//	}
+//	return cc.flush(ctx)
+//}
 
 // writeEOF writes an EOF packet.
 // Note this function won't flush the stream because maybe there are more
@@ -1717,87 +1714,87 @@ func (cc *clientConn) audit(eventType plugin.GeneralEvent) {
 	}
 }
 
-// handleQuery executes the sql query string and writes result set or result ok to the client.
-// As the execution time of this function represents the performance of TiDB, we do time log and metrics here.
-// There is a special query `load data` that does not return result, which is handled differently.
-// Query `load stats` does not return result either.
-func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
-	defer trace.StartRegion(ctx, "handleQuery").End()
-	sc := cc.ctx.GetSessionVars().StmtCtx
-	prevWarns := sc.GetWarnings()
-	stmts, err := cc.ctx.Parse(ctx, sql)
-	if err != nil {
-		return err
-	}
-
-	if len(stmts) == 0 {
-		return cc.writeOK(ctx)
-	}
-
-	warns := sc.GetWarnings()
-	parserWarns := warns[len(prevWarns):]
-
-	var pointPlans []plannercore.Plan
-	if len(stmts) > 1 {
-
-		// The client gets to choose if it allows multi-statements, and
-		// probably defaults OFF. This helps prevent against SQL injection attacks
-		// by early terminating the first statement, and then running an entirely
-		// new statement.
-
-		capabilities := cc.ctx.GetSessionVars().ClientCapability
-		if capabilities&mysql.ClientMultiStatements < 1 {
-			// The client does not have multi-statement enabled. We now need to determine
-			// how to handle an unsafe situation based on the multiStmt sysvar.
-			switch cc.ctx.GetSessionVars().MultiStatementMode {
-			case variable.OffInt:
-				err = errMultiStatementDisabled
-				return err
-			case variable.OnInt:
-				// multi statement is fully permitted, do nothing
-			default:
-				warn := stmtctx.SQLWarn{Level: stmtctx.WarnLevelWarning, Err: errMultiStatementDisabled}
-				parserWarns = append(parserWarns, warn)
-			}
-		}
-
-		// Only pre-build point plans for multi-statement query
-		pointPlans, err = cc.prefetchPointPlanKeys(ctx, stmts)
-		if err != nil {
-			return err
-		}
-	}
-	if len(pointPlans) > 0 {
-		defer cc.ctx.ClearValue(plannercore.PointPlanKey)
-	}
-	var retryable bool
-	for i, stmt := range stmts {
-		if len(pointPlans) > 0 {
-			// Save the point plan in Session so we don't need to build the point plan again.
-			cc.ctx.SetValue(plannercore.PointPlanKey, plannercore.PointPlanVal{Plan: pointPlans[i]})
-		}
-		retryable, err = cc.handleStmt(ctx, stmt, parserWarns, i == len(stmts)-1)
-		if err != nil {
-			if !retryable || !errors.ErrorEqual(err, storeerr.ErrTiFlashServerTimeout) {
-				break
-			}
-			_, allowTiFlashFallback := cc.ctx.GetSessionVars().AllowFallbackToTiKV[kv.TiFlash]
-			if !allowTiFlashFallback {
-				break
-			}
-			// When the TiFlash server seems down, we append a warning to remind the user to check the status of the TiFlash
-			// server and fallback to TiKV.
-			warns := append(parserWarns, stmtctx.SQLWarn{Level: stmtctx.WarnLevelError, Err: err})
-			delete(cc.ctx.GetSessionVars().IsolationReadEngines, kv.TiFlash)
-			_, err = cc.handleStmt(ctx, stmt, warns, i == len(stmts)-1)
-			cc.ctx.GetSessionVars().IsolationReadEngines[kv.TiFlash] = struct{}{}
-			if err != nil {
-				break
-			}
-		}
-	}
-	return err
-}
+//// handleQuery executes the sql query string and writes result set or result ok to the client.
+//// As the execution time of this function represents the performance of TiDB, we do time log and metrics here.
+//// There is a special query `load data` that does not return result, which is handled differently.
+//// Query `load stats` does not return result either.
+//func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
+//	defer trace.StartRegion(ctx, "handleQuery").End()
+//	sc := cc.ctx.GetSessionVars().StmtCtx
+//	prevWarns := sc.GetWarnings()
+//	stmts, err := cc.ctx.Parse(ctx, sql)
+//	if err != nil {
+//		return err
+//	}
+//
+//	if len(stmts) == 0 {
+//		return cc.writeOK(ctx)
+//	}
+//
+//	warns := sc.GetWarnings()
+//	parserWarns := warns[len(prevWarns):]
+//
+//	var pointPlans []plannercore.Plan
+//	if len(stmts) > 1 {
+//
+//		// The client gets to choose if it allows multi-statements, and
+//		// probably defaults OFF. This helps prevent against SQL injection attacks
+//		// by early terminating the first statement, and then running an entirely
+//		// new statement.
+//
+//		capabilities := cc.ctx.GetSessionVars().ClientCapability
+//		if capabilities&mysql.ClientMultiStatements < 1 {
+//			// The client does not have multi-statement enabled. We now need to determine
+//			// how to handle an unsafe situation based on the multiStmt sysvar.
+//			switch cc.ctx.GetSessionVars().MultiStatementMode {
+//			case variable.OffInt:
+//				err = errMultiStatementDisabled
+//				return err
+//			case variable.OnInt:
+//				// multi statement is fully permitted, do nothing
+//			default:
+//				warn := stmtctx.SQLWarn{Level: stmtctx.WarnLevelWarning, Err: errMultiStatementDisabled}
+//				parserWarns = append(parserWarns, warn)
+//			}
+//		}
+//
+//		// Only pre-build point plans for multi-statement query
+//		pointPlans, err = cc.prefetchPointPlanKeys(ctx, stmts)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//	if len(pointPlans) > 0 {
+//		defer cc.ctx.ClearValue(plannercore.PointPlanKey)
+//	}
+//	var retryable bool
+//	for i, stmt := range stmts {
+//		if len(pointPlans) > 0 {
+//			// Save the point plan in Session so we don't need to build the point plan again.
+//			cc.ctx.SetValue(plannercore.PointPlanKey, plannercore.PointPlanVal{Plan: pointPlans[i]})
+//		}
+//		retryable, err = cc.handleStmt(ctx, stmt, parserWarns, i == len(stmts)-1)
+//		if err != nil {
+//			if !retryable || !errors.ErrorEqual(err, storeerr.ErrTiFlashServerTimeout) {
+//				break
+//			}
+//			_, allowTiFlashFallback := cc.ctx.GetSessionVars().AllowFallbackToTiKV[kv.TiFlash]
+//			if !allowTiFlashFallback {
+//				break
+//			}
+//			// When the TiFlash server seems down, we append a warning to remind the user to check the status of the TiFlash
+//			// server and fallback to TiKV.
+//			warns := append(parserWarns, stmtctx.SQLWarn{Level: stmtctx.WarnLevelError, Err: err})
+//			delete(cc.ctx.GetSessionVars().IsolationReadEngines, kv.TiFlash)
+//			_, err = cc.handleStmt(ctx, stmt, warns, i == len(stmts)-1)
+//			cc.ctx.GetSessionVars().IsolationReadEngines[kv.TiFlash] = struct{}{}
+//			if err != nil {
+//				break
+//			}
+//		}
+//	}
+//	return err
+//}
 
 // prefetchPointPlanKeys extracts the point keys in multi-statement query,
 // use BatchGet to get the keys, so the values will be cached in the snapshot cache, save RPC call cost.
@@ -1952,46 +1949,46 @@ func (cc *clientConn) prefetchPointPlanKeys(ctx context.Context, stmts []ast.Stm
 //	return false, nil
 //}
 
-func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bool, error) {
-	handled := false
-	loadDataInfo := cc.ctx.Value(executor.LoadDataVarKey)
-	if loadDataInfo != nil {
-		handled = true
-		defer cc.ctx.SetValue(executor.LoadDataVarKey, nil)
-		if err := cc.handleLoadData(ctx, loadDataInfo.(*executor.LoadDataInfo)); err != nil {
-			return handled, err
-		}
-	}
-
-	loadStats := cc.ctx.Value(executor.LoadStatsVarKey)
-	if loadStats != nil {
-		handled = true
-		defer cc.ctx.SetValue(executor.LoadStatsVarKey, nil)
-		if err := cc.handleLoadStats(ctx, loadStats.(*executor.LoadStatsInfo)); err != nil {
-			return handled, err
-		}
-	}
-
-	indexAdvise := cc.ctx.Value(executor.IndexAdviseVarKey)
-	if indexAdvise != nil {
-		handled = true
-		defer cc.ctx.SetValue(executor.IndexAdviseVarKey, nil)
-		if err := cc.handleIndexAdvise(ctx, indexAdvise.(*executor.IndexAdviseInfo)); err != nil {
-			return handled, err
-		}
-	}
-
-	planReplayerLoad := cc.ctx.Value(executor.PlanReplayerLoadVarKey)
-	if planReplayerLoad != nil {
-		handled = true
-		defer cc.ctx.SetValue(executor.PlanReplayerLoadVarKey, nil)
-		if err := cc.handlePlanReplayerLoad(ctx, planReplayerLoad.(*executor.PlanReplayerLoadInfo)); err != nil {
-			return handled, err
-		}
-	}
-
-	return handled, cc.writeOkWith(ctx, cc.ctx.LastMessage(), cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), status, cc.ctx.WarningCount())
-}
+//func (cc *clientConn) handleQuerySpecial(ctx context.Context, status uint16) (bool, error) {
+//	handled := false
+//	loadDataInfo := cc.ctx.Value(executor.LoadDataVarKey)
+//	if loadDataInfo != nil {
+//		handled = true
+//		defer cc.ctx.SetValue(executor.LoadDataVarKey, nil)
+//		if err := cc.handleLoadData(ctx, loadDataInfo.(*executor.LoadDataInfo)); err != nil {
+//			return handled, err
+//		}
+//	}
+//
+//	loadStats := cc.ctx.Value(executor.LoadStatsVarKey)
+//	if loadStats != nil {
+//		handled = true
+//		defer cc.ctx.SetValue(executor.LoadStatsVarKey, nil)
+//		if err := cc.handleLoadStats(ctx, loadStats.(*executor.LoadStatsInfo)); err != nil {
+//			return handled, err
+//		}
+//	}
+//
+//	indexAdvise := cc.ctx.Value(executor.IndexAdviseVarKey)
+//	if indexAdvise != nil {
+//		handled = true
+//		defer cc.ctx.SetValue(executor.IndexAdviseVarKey, nil)
+//		if err := cc.handleIndexAdvise(ctx, indexAdvise.(*executor.IndexAdviseInfo)); err != nil {
+//			return handled, err
+//		}
+//	}
+//
+//	planReplayerLoad := cc.ctx.Value(executor.PlanReplayerLoadVarKey)
+//	if planReplayerLoad != nil {
+//		handled = true
+//		defer cc.ctx.SetValue(executor.PlanReplayerLoadVarKey, nil)
+//		if err := cc.handlePlanReplayerLoad(ctx, planReplayerLoad.(*executor.PlanReplayerLoadInfo)); err != nil {
+//			return handled, err
+//		}
+//	}
+//
+//	return handled, cc.writeOkWith(ctx, cc.ctx.LastMessage(), cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), status, cc.ctx.WarningCount())
+//}
 
 // handleFieldList returns the field list for a table.
 // The sql string is composed of a table name and a terminating character \x00.
