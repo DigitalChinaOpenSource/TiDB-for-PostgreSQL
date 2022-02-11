@@ -350,6 +350,28 @@ const (
 	NextVal = "nextval"
 	LastVal = "lastval"
 	SetVal  = "setval"
+
+	// Pg function
+	// PgSQL Modified
+	PgFuncCurrentDatabase      = "current_database"
+	PgFuncSetConfig            = "set_config"
+	PgFuncEncodingToChar       = "pg_encoding_to_char"
+	PgFuncHasDatabasePrivilege = "has_database_privilege"
+	PgFuncHasTablePrivilege    = "has_table_privilege"
+	PgFuncHasSchemaPrivilege   = "has_schema_privilege"
+	PgFuncIsInRecovery         = "pg_is_in_recovery"
+	PgFuncIsWalReplayPaused    = "pg_is_wal_replay_paused"
+	PgFuncGetUserById          = "pg_get_userbyid"
+	PgFuncObjDescription       = "obj_description"
+	PgFuncShobjDescription     = "shobj_description"
+	PgFuncCurrentSchema        = "current_schema"
+	PgFuncCurrentSchemas       = "current_schemas"
+	PgFuncArrayPosition        = "array_position"
+	PgFuncArrayPositions       = "array_positions"
+	PgFuncFormatType           = "format_type"
+	PgFuncPgGetExpr            = "pg_get_expr"
+	pgFuncColDescription       = "col_description"
+	PgFuncGenerateSubscripts   = "generate_subscripts"
 )
 
 type FuncCallExprType int8

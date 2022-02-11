@@ -52,18 +52,24 @@ import (
 
 const (
 	// TableSchemata is the string constant of infoschema table.
-	TableSchemata = "SCHEMATA"
+	// TableSchemata = "SCHEMATA"
+	// PgSQL Modified
+	TableSchemata = "TiDB_SCHEMATA"
 	// TableTables is the string constant of infoschema table.
-	TableTables = "TABLES"
+	// PgSQL Modified
+	TableTables = "TiDB_TABLES"
 	// TableColumns is the string constant of infoschema table
-	TableColumns          = "COLUMNS"
+	// PgSQL Modified
+	TableColumns          = "TiDB_COLUMNS"
 	tableColumnStatistics = "COLUMN_STATISTICS"
 	// TableStatistics is the string constant of infoschema table
 	TableStatistics = "STATISTICS"
 	// TableCharacterSets is the string constant of infoschema charactersets memory table
-	TableCharacterSets = "CHARACTER_SETS"
+	// PgSQL Modified
+	TableCharacterSets = "TiDB_CHARACTER_SETS"
 	// TableCollations is the string constant of infoschema collations memory table.
-	TableCollations = "COLLATIONS"
+	// PgSQL Modified
+	TableCollations = "TIDB_COLLATIONS"
 	tableFiles      = "FILES"
 	// CatalogVal is the string constant of TABLE_CATALOG.
 	CatalogVal = "def"
@@ -72,25 +78,30 @@ const (
 	// TablePartitions is the string constant of infoschema table.
 	TablePartitions = "PARTITIONS"
 	// TableKeyColumn is the string constant of KEY_COLUMN_USAGE.
-	TableKeyColumn = "KEY_COLUMN_USAGE"
+	// PgSQL Modified
+	TableKeyColumn = "TiDB_KEY_COLUMN_USAGE"
 	// TableReferConst is the string constant of REFERENTIAL_CONSTRAINTS.
 	TableReferConst = "REFERENTIAL_CONSTRAINTS"
 	// TableSessionVar is the string constant of SESSION_VARIABLES.
 	TableSessionVar = "SESSION_VARIABLES"
 	tablePlugins    = "PLUGINS"
 	// TableConstraints is the string constant of TABLE_CONSTRAINTS.
-	TableConstraints = "TABLE_CONSTRAINTS"
+	// PgSQL Modified
+	TableConstraints = "TiDB_TABLE_CONSTRAINTS"
 	tableTriggers    = "TRIGGERS"
 	// TableUserPrivileges is the string constant of infoschema user privilege table.
 	TableUserPrivileges   = "USER_PRIVILEGES"
 	tableSchemaPrivileges = "SCHEMA_PRIVILEGES"
-	tableTablePrivileges  = "TABLE_PRIVILEGES"
+	// PgSQL Modified
+	tableTablePrivileges  = "TiDB_TABLE_PRIVILEGES"
 	tableColumnPrivileges = "COLUMN_PRIVILEGES"
 	// TableEngines is the string constant of infoschema table.
 	TableEngines = "ENGINES"
 	// TableViews is the string constant of infoschema table.
-	TableViews           = "VIEWS"
-	tableRoutines        = "ROUTINES"
+	// PgSQL Modified
+	TableViews = "TIDB_VIEWS"
+	// PgSQL Modified
+	tableRoutines        = "TiDB_ROUTINES"
 	tableParameters      = "PARAMETERS"
 	tableEvents          = "EVENTS"
 	tableGlobalStatus    = "GLOBAL_STATUS"
@@ -99,7 +110,8 @@ const (
 	tableOptimizerTrace  = "OPTIMIZER_TRACE"
 	tableTableSpaces     = "TABLESPACES"
 	// TableCollationCharacterSetApplicability is the string constant of infoschema memory table.
-	TableCollationCharacterSetApplicability = "COLLATION_CHARACTER_SET_APPLICABILITY"
+	// PgSQL Modified
+	TableCollationCharacterSetApplicability = "TiDB_COLLATION_CHARACTER_SET_APPLICABILITY"
 	// TableProcesslist is the string constant of infoschema table.
 	TableProcesslist = "PROCESSLIST"
 	// TableTiDBIndexes is the string constant of infoschema table
@@ -149,7 +161,8 @@ const (
 	// TableDDLJobs is the string constant of DDL job table.
 	TableDDLJobs = "DDL_JOBS"
 	// TableSequences is the string constant of all sequences created by user.
-	TableSequences = "SEQUENCES"
+	// PgSQL Modified
+	TableSequences = "TiDB_SEQUENCES"
 	// TableStatementsSummary is the string constant of statement summary table.
 	TableStatementsSummary = "STATEMENTS_SUMMARY"
 	// TableStatementsSummaryHistory is the string constant of statements summary history table.

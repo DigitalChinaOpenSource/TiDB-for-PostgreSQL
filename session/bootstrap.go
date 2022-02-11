@@ -21,9 +21,7 @@ package session
 import (
 	"context"
 	"encoding/hex"
-	"flag"
 	"fmt"
-	osuser "os/user"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -1639,155 +1637,315 @@ func getBootstrapVersion(s Session) (int64, error) {
 	return strconv.ParseInt(sVal, 10, 64)
 }
 
-// doDDLWorks executes DDL statements in bootstrap stage.
-func doDDLWorks(s Session) {
-	// Create a test database.
-	mustExecute(s, "CREATE DATABASE IF NOT EXISTS test")
-	// Create system db.
-	mustExecute(s, "CREATE DATABASE IF NOT EXISTS %n", mysql.SystemDB)
-	// Create user table.
-	mustExecute(s, CreateUserTable)
-	// Create privilege tables.
-	mustExecute(s, CreateGlobalPrivTable)
-	mustExecute(s, CreateDBPrivTable)
-	mustExecute(s, CreateTablePrivTable)
-	mustExecute(s, CreateColumnPrivTable)
-	// Create global system variable table.
-	mustExecute(s, CreateGlobalVariablesTable)
-	// Create TiDB table.
-	mustExecute(s, CreateTiDBTable)
-	// Create help table.
-	mustExecute(s, CreateHelpTopic)
-	// Create stats_meta table.
-	mustExecute(s, CreateStatsMetaTable)
-	// Create stats_columns table.
-	mustExecute(s, CreateStatsColsTable)
-	// Create stats_buckets table.
-	mustExecute(s, CreateStatsBucketsTable)
-	// Create gc_delete_range table.
-	mustExecute(s, CreateGCDeleteRangeTable)
-	// Create gc_delete_range_done table.
-	mustExecute(s, CreateGCDeleteRangeDoneTable)
-	// Create stats_feedback table.
-	mustExecute(s, CreateStatsFeedbackTable)
-	// Create role_edges table.
-	mustExecute(s, CreateRoleEdgesTable)
-	// Create default_roles table.
-	mustExecute(s, CreateDefaultRolesTable)
-	// Create bind_info table.
-	initBindInfoTable(s)
-	// Create stats_topn_store table.
-	mustExecute(s, CreateStatsTopNTable)
-	// Create expr_pushdown_blacklist table.
-	mustExecute(s, CreateExprPushdownBlacklist)
-	// Create opt_rule_blacklist table.
-	mustExecute(s, CreateOptRuleBlacklist)
-	// Create stats_extended table.
-	mustExecute(s, CreateStatsExtended)
-	// Create schema_index_usage.
-	mustExecute(s, CreateSchemaIndexUsageTable)
-	// Create stats_fm_sketch table.
-	mustExecute(s, CreateStatsFMSketchTable)
-	// Create global_grants
-	mustExecute(s, CreateGlobalGrantsTable)
-	// Create capture_plan_baselines_blacklist
-	mustExecute(s, CreateCapturePlanBaselinesBlacklist)
-	// Create column_stats_usage table
-	mustExecute(s, CreateColumnStatsUsageTable)
-}
-
-// doDMLWorks executes DML statements in bootstrap stage.
-// All the statements run in a single transaction.
-// TODO: sanitize.
-func doDMLWorks(s Session) {
-	mustExecute(s, "BEGIN")
-	if config.GetGlobalConfig().Security.SecureBootstrap {
-		// If secure bootstrap is enabled, we create a root@localhost account which can login with auth_socket.
-		// i.e. mysql -S /tmp/tidb.sock -uroot
-		// The auth_socket plugin will validate that the user matches $USER.
-		u, err := osuser.Current()
-		if err != nil {
-			logutil.BgLogger().Fatal("failed to read current user. unable to secure bootstrap.", zap.Error(err))
-		}
-		mustExecute(s, `INSERT HIGH_PRIORITY INTO mysql.user VALUES
-		("localhost", "root", %?, "auth_socket", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "N", "Y", "Y", "Y", "Y", "Y", "Y", "Y")`, u.Username)
-	} else {
-		mustExecute(s, `INSERT HIGH_PRIORITY INTO mysql.user VALUES
-		("%", "root", "", "mysql_native_password", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "N", "Y", "Y", "Y", "Y", "Y", "Y", "Y")`)
-	}
-
-	// Init global system variables table.
-	values := make([]string, 0, len(variable.GetSysVars()))
-	for k, v := range variable.GetSysVars() {
-		// Session only variable should not be inserted.
-		if v.Scope != variable.ScopeSession {
-			vVal := v.Value
-			if v.Name == variable.TiDBTxnMode && config.GetGlobalConfig().Store == "tikv" {
-				vVal = "pessimistic"
-			}
-			if v.Name == variable.TiDBRowFormatVersion {
-				vVal = strconv.Itoa(variable.DefTiDBRowFormatV2)
-			}
-			if v.Name == variable.TiDBPartitionPruneMode {
-				vVal = variable.DefTiDBPartitionPruneMode
-				if flag.Lookup("test.v") != nil || flag.Lookup("check.v") != nil || config.CheckTableBeforeDrop {
-					// enable Dynamic Prune by default in test case.
-					vVal = string(variable.Dynamic)
-				}
-			}
-			if v.Name == variable.TiDBEnableChangeMultiSchema {
-				vVal = variable.Off
-				if flag.Lookup("test.v") != nil || flag.Lookup("check.v") != nil {
-					// enable change multi schema in test case for compatibility with old cases.
-					vVal = variable.On
-				}
-			}
-			if v.Name == variable.TiDBEnableAsyncCommit && config.GetGlobalConfig().Store == "tikv" {
-				vVal = variable.On
-			}
-			if v.Name == variable.TiDBEnable1PC && config.GetGlobalConfig().Store == "tikv" {
-				vVal = variable.On
-			}
-			value := fmt.Sprintf(`("%s", "%s")`, strings.ToLower(k), vVal)
-			values = append(values, value)
-		}
-	}
-	sql := fmt.Sprintf("INSERT HIGH_PRIORITY INTO %s.%s VALUES %s;", mysql.SystemDB, mysql.GlobalVariablesTable,
-		strings.Join(values, ", "))
-	mustExecute(s, sql)
-
-	mustExecute(s, `INSERT HIGH_PRIORITY INTO %n.%n VALUES(%?, %?, "Bootstrap flag. Do not delete.") ON DUPLICATE KEY UPDATE VARIABLE_VALUE=%?`,
-		mysql.SystemDB, mysql.TiDBTable, bootstrappedVar, varTrue, varTrue,
-	)
-
-	mustExecute(s, `INSERT HIGH_PRIORITY INTO %n.%n VALUES(%?, %?, "Bootstrap version. Do not delete.")`,
-		mysql.SystemDB, mysql.TiDBTable, tidbServerVersionVar, currentBootstrapVersion,
-	)
-
-	writeSystemTZ(s)
-
-	writeNewCollationParameter(s, config.GetGlobalConfig().NewCollationsEnabledOnFirstBootstrap)
-
-	writeDefaultExprPushDownBlacklist(s)
-
-	writeStmtSummaryVars(s)
-
-	_, err := s.ExecuteInternal(context.Background(), "COMMIT")
-	if err != nil {
-		sleepTime := 1 * time.Second
-		logutil.BgLogger().Info("doDMLWorks failed", zap.Error(err), zap.Duration("sleeping time", sleepTime))
-		time.Sleep(sleepTime)
-		// Check if TiDB is already bootstrapped.
-		b, err1 := checkBootstrapped(s)
-		if err1 != nil {
-			logutil.BgLogger().Fatal("doDMLWorks failed", zap.Error(err1))
-		}
-		if b {
-			return
-		}
-		logutil.BgLogger().Fatal("doDMLWorks failed", zap.Error(err))
-	}
-}
+//// doDDLWorks executes DDL statements in bootstrap stage.
+//func doDDLWorks(s Session) {
+//	// Create a test database.
+//	mustExecute(s, "CREATE DATABASE IF NOT EXISTS test")
+//	// Create system db.
+//	mustExecute(s, "CREATE DATABASE IF NOT EXISTS %n", mysql.SystemDB)
+//	// Create user table.
+//	mustExecute(s, CreateUserTable)
+//	// Create privilege tables.
+//	mustExecute(s, CreateGlobalPrivTable)
+//	mustExecute(s, CreateDBPrivTable)
+//	mustExecute(s, CreateTablePrivTable)
+//	mustExecute(s, CreateColumnPrivTable)
+//	// Create global system variable table.
+//	mustExecute(s, CreateGlobalVariablesTable)
+//	// Create TiDB table.
+//	mustExecute(s, CreateTiDBTable)
+//	// Create help table.
+//	mustExecute(s, CreateHelpTopic)
+//	// Create stats_meta table.
+//	mustExecute(s, CreateStatsMetaTable)
+//	// Create stats_columns table.
+//	mustExecute(s, CreateStatsColsTable)
+//	// Create stats_buckets table.
+//	mustExecute(s, CreateStatsBucketsTable)
+//	// Create gc_delete_range table.
+//	mustExecute(s, CreateGCDeleteRangeTable)
+//	// Create gc_delete_range_done table.
+//	mustExecute(s, CreateGCDeleteRangeDoneTable)
+//	// Create stats_feedback table.
+//	mustExecute(s, CreateStatsFeedbackTable)
+//	// Create role_edges table.
+//	mustExecute(s, CreateRoleEdgesTable)
+//	// Create default_roles table.
+//	mustExecute(s, CreateDefaultRolesTable)
+//	// Create bind_info table.
+//	initBindInfoTable(s)
+//	// Create stats_topn_store table.
+//	mustExecute(s, CreateStatsTopNTable)
+//	// Create expr_pushdown_blacklist table.
+//	mustExecute(s, CreateExprPushdownBlacklist)
+//	// Create opt_rule_blacklist table.
+//	mustExecute(s, CreateOptRuleBlacklist)
+//	// Create stats_extended table.
+//	mustExecute(s, CreateStatsExtended)
+//	// Create schema_index_usage.
+//	mustExecute(s, CreateSchemaIndexUsageTable)
+//	// Create stats_fm_sketch table.
+//	mustExecute(s, CreateStatsFMSketchTable)
+//	// Create global_grants
+//	mustExecute(s, CreateGlobalGrantsTable)
+//	// Create capture_plan_baselines_blacklist
+//	mustExecute(s, CreateCapturePlanBaselinesBlacklist)
+//	// Create column_stats_usage table
+//	mustExecute(s, CreateColumnStatsUsageTable)
+//	// Create postgres Database
+//	mustExecute(s, "CREATE DATABASE IF NOT EXISTS postgres;")
+//	// Create postgres pg_aggregate Table
+//	mustExecute(s, CreateTablePgAggregate)
+//	// Create postgres pg_am Table
+//	mustExecute(s, CreateTablePgAm)
+//	// Create postgres pg_amop Table
+//	mustExecute(s, CreateTablePgAmop)
+//	// Create postgres pg_amproc Table
+//	mustExecute(s, CreateTablePgAmproc)
+//	// Create postgres pg_attrdef Table
+//	mustExecute(s, CreateTablePgAttrdef)
+//	// Create postgres pg_attribute Table
+//	mustExecute(s, CreateTablePgAttribute)
+//	// Create postgres pg_auth_members Table
+//	mustExecute(s, CreateTablePgAuthMembers)
+//	// Create postgres pg_authid Table
+//	mustExecute(s, CreateTablePgAuthID)
+//	// Create postgres pg_cast Table
+//	mustExecute(s, CreateTablePgCast)
+//	// Create postgres pg_calss Table
+//	mustExecute(s, CreateTablePgClass)
+//	// Create postgres pg_collation Table
+//	mustExecute(s, CreateTablePgCollation)
+//	// Create postgres pg_constraint Table
+//	mustExecute(s, CreateTablePgConstraint)
+//	// Create postgres pg_conversion Table
+//	mustExecute(s, CreateTablePgConversion)
+//	// Create postgres pg_database Table
+//	mustExecute(s, CreateTablePgDatabase)
+//	// Create postgres pg_db_role_setting Table
+//	mustExecute(s, CreateTablePgDbRoleSetting)
+//	// Create postgres pg_default_acl Table
+//	mustExecute(s, CreateTablePgDefaultACL)
+//	// Create postgres pg_depend Table
+//	mustExecute(s, CreateTablePgDepend)
+//	// Create postgres pg_description Table
+//	mustExecute(s, CreateTablePgDescription)
+//	// Create postgres pg_enum Table
+//	mustExecute(s, CreateTablePgEnum)
+//	// Create postgres pg_event_trigger Table
+//	mustExecute(s, CreateTablePgEventTrigger)
+//	// Create postgres pg_extension Table
+//	mustExecute(s, CreateTablePgExtension)
+//	// Create postgres pg_foreign_data_wrapper Table
+//	mustExecute(s, CreateTablePgForeignDataWrapper)
+//	// Create postgres pg_foreign_server Table
+//	mustExecute(s, CreateTablePgForeignServer)
+//	// Create postgres pg_foreign_table Table
+//	mustExecute(s, CreateTablePgForeignTable)
+//	// Create postgres pg_index Table
+//	mustExecute(s, CreateTablePgIndex)
+//	// Create postgres pg_inherits Table
+//	mustExecute(s, CreateTablePgInherits)
+//	// Create postgres pg_init_privs Table
+//	mustExecute(s, CreateTablePgInitPrivs)
+//	// Create postgres pg_language Table
+//	mustExecute(s, CreateTablePgLanguage)
+//	// Create postgres pg_largeobject Table
+//	mustExecute(s, CreateTablePgLargeObject)
+//	// Create postgres pg_largeobject_metadata Table
+//	mustExecute(s, CreateTablePgLargeObjectMetadata)
+//	// Create postgres pg_namespace Table
+//	mustExecute(s, CreateTablePgNamespace)
+//	// Create postgres pg_opclass Table
+//	mustExecute(s, CreateTablePgOpclass)
+//	// Create postgres pg_operator Table
+//	mustExecute(s, CreateTablePgOperator)
+//	// Create postgres pg_opfamily Table
+//	mustExecute(s, CreateTablePgOpFamily)
+//	// Create postgres pg_partitioned_table Table
+//	mustExecute(s, CreateTablePgPartitionedTable)
+//	// Create postgres pg_policy Table
+//	mustExecute(s, CreateTablePgPolicy)
+//	// Create postgres pg_proc Table
+//	mustExecute(s, CreateTablePgProc)
+//	// Create postgres pg_publication Table
+//	mustExecute(s, CreateTablePgPublication)
+//	// Create postgres pg_publication_rel Table
+//	mustExecute(s, CreateTablePgPublicationRel)
+//	// Create postgres pg_range Table
+//	mustExecute(s, CreateTablePgRange)
+//	// Create postgres pg_replication_origin Table
+//	mustExecute(s, CreateTablePgReplicationOrigin)
+//	// Create postgres pg_rewrite Table
+//	mustExecute(s, CreateTablePgRewrite)
+//	// Create postgres pg_seclabel Table
+//	mustExecute(s, CreateTablePgSeclabel)
+//	// Create postgres pg_sequence Table
+//	mustExecute(s, CreateTablePgSequence)
+//	// Create postgres pg_shdepend Table
+//	mustExecute(s, CreateTablePgShdepend)
+//	// Create postgres pg_shdescription Table
+//	mustExecute(s, CreateTablePgShdescription)
+//	// Create postgres pg_shseclabel Table
+//	mustExecute(s, CreateTablePgShseclabel)
+//	// Create postgres pg_statistic Table
+//	mustExecute(s, CreateTablePgStatistic)
+//	// Create postgres pg_statistic_ext Table
+//	mustExecute(s, CreateTablePgStatisticExt)
+//	// Create postgres pg_statistic_ext_data Table
+//	mustExecute(s, CreateTablePgStatisticExtData)
+//	// Create postgres pg_subscription Table
+//	mustExecute(s, CreateTablePgSubscription)
+//	// Create postgres pg_subscription_rel Table
+//	mustExecute(s, CreateTablePgSubscriptionRel)
+//	// Create postgres pg_tablespace Table
+//	mustExecute(s, CreateTablePgTablespace)
+//	// Create postgres pg_transform Table
+//	mustExecute(s, CreateTablePgTransform)
+//	// Create postgres pg_trigger Table
+//	mustExecute(s, CreateTablePgTrigger)
+//	// Create postgres pg_ts_config Table
+//	mustExecute(s, CreateTablePgTsConfig)
+//	// Create postgres pg_ts_config_map Table
+//	mustExecute(s, CreateTablePgTsConfigMap)
+//	// Create postgres pg_ts_dict Table
+//	mustExecute(s, CreateTablePgTsDict)
+//	// Create postgres pg_ts_parser Table
+//	mustExecute(s, CreateTablePgTsParser)
+//	// Create postgres pg_ts_template Table
+//	mustExecute(s, CreateTablePgTsTemplate)
+//	// Create postgres pg_type Table
+//	mustExecute(s, CreateTablePgType)
+//	// Create postgres pg_user_mapping Table
+//	mustExecute(s, CreateTablePgUserMapping)
+//	// Create postgres pg_all_settings Table
+//	mustExecute(s, CreateTablePgAllSettings)
+//	// Create postgres pg_stat_activity Table
+//	mustExecute(s, CreateTablePgStatActivity)
+//
+//	mustExecute(s, "USE postgres;")
+//	// Create postgres pg_roles View
+//	mustExecute(s, CreateViewPgRoles)
+//	// Create postgres pg_shadow View
+//	mustExecute(s, CreateViewPgShadow)
+//	// Create postgres pg_user View
+//	mustExecute(s, CreateViewPgUser)
+//	// Create postgres pg_group View
+//	mustExecute(s, CreateViewPgGroup)
+//	// Create postgres pg_settings View
+//	mustExecute(s, CreateViewPgSettings)
+//}
+//
+//// doDMLWorks executes DML statements in bootstrap stage.
+//// All the statements run in a single transaction.
+//// TODO: sanitize.
+//func doDMLWorks(s Session) {
+//	mustExecute(s, "BEGIN")
+//	if config.GetGlobalConfig().Security.SecureBootstrap {
+//		// If secure bootstrap is enabled, we create a root@localhost account which can login with auth_socket.
+//		// i.e. mysql -S /tmp/tidb.sock -uroot
+//		// The auth_socket plugin will validate that the user matches $USER.
+//		u, err := osuser.Current()
+//		if err != nil {
+//			logutil.BgLogger().Fatal("failed to read current user. unable to secure bootstrap.", zap.Error(err))
+//		}
+//		mustExecute(s, `INSERT HIGH_PRIORITY INTO mysql.user VALUES
+//		("localhost", "root", %?, "auth_socket", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "N", "Y", "Y", "Y", "Y", "Y", "Y", "Y")`, u.Username)
+//	} else {
+//		mustExecute(s, `INSERT HIGH_PRIORITY INTO mysql.user VALUES
+//		("%", "root", "", "mysql_native_password", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "Y", "N", "Y", "Y", "Y", "Y", "Y", "Y", "Y")`)
+//	}
+//
+//	// Init global system variables table.
+//	values := make([]string, 0, len(variable.GetSysVars()))
+//	for k, v := range variable.GetSysVars() {
+//		// Session only variable should not be inserted.
+//		if v.Scope != variable.ScopeSession {
+//			vVal := v.Value
+//			if v.Name == variable.TiDBTxnMode && config.GetGlobalConfig().Store == "tikv" {
+//				vVal = "pessimistic"
+//			}
+//			if v.Name == variable.TiDBRowFormatVersion {
+//				vVal = strconv.Itoa(variable.DefTiDBRowFormatV2)
+//			}
+//			if v.Name == variable.TiDBPartitionPruneMode {
+//				vVal = variable.DefTiDBPartitionPruneMode
+//				if flag.Lookup("test.v") != nil || flag.Lookup("check.v") != nil || config.CheckTableBeforeDrop {
+//					// enable Dynamic Prune by default in test case.
+//					vVal = string(variable.Dynamic)
+//				}
+//			}
+//			if v.Name == variable.TiDBEnableChangeMultiSchema {
+//				vVal = variable.Off
+//				if flag.Lookup("test.v") != nil || flag.Lookup("check.v") != nil {
+//					// enable change multi schema in test case for compatibility with old cases.
+//					vVal = variable.On
+//				}
+//			}
+//			if v.Name == variable.TiDBEnableAsyncCommit && config.GetGlobalConfig().Store == "tikv" {
+//				vVal = variable.On
+//			}
+//			if v.Name == variable.TiDBEnable1PC && config.GetGlobalConfig().Store == "tikv" {
+//				vVal = variable.On
+//			}
+//			value := fmt.Sprintf(`("%s", "%s")`, strings.ToLower(k), vVal)
+//			values = append(values, value)
+//		}
+//	}
+//	sql := fmt.Sprintf("INSERT HIGH_PRIORITY INTO %s.%s VALUES %s;", mysql.SystemDB, mysql.GlobalVariablesTable,
+//		strings.Join(values, ", "))
+//	mustExecute(s, sql)
+//
+//	mustExecute(s, `INSERT HIGH_PRIORITY INTO %n.%n VALUES(%?, %?, "Bootstrap flag. Do not delete.") ON DUPLICATE KEY UPDATE VARIABLE_VALUE=%?`,
+//		mysql.SystemDB, mysql.TiDBTable, bootstrappedVar, varTrue, varTrue,
+//	)
+//
+//	mustExecute(s, `INSERT HIGH_PRIORITY INTO %n.%n VALUES(%?, %?, "Bootstrap version. Do not delete.")`,
+//		mysql.SystemDB, mysql.TiDBTable, tidbServerVersionVar, currentBootstrapVersion,
+//	)
+//
+//	writeSystemTZ(s)
+//
+//	writeNewCollationParameter(s, config.GetGlobalConfig().NewCollationsEnabledOnFirstBootstrap)
+//
+//	writeDefaultExprPushDownBlacklist(s)
+//
+//	writeStmtSummaryVars(s)
+//
+//	mustExecute(s, DataForTablePgAggregate)
+//
+//	mustExecute(s, DataForTablePgAuthMembers)
+//
+//	mustExecute(s, DataForTablePgType)
+//
+//	mustExecute(s, DataForTablePgDatabase)
+//
+//	mustExecute(s, DataForTablePgTablespace)
+//
+//	mustExecute(s, DataForTablePgNamespace)
+//
+//	mustExecute(s, DataForTablePgAllSettings)
+//
+//	mustExecute(s, DataForTablePgProc)
+//
+//	mustExecute(s, DataForTablePgClass)
+//
+//	_, err := s.ExecuteInternal(context.Background(), "COMMIT")
+//	if err != nil {
+//		sleepTime := 1 * time.Second
+//		logutil.BgLogger().Info("doDMLWorks failed", zap.Error(err), zap.Duration("sleeping time", sleepTime))
+//		time.Sleep(sleepTime)
+//		// Check if TiDB is already bootstrapped.
+//		b, err1 := checkBootstrapped(s)
+//		if err1 != nil {
+//			logutil.BgLogger().Fatal("doDMLWorks failed", zap.Error(err1))
+//		}
+//		if b {
+//			return
+//		}
+//		logutil.BgLogger().Fatal("doDMLWorks failed", zap.Error(err))
+//	}
+//}
 
 func mustExecute(s Session, sql string, args ...interface{}) {
 	_, err := s.ExecuteInternal(context.Background(), sql, args...)

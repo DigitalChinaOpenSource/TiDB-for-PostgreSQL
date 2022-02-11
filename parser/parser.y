@@ -285,6 +285,7 @@ import (
 	yearMonth         "YEAR_MONTH"
 	zerofill          "ZEROFILL"
 	natural           "NATURAL"
+	returning         "RETURNING"
 
 	/* The following tokens belong to UnReservedKeyword. Notice: make sure these tokens are contained in UnReservedKeyword. */
 	account               "ACCOUNT"
@@ -347,6 +348,7 @@ import (
 	compression           "COMPRESSION"
 	concurrency           "CONCURRENCY"
 	connection            "CONNECTION"
+	conflict              "CONFLICT"
 	consistency           "CONSISTENCY"
 	consistent            "CONSISTENT"
 	context               "CONTEXT"
@@ -473,6 +475,7 @@ import (
 	nominvalue            "NOMINVALUE"
 	nonclustered          "NONCLUSTERED"
 	none                  "NONE"
+	nothing               "NOTHING"
 	nowait                "NOWAIT"
 	nvarcharType          "NVARCHAR"
 	nulls                 "NULLS"
@@ -482,6 +485,7 @@ import (
 	online                "ONLINE"
 	only                  "ONLY"
 	open                  "OPEN"
+	overriding            "OVERRIDING"
 	optional              "OPTIONAL"
 	packKeys              "PACK_KEYS"
 	pageSym               "PAGE"
@@ -775,6 +779,9 @@ import (
 	builtinVarPop
 	builtinVarSamp
 
+	/* The following tokens are added for TiDB for Postgres. */
+	characteristics "CHARACTERISTICS"
+
 %token	<item>
 
 	/*yy:token "1.%d"   */
@@ -807,6 +814,7 @@ import (
 
 %token not2
 %type	<expr>
+	PgParamMarker          "Postgresql Prepare query paramMarker"
 	Expression             "expression"
 	MaxValueOrExpression   "maxvalue or expression"
 	BoolPri                "boolean primary expression"
@@ -1068,6 +1076,8 @@ import (
 	NoWriteToBinLogAliasOpt                "NO_WRITE_TO_BINLOG alias LOCAL or empty"
 	ObjectType                             "Grant statement object type"
 	OnDuplicateKeyUpdate                   "ON DUPLICATE KEY UPDATE value list"
+	OnConflictOpt                          "ON CONFLICT optional"
+	OverridingOpt                          "OVERRIDING VALUE optional"
 	OnCommitOpt                            "ON COMMIT DELETE |PRESERVE ROWS"
 	DuplicateOpt                           "[IGNORE|REPLACE] in CREATE TABLE ... SELECT statement or LOAD DATA statement"
 	OfTablesOpt                            "OF table_name [, ...]"
@@ -1318,6 +1328,9 @@ import (
 	AttributesOpt                          "Attributes options"
 	PredicateColumnsOpt                    "predicate columns option"
 	StatsOptionsOpt                        "Stats options"
+	OnConflictClause                       "On COnflict Clause"
+	ReturningClause                        "Returning Clause"
+	ReturningOptional                      "Returning option"
 
 %type	<ident>
 	AsOpt             "AS or EmptyString"
@@ -1364,6 +1377,7 @@ import (
 	NotKeywordToken                 "Tokens not mysql keyword but treated specially"
 	UnReservedKeyword               "MySQL unreserved keywords"
 	TiDBKeyword                     "TiDB added keywords"
+	TiDB4PGKeyword                  "TiDB for Postgres added keywords"
 	FunctionNameConflict            "Built-in function call names which are conflict with keywords"
 	FunctionNameOptionalBraces      "Function with optional braces, all of them are reserved keywords."
 	FunctionNameDatetimePrecision   "Function with optional datetime precision, all of them are reserved keywords."
@@ -2850,10 +2864,26 @@ BeginTransactionStmt:
 	{
 		$$ = &ast.BeginStmt{}
 	}
+|	"BEGIN" "READ" "WRITE"
+	{
+		$$ = &ast.BeginStmt{}
+	}
+|	"BEGIN" "READ" "ONLY"
+	{
+		$$ = &ast.BeginStmt{
+			ReadOnly: true,
+		}
+	}
 |	"BEGIN" "PESSIMISTIC"
 	{
 		$$ = &ast.BeginStmt{
 			Mode: ast.Pessimistic,
+		}
+	}
+|	"BEGIN" "ISOLATION" "LEVEL" IsolationLevel
+	{
+		$$ = &ast.BeginStmt{
+			IsolationLevel: $4,
 		}
 	}
 |	"BEGIN" "OPTIMISTIC"
@@ -2891,6 +2921,12 @@ BeginTransactionStmt:
 		$$ = &ast.BeginStmt{
 			ReadOnly: true,
 			AsOf:     $5.(*ast.AsOfClause),
+		}
+	}
+|	"START" "TRANSACTION" "ISOLATION" "LEVEL" IsolationLevel
+	{
+		$$ = &ast.BeginStmt{
+			IsolationLevel: $5,
 		}
 	}
 
@@ -4427,7 +4463,7 @@ DoStmt:
  *
  *******************************************************************/
 DeleteWithoutUsingStmt:
-	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional "FROM" TableName PartitionNameListOpt TableAsNameOpt IndexHintListOpt WhereClauseOptional OrderByOptional LimitClause
+	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional "FROM" TableName PartitionNameListOpt TableAsNameOpt IndexHintListOpt WhereClauseOptional OrderByOptional LimitClause ReturningOptional
 	{
 		// Single Table
 		tn := $7.(*ast.TableName)
@@ -4452,10 +4488,13 @@ DeleteWithoutUsingStmt:
 		if $13 != nil {
 			x.Limit = $13.(*ast.Limit)
 		}
+		if $14 != nil {
+			x.Returning = $14.(*ast.ReturningClause)
+		}
 
 		$$ = x
 	}
-|	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional TableAliasRefList "FROM" TableRefs WhereClauseOptional
+|	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional TableAliasRefList "FROM" TableRefs WhereClauseOptional ReturningOptional
 	{
 		// Multiple Table
 		x := &ast.DeleteStmt{
@@ -4473,11 +4512,14 @@ DeleteWithoutUsingStmt:
 		if $9 != nil {
 			x.Where = $9.(ast.ExprNode)
 		}
+		if $10 != nil {
+			x.Returning = $10.(*ast.ReturningClause)
+		}
 		$$ = x
 	}
 
 DeleteWithUsingStmt:
-	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional "FROM" TableAliasRefList "USING" TableRefs WhereClauseOptional
+	"DELETE" TableOptimizerHintsOpt PriorityOpt QuickOptional IgnoreOptional "FROM" TableAliasRefList "USING" TableRefs WhereClauseOptional ReturningOptional
 	{
 		// Multiple Table
 		x := &ast.DeleteStmt{
@@ -4493,6 +4535,9 @@ DeleteWithUsingStmt:
 		}
 		if $10 != nil {
 			x.Where = $10.(ast.ExprNode)
+		}
+		if $11 != nil {
+			x.Returning = $11.(*ast.ReturningClause)
 		}
 		$$ = x
 	}
@@ -5824,6 +5869,7 @@ Identifier:
 |	UnReservedKeyword
 |	NotKeywordToken
 |	TiDBKeyword
+|	TiDB4PGKeyword
 
 UnReservedKeyword:
 	"ACTION"
@@ -5866,6 +5912,8 @@ UnReservedKeyword:
 |	"DEALLOCATE"
 |	"DO"
 |	"DUPLICATE"
+|	"CONFLICT"
+|	"OVERRIDING"
 |	"DYNAMIC"
 |	"ENCRYPTION"
 |	"END"
@@ -5989,6 +6037,7 @@ UnReservedKeyword:
 |	"EVENTS"
 |	"PARTITIONS"
 |	"NONE"
+|	"NOTHING"
 |	"NULLS"
 |	"SUPER"
 |	"EXCLUSIVE"
@@ -6284,6 +6333,9 @@ NotKeywordToken:
 |	"LEARNER_CONSTRAINTS"
 |	"VOTER_CONSTRAINTS"
 
+TiDB4PGKeyword:
+	"CHARACTERISTICS"
+
 /************************************************************************************
  *
  *  Call Statements
@@ -6340,16 +6392,17 @@ ProcedureCall:
  *  TODO: support PARTITION
  **********************************************************************************/
 InsertIntoStmt:
-	"INSERT" TableOptimizerHintsOpt PriorityOpt IgnoreOptional IntoOpt TableName PartitionNameListOpt InsertValues OnDuplicateKeyUpdate
+	"INSERT" TableOptimizerHintsOpt PriorityOpt IgnoreOptional IntoOpt TableName PartitionNameListOpt OverridingOpt InsertValues OnDuplicateKeyUpdate
 	{
-		x := $8.(*ast.InsertStmt)
+		x := $9.(*ast.InsertStmt)
 		x.Priority = $3.(mysql.PriorityEnum)
 		x.IgnoreErr = $4.(bool)
+		x.Overriding = $8.(bool)
 		// Wraps many layers here so that it can be processed the same way as select statement.
 		ts := &ast.TableSource{Source: $6.(*ast.TableName)}
 		x.Table = &ast.TableRefsClause{TableRefs: &ast.Join{Left: ts}}
-		if $9 != nil {
-			x.OnDuplicate = $9.([]*ast.Assignment)
+		if $10 != nil {
+			x.OnDuplicate = $10.([]*ast.Assignment)
 		}
 		if $2 != nil {
 			x.TableHints = $2.([]*ast.TableOptimizerHint)
@@ -6429,9 +6482,42 @@ InsertValues:
 		$$ = &ast.InsertStmt{Setlist: $2.([]*ast.Assignment)}
 	}
 
+OverridingOpt:
+	{
+		$$ = false
+	}
+|	"OVERRIDING" SystemSym "VALUE"
+	{
+		$$ = true
+	}
+
+SystemSym:
+	"SYSTEM"
+|	"USER"
+
+OnConflictOpt:
+	{
+		$$ = nil
+	}
+|	OnConflictClause
+	{
+		$$ = $1
+	}
+
+OnConflictClause:
+	"ON" "CONFLICT" "DO" "NOTHING"
+	{
+		$$ = nil
+	}
+|	"ON" "CONFLICT" "DO" "UPDATE" "SET" AssignmentList
+	{
+		$$ = $6
+	}
+
 ValueSym:
 	"VALUE"
 |	"VALUES"
+|	"DEFAULT" "VALUES"
 
 ValuesList:
 	RowValue
@@ -6505,6 +6591,10 @@ OnDuplicateKeyUpdate:
 |	"ON" "DUPLICATE" "KEY" "UPDATE" AssignmentList
 	{
 		$$ = $5
+	}
+|	OnConflictClause
+	{
+		$$ = $1
 	}
 
 /************************************************************************************
@@ -6827,6 +6917,10 @@ SimpleExpr:
 |	paramMarker
 	{
 		$$ = ast.NewParamMarkerExpr(yyS[yypt].offset)
+	}
+|	PgParamMarker
+	{
+		$$ = $1
 	}
 |	Variable
 |	SumExpr
@@ -8600,6 +8694,10 @@ WindowFrameStart:
 	{
 		$$ = ast.FrameBound{Type: ast.Preceding, Expr: ast.NewParamMarkerExpr(yyS[yypt].offset)}
 	}
+|	PgParamMarker "PRECEDING"
+	{
+		$$ = ast.FrameBound{Type: ast.Preceding, Expr: $1}
+	}
 |	"INTERVAL" Expression TimeUnit "PRECEDING"
 	{
 		$$ = ast.FrameBound{Type: ast.Preceding, Expr: $2, Unit: $3.(ast.TimeUnitType)}
@@ -8628,6 +8726,10 @@ WindowFrameBound:
 |	paramMarker "FOLLOWING"
 	{
 		$$ = ast.FrameBound{Type: ast.Following, Expr: ast.NewParamMarkerExpr(yyS[yypt].offset)}
+	}
+|	PgParamMarker "FOLLOWING"
+	{
+		$$ = ast.FrameBound{Type: ast.Following, Expr: $1}
 	}
 |	"INTERVAL" Expression TimeUnit "FOLLOWING"
 	{
@@ -9014,6 +9116,10 @@ LimitOption:
 |	paramMarker
 	{
 		$$ = ast.NewParamMarkerExpr(yyS[yypt].offset)
+	}
+|	PgParamMarker
+	{
+		$$ = $1
 	}
 
 RowOrRows:
@@ -9643,6 +9749,10 @@ SetStmt:
 	{
 		$$ = &ast.SetStmt{Variables: $4.([]*ast.VariableAssignment)}
 	}
+|	"SET" "SESSION" "CHARACTERISTICS" "AS" "TRANSACTION" TransactionChars
+	{
+		$$ = &ast.SetStmt{Variables: $6.([]*ast.VariableAssignment)}
+	}
 |	"SET" "TRANSACTION" TransactionChars
 	{
 		assigns := $3.([]*ast.VariableAssignment)
@@ -9788,6 +9898,7 @@ SetExpr:
 EqOrAssignmentEq:
 	eq
 |	assignmentEq
+|	to
 
 VariableName:
 	Identifier
@@ -10460,6 +10571,13 @@ ShowStmt:
 |	"SHOW" "PLACEMENT" "FOR" ShowPlacementTarget
 	{
 		$$ = $4.(*ast.ShowStmt)
+	}
+|	"SHOW" identifier
+	{
+		$$ = &ast.ShowStmt{
+			Tp:           ast.ShowVariable,
+			VariableName: $2,
+		}
 	}
 
 ShowPlacementTarget:
@@ -12153,7 +12271,7 @@ UpdateStmt:
 	}
 
 UpdateStmtNoWith:
-	"UPDATE" TableOptimizerHintsOpt PriorityOpt IgnoreOptional TableRef "SET" AssignmentList WhereClauseOptional OrderByOptional LimitClause
+	"UPDATE" TableOptimizerHintsOpt PriorityOpt IgnoreOptional TableRef "SET" AssignmentList WhereClauseOptional OrderByOptional LimitClause ReturningOptional
 	{
 		var refs *ast.Join
 		if x, ok := $5.(*ast.Join); ok {
@@ -12178,6 +12296,9 @@ UpdateStmtNoWith:
 		}
 		if $10 != nil {
 			st.Limit = $10.(*ast.Limit)
+		}
+		if $11 != nil {
+			st.Returning = $11.(*ast.ReturningClause)
 		}
 		$$ = st
 	}
@@ -13840,5 +13961,30 @@ PlanReplayerStmt:
 		}
 
 		$$ = x
+	}
+
+PgParamMarker:
+	'$' LengthNum
+	{
+		var offset int
+		offset = yyS[yypt].offset
+		x := ast.NewParamMarkerExpr(offset)
+		x.SetOrder(int($2.(uint64)))
+		$$ = x
+	}
+
+ReturningClause:
+	"RETURNING" SelectStmtFieldList
+	{
+		$$ = &ast.ReturningClause{Fields: $2.(*ast.FieldList)}
+	}
+
+ReturningOptional:
+	{
+		$$ = nil
+	}
+|	ReturningClause
+	{
+		$$ = $1
 	}
 %%

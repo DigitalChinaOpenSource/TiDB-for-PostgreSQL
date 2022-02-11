@@ -87,6 +87,9 @@ var (
 	_ functionClass = &instrFunctionClass{}
 	_ functionClass = &loadFileFunctionClass{}
 	_ functionClass = &weightStringFunctionClass{}
+	// PgSQL Modified
+	_ functionClass = &currentDatabaseFunctionClass{}
+	_ functionClass = &pgSettingsDatabaseFunctionClass{}
 )
 
 var (

@@ -575,16 +575,16 @@ func GetSysVars() map[string]*SysVar {
 	return copy
 }
 
-func init() {
-	sysVars = make(map[string]*SysVar)
-	for _, v := range defaultSysVars {
-		RegisterSysVar(v)
-	}
-	for _, v := range noopSysVars {
-		v.IsNoop = true
-		RegisterSysVar(v)
-	}
-}
+//func init() {
+//	sysVars = make(map[string]*SysVar)
+//	for _, v := range defaultSysVars {
+//		RegisterSysVar(v)
+//	}
+//	for _, v := range noopSysVars {
+//		v.IsNoop = true
+//		RegisterSysVar(v)
+//	}
+//}
 
 var defaultSysVars = []*SysVar{
 	{Scope: ScopeGlobal | ScopeSession, Name: SQLSelectLimit, Value: "18446744073709551615", Type: TypeUnsigned, MinValue: 0, MaxValue: math.MaxUint64, SetSession: func(s *SessionVars, val string) error {
