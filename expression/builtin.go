@@ -879,6 +879,23 @@ var funcs = map[string]functionClass{
 	ast.NextVal: &nextValFunctionClass{baseFunctionClass{ast.NextVal, 1, 1}},
 	ast.LastVal: &lastValFunctionClass{baseFunctionClass{ast.LastVal, 1, 1}},
 	ast.SetVal:  &setValFunctionClass{baseFunctionClass{ast.SetVal, 2, 2}},
+
+	// Pg function
+	// PgSQL Modified
+	ast.PgFuncCurrentDatabase:      &currentDatabaseFunctionClass{baseFunctionClass{ast.PgFuncCurrentDatabase, 0, 0}},
+	ast.PgFuncSetConfig:            &pgSettingsDatabaseFunctionClass{baseFunctionClass{ast.PgFuncSetConfig, 2, 3}},
+	ast.PgFuncEncodingToChar:       &pgEncodingToCharFunctionClass{baseFunctionClass{ast.PgFuncEncodingToChar, 1, 1}},
+	ast.PgFuncHasDatabasePrivilege: &pgHasDatabasePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasDatabasePrivilege, 2, 3}},
+	ast.PgFuncHasTablePrivilege:    &pgHasTablePrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasTablePrivilege, 2, 3}},
+	ast.PgFuncHasSchemaPrivilege:   &pgHasSchemaPrivilegeFunctionClass{baseFunctionClass{ast.PgFuncHasSchemaPrivilege, 2, 3}},
+	ast.PgFuncIsInRecovery:         &pgIsInRecoveryFunctionClass{baseFunctionClass{ast.PgFuncIsInRecovery, 0, 0}},
+	ast.PgFuncIsWalReplayPaused:    &pgIsWalReplayPausedFunctionClass{baseFunctionClass{ast.PgFuncIsWalReplayPaused, 0, 0}},
+	ast.PgFuncGetUserById:          &pgGetUserByIDFunctionClass{baseFunctionClass{ast.PgFuncGetUserById, 1, 1}},
+	ast.PgFuncShobjDescription:     &pgShobjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncShobjDescription, 2, 2}},
+	ast.PgFuncObjDescription:       &pgObjDescriptionFunctionClass{baseFunctionClass{ast.PgFuncObjDescription, 2, 2}},
+	ast.PgFuncCurrentSchema:        &pgCurrentSchemaFunctionClass{baseFunctionClass{ast.PgFuncCurrentSchema, 0, 0}},
+	ast.PgFuncCurrentSchemas:       &pgCurrentSchemasFunctionClass{baseFunctionClass{ast.PgFuncCurrentSchemas, 1, 1}},
+	ast.PgFuncArrayPosition:        &pgArrayPositionFunctionClass{baseFunctionClass{ast.PgFuncArrayPosition, 2, 2}},
 }
 
 // IsFunctionSupported check if given function name is a builtin sql function.

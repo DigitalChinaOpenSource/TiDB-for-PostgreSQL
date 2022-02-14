@@ -485,6 +485,8 @@ type BeginStmt struct {
 	// AS OF is used to read the data at a specific point of time.
 	// Should only be used when ReadOnly is true.
 	AsOf *AsOfClause
+	// PgSQL Modified
+	IsolationLevel string
 }
 
 // Restore implements Node interface.
@@ -500,6 +502,20 @@ func (n *BeginStmt) Restore(ctx *format.RestoreCtx) error {
 			ctx.WriteKeyWord("START TRANSACTION WITH CAUSAL CONSISTENCY ONLY")
 		} else {
 			ctx.WriteKeyWord("START TRANSACTION")
+			// PgSQL Modified
+			if n.IsolationLevel != "" {
+				switch n.IsolationLevel {
+				case ReadCommitted:
+					ctx.WriteKeyWord(" ISOLATION LEVEL READ COMMITTED")
+				case ReadUncommitted:
+					ctx.WriteKeyWord(" ISOLATION LEVEL READ UNCOMMITTED")
+				case Serializable:
+					ctx.WriteKeyWord(" ISOLATION LEVEL SERIALIZABLE")
+				case RepeatableRead:
+					ctx.WriteKeyWord(" ISOLATION LEVEL REPEATABLE READ")
+				}
+
+			}
 		}
 	} else {
 		ctx.WriteKeyWord("BEGIN ")

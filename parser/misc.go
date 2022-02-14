@@ -94,6 +94,8 @@ func init() {
 	initTokenByte('~', int('~'))
 	initTokenByte('\\', int('\\'))
 	initTokenByte('?', paramMarker)
+	// PgSQL Modified
+	initTokenByte('$', int('$'))
 	initTokenByte('=', eq)
 	initTokenByte('{', int('{'))
 	initTokenByte('}', int('}'))
@@ -120,7 +122,7 @@ func init() {
 	initTokenFunc("Nn", startWithNn)
 	initTokenFunc("Bb", startWithBb)
 	initTokenFunc(".", startWithDot)
-	initTokenFunc("_$ACDEFGHIJKLMOPQRSTUVWYZacdefghijklmopqrstuvwyz", scanIdentifier)
+	initTokenFunc("_ACDEFGHIJKLMOPQRSTUVWYZacdefghijklmopqrstuvwyz", scanIdentifier)
 	initTokenFunc("`", scanQuotedIdent)
 	initTokenFunc("0123456789", startWithNumber)
 	initTokenFunc("'\"", startString)
@@ -208,6 +210,7 @@ var tokenMap = map[string]int{
 	"CHANGE":                   change,
 	"CHAR":                     charType,
 	"CHARACTER":                character,
+	"CHARACTERISTICS":          characteristics,
 	"CHARSET":                  charsetKwd,
 	"CHECK":                    check,
 	"CHECKPOINT":               checkpoint,
@@ -233,6 +236,7 @@ var tokenMap = map[string]int{
 	"COMPRESSION":              compression,
 	"CONCURRENCY":              concurrency,
 	"CONFIG":                   config,
+	"CONFLICT":                 conflict,
 	"CONNECTION":               connection,
 	"CONSISTENCY":              consistency,
 	"CONSISTENT":               consistent,
@@ -494,6 +498,7 @@ var tokenMap = map[string]int{
 	"NONCLUSTERED":             nonclustered,
 	"NONE":                     none,
 	"NOT":                      not,
+	"NOTHING":                  nothing,
 	"NOW":                      now,
 	"NOWAIT":                   nowait,
 	"NULL":                     null,
@@ -518,6 +523,7 @@ var tokenMap = map[string]int{
 	"ORDER":                    order,
 	"OUTER":                    outer,
 	"OUTFILE":                  outfile,
+	"OVERRIDING":               overriding,
 	"PACK_KEYS":                packKeys,
 	"PAGE":                     pageSym,
 	"PARSER":                   parser,
@@ -792,6 +798,7 @@ var tokenMap = map[string]int{
 	"YEAR":                     yearType,
 	"ZEROFILL":                 zerofill,
 	"WAIT":                     wait,
+	"RETURNING":                returning,
 }
 
 // See https://dev.mysql.com/doc/refman/5.7/en/function-resolution.html for details

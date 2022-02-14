@@ -1995,8 +1995,10 @@ func (n *CallStmt) Accept(v Visitor) (Node, bool) {
 type InsertStmt struct {
 	dmlNode
 
-	IsReplace   bool
-	IgnoreErr   bool
+	IsReplace bool
+	IgnoreErr bool
+	// PgSQL Modified
+	Overriding  bool
 	Table       *TableRefsClause
 	Columns     []*ColumnName
 	Lists       [][]ExprNode
@@ -2007,6 +2009,8 @@ type InsertStmt struct {
 	// TableHints represents the table level Optimizer Hint for join type.
 	TableHints     []*TableOptimizerHint
 	PartitionNames []model.CIStr
+	// PgSQL Modified
+	Returning *ReturningClause
 }
 
 // Restore implements Node interface.
@@ -2038,6 +2042,10 @@ func (n *InsertStmt) Restore(ctx *format.RestoreCtx) error {
 	}
 	if n.IgnoreErr {
 		ctx.WriteKeyWord("IGNORE ")
+	}
+	// PgSQL Modified
+	if n.Overriding {
+		ctx.WriteKeyWord("OVERRIDING ")
 	}
 	ctx.WriteKeyWord("INTO ")
 	if err := n.Table.Restore(ctx); err != nil {
@@ -2118,6 +2126,14 @@ func (n *InsertStmt) Restore(ctx *format.RestoreCtx) error {
 		}
 	}
 
+	// PgSQL Modified
+	if n.Returning != nil {
+		ctx.WritePlain(" ")
+		if err := n.Returning.Restore(ctx); err != nil {
+			return errors.Annotate(err, "An error occurred while restore DeleteStmt.Returning")
+		}
+	}
+
 	return nil
 }
 
@@ -2173,6 +2189,14 @@ func (n *InsertStmt) Accept(v Visitor) (Node, bool) {
 		}
 		n.OnDuplicate[i] = node.(*Assignment)
 	}
+	// PgSQL Modified
+	if n.Returning != nil {
+		node, ok = n.Returning.Accept(v)
+		if !ok {
+			return n, false
+		}
+		n.Returning = node.(*ReturningClause)
+	}
 	return v.Leave(n)
 }
 
@@ -2196,6 +2220,8 @@ type DeleteStmt struct {
 	// TableHints represents the table level Optimizer Hint for join type.
 	TableHints []*TableOptimizerHint
 	With       *WithClause
+	// PgSQL Modified
+	Returning *ReturningClause
 }
 
 // Restore implements Node interface.
@@ -2288,6 +2314,13 @@ func (n *DeleteStmt) Restore(ctx *format.RestoreCtx) error {
 			return errors.Annotate(err, "An error occurred while restore DeleteStmt.Limit")
 		}
 	}
+	// PgSQL Modified
+	if n.Returning != nil {
+		ctx.WritePlain(" ")
+		if err := n.Returning.Restore(ctx); err != nil {
+			return errors.Annotate(err, "An error occurred while restore DeleteStmt.Returning")
+		}
+	}
 
 	return nil
 }
@@ -2342,6 +2375,14 @@ func (n *DeleteStmt) Accept(v Visitor) (Node, bool) {
 		}
 		n.Limit = node.(*Limit)
 	}
+	// PgSQL Modified
+	if n.Returning != nil {
+		node, ok = n.Returning.Accept(v)
+		if !ok {
+			return n, false
+		}
+		n.Returning = node.(*ReturningClause)
+	}
 	return v.Leave(n)
 }
 
@@ -2360,6 +2401,8 @@ type UpdateStmt struct {
 	MultipleTable bool
 	TableHints    []*TableOptimizerHint
 	With          *WithClause
+	// PgSQL Modified
+	Returning *ReturningClause
 }
 
 // Restore implements Node interface.
@@ -2441,6 +2484,13 @@ func (n *UpdateStmt) Restore(ctx *format.RestoreCtx) error {
 			return errors.Annotate(err, "An error occur while restore UpdateStmt.Limit")
 		}
 	}
+	// PgSQL Modified
+	if n.Returning != nil {
+		ctx.WritePlain(" ")
+		if err := n.Returning.Restore(ctx); err != nil {
+			return errors.Annotate(err, "An error occurred while restore UpdateStmt.Returning")
+		}
+	}
 
 	return nil
 }
@@ -2491,6 +2541,14 @@ func (n *UpdateStmt) Accept(v Visitor) (Node, bool) {
 			return n, false
 		}
 		n.Limit = node.(*Limit)
+	}
+	// PgSQL Modified
+	if n.Returning != nil {
+		node, ok = n.Returning.Accept(v)
+		if !ok {
+			return n, false
+		}
+		n.Returning = node.(*ReturningClause)
 	}
 	return v.Leave(n)
 }
@@ -2557,6 +2615,8 @@ const (
 	ShowWarnings
 	ShowCharset
 	ShowVariables
+	// PgSQL Modified
+	ShowVariable
 	ShowStatus
 	ShowCollation
 	ShowCreateTable
@@ -2643,6 +2703,10 @@ type ShowStmt struct {
 	ShowProfileTypes []int  // Used for `SHOW PROFILE` syntax
 	ShowProfileArgs  *int64 // Used for `SHOW PROFILE` syntax
 	ShowProfileLimit *Limit // Used for `SHOW PROFILE` syntax
+
+	// PgSQL Modified
+	// pg variable
+	VariableName string
 }
 
 // Restore implements Node interface.
@@ -2884,6 +2948,9 @@ func (n *ShowStmt) Restore(ctx *format.RestoreCtx) error {
 			ctx.WriteKeyWord("ERRORS")
 		case ShowVariables:
 			restoreGlobalScope()
+			ctx.WriteKeyWord("VARIABLES")
+		// PgSQL Modified
+		case ShowVariable:
 			ctx.WriteKeyWord("VARIABLES")
 		case ShowStatus:
 			restoreGlobalScope()
@@ -3497,5 +3564,44 @@ func (n *AsOfClause) Accept(v Visitor) (Node, bool) {
 		return n, false
 	}
 	n.TsExpr = node.(ExprNode)
+	return v.Leave(n)
+}
+
+// PgSQL Modified
+type ReturningClause struct {
+	node
+	Fields *FieldList
+}
+
+// PgSQL Modified
+func (n *ReturningClause) Restore(ctx *format.RestoreCtx) error {
+	ctx.WriteKeyWord("Returning ")
+	for i, item := range n.Fields.Fields {
+		if i != 0 {
+			ctx.WritePlain(",")
+		}
+		if err := item.Restore(ctx); err != nil {
+			return errors.Annotatef(err, "An error occurred while restore ReturningClause.Fields[%d]", i)
+		}
+	}
+	return nil
+}
+
+// PgSQL Modified
+func (n *ReturningClause) Accept(v Visitor) (Node, bool) {
+	newNode, skipChildren := v.Enter(n)
+	if skipChildren {
+		return v.Leave(newNode)
+	}
+	n = newNode.(*ReturningClause)
+
+	if n.Fields != nil {
+		node, ok := n.Fields.Accept(v)
+		if !ok {
+			return n, false
+		}
+		n.Fields = node.(*FieldList)
+	}
+
 	return v.Leave(n)
 }

@@ -15,7 +15,6 @@
 package infoschema
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 
@@ -329,34 +328,34 @@ func GetSequenceByName(is InfoSchema, schema, sequence model.CIStr) (util.Sequen
 	return tbl.(util.SequenceTable), nil
 }
 
-func init() {
-	// Initialize the information shema database and register the driver to `drivers`
-	dbID := autoid.InformationSchemaDBID
-	infoSchemaTables := make([]*model.TableInfo, 0, len(tableNameToColumns))
-	for name, cols := range tableNameToColumns {
-		tableInfo := buildTableMeta(name, cols)
-		infoSchemaTables = append(infoSchemaTables, tableInfo)
-		var ok bool
-		tableInfo.ID, ok = tableIDMap[tableInfo.Name.O]
-		if !ok {
-			panic(fmt.Sprintf("get information_schema table id failed, unknown system table `%v`", tableInfo.Name.O))
-		}
-		for i, c := range tableInfo.Columns {
-			c.ID = int64(i) + 1
-		}
-	}
-	infoSchemaDB := &model.DBInfo{
-		ID:      dbID,
-		Name:    util.InformationSchemaName,
-		Charset: mysql.DefaultCharset,
-		Collate: mysql.DefaultCollationName,
-		Tables:  infoSchemaTables,
-	}
-	RegisterVirtualTable(infoSchemaDB, createInfoSchemaTable)
-	util.GetSequenceByName = func(is interface{}, schema, sequence model.CIStr) (util.SequenceTable, error) {
-		return GetSequenceByName(is.(InfoSchema), schema, sequence)
-	}
-}
+//func init() {
+//	// Initialize the information shema database and register the driver to `drivers`
+//	dbID := autoid.InformationSchemaDBID
+//	infoSchemaTables := make([]*model.TableInfo, 0, len(tableNameToColumns))
+//	for name, cols := range tableNameToColumns {
+//		tableInfo := buildTableMeta(name, cols)
+//		infoSchemaTables = append(infoSchemaTables, tableInfo)
+//		var ok bool
+//		tableInfo.ID, ok = tableIDMap[tableInfo.Name.O]
+//		if !ok {
+//			panic(fmt.Sprintf("get information_schema table id failed, unknown system table `%v`", tableInfo.Name.O))
+//		}
+//		for i, c := range tableInfo.Columns {
+//			c.ID = int64(i) + 1
+//		}
+//	}
+//	infoSchemaDB := &model.DBInfo{
+//		ID:      dbID,
+//		Name:    util.InformationSchemaName,
+//		Charset: mysql.DefaultCharset,
+//		Collate: mysql.DefaultCollationName,
+//		Tables:  infoSchemaTables,
+//	}
+//	RegisterVirtualTable(infoSchemaDB, createInfoSchemaTable)
+//	util.GetSequenceByName = func(is interface{}, schema, sequence model.CIStr) (util.SequenceTable, error) {
+//		return GetSequenceByName(is.(InfoSchema), schema, sequence)
+//	}
+//}
 
 // HasAutoIncrementColumn checks whether the table has auto_increment columns, if so, return true and the column name.
 func HasAutoIncrementColumn(tbInfo *model.TableInfo) (bool, string) {
