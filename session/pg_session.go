@@ -27,8 +27,8 @@ func (s *session) PrepareStmt(sql string, name string) (stmtID uint32, paramCoun
 	// So we have to call PrepareTxnCtx here.
 	s.PrepareTxnCtx(ctx)
 	s.PrepareTSFuture(ctx)
-	prepareExec := executor.NewPrepareExec(s, sql)
-	// prepareExec := executor.NewPrepareExec(s, infoschema.GetInfoSchema(s), sql, name)
+	//prepareExec := executor.NewPrepareExec(s, sql)
+	prepareExec := executor.NewPrepareExec(s, sql, name)
 	err = prepareExec.Next(ctx, nil)
 	if err != nil {
 		return

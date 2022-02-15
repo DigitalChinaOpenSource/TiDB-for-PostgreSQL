@@ -7,6 +7,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const md5EncryptedLength = 35
+
 // ConnectionVerification implements the Manager interface.
 func (p *UserPrivileges) ConnectionVerification(user, host string, authentication, salt []byte, tlsState *tls.ConnectionState) (u string, h string, success bool) {
 	if SkipWithGrant {
@@ -47,7 +49,9 @@ func (p *UserPrivileges) ConnectionVerification(user, host string, authenticatio
 	}
 
 	pwd := record.AuthenticationString
-	if !p.isValidHash(record) {
+	// The length of the password encrypted by MD5 is 35
+	if len(pwd) != 0 && len(pwd) != md5EncryptedLength {
+		logutil.BgLogger().Error("user password from system DB not like md5 ciphertext", zap.String("user", user))
 		return
 	}
 

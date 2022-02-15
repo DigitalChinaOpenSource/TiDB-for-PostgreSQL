@@ -972,6 +972,15 @@ func (cc *clientConn) WriteData(data []byte) error {
 	}
 }
 
+// writeOK You can choose this method when you need to return complete and readyforquery directly to the client
+func (cc *clientConn) writeOK(ctx context.Context) error {
+	//msg := cc.ctx.LastMessage()
+	if err := cc.writeCommandComplete(); err != nil {
+		return err
+	}
+	return cc.writeReadyForQuery(ctx, cc.ctx.Status())
+}
+
 // writeError 向客户端写回错误信息
 // 这里需要将MySQL错误信息转换为PgSQL格式
 // PgSQL 错误信息报文格式: https://www.postgresql.org/docs/13/protocol-error-fields.html

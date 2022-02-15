@@ -68,6 +68,14 @@ type Constant struct {
 	ParamMarker *ParamMarker
 	hashcode    []byte
 
+	// 用于保存参数偏移量的变量
+	// PgSQL modified
+	Offset int
+
+	// 参数顺序 即$1这样的形式后面的数字
+	// PgSQL modified
+	Order int
+
 	collationInfo
 }
 

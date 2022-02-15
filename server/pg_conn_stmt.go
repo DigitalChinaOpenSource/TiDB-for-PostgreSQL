@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"github.com/jackc/pgproto3/v2"
+	pgOID "github.com/lib/pq/oid"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/parser/mysql"
@@ -38,18 +39,36 @@ func (cc *clientConn) handleStmtPrepare(ctx context.Context, parse pgproto3.Pars
 
 	// Get param types in sql plan, and save it in `stmt`.
 	var paramTypes []byte
-	if cachedStmt, ok := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt); ok {
-		cachedParams := cachedStmt.PreparedAst.Params
-		for i := range cachedParams {
-			paramTypes = append(paramTypes, cachedParams[i].GetType().Tp)
+	numberOfParams := stmt.NumParams()
+
+	// parameters' oid sent in by frontend
+	oids := parse.ParameterOIDs
+
+	// here we get cacheParams from our prepared plan.
+	// if oid is not available, we use our prepared plan.
+	cacheStmt := vars.PreparedStmts[uint32(stmt.ID())].(*plannercore.CachedPrepareStmt)
+	cacheParams := cacheStmt.PreparedAst.Params
+
+	// If frontend send in OIDs, we save them into stmt
+	if len(oids) > 0 {
+		stmt.SetOIDs(oids)
+	}
+
+	for i := 0; i < numberOfParams; i++ {
+		// check if oids are available, there are three situations in which oid is not available:
+		// 1. Frontend didn't send them, since it's optional
+		// 2. Frontend didn't send enough of them
+		// 3. Frontend send in oid of 0, indicate unspecified
+		if len(oids) > i && oids[i] != 0 {
+			// If frontend gives param OID, we convert it to paramTypes directly
+			paramTypes = append(paramTypes, pgOIDToMySQLType(oids[i]))
+		} else {
+			// If OID is not available, we get it from our prepared statement
+			paramTypes = append(paramTypes, cacheParams[i].GetType().Tp)
 		}
 	}
 
 	stmt.SetParamsType(paramTypes)
-
-	if len(parse.ParameterOIDs) > 0 {
-		stmt.SetOIDs(parse.ParameterOIDs)
-	}
 
 	return cc.writeParseComplete()
 }
@@ -507,4 +526,32 @@ func parseBindArgs(sc *stmtctx.StatementContext, args []types.Datum, paramTypes 
 	}
 
 	return nil
+}
+
+// pgOIDToMySQLType converts postgres OID into mysql type
+func pgOIDToMySQLType(oid uint32) byte {
+	switch pgOID.Oid(oid) {
+	case pgOID.T_int8:
+		return mysql.TypeLonglong
+	case pgOID.T_int4:
+		return mysql.TypeLong
+	case pgOID.T_int2:
+		return mysql.TypeShort
+	case pgOID.T_float4:
+		return mysql.TypeFloat
+	case pgOID.T_float8:
+		return mysql.TypeDouble
+	case pgOID.T_timestamp:
+		return mysql.TypeTimestamp
+	case pgOID.T_date:
+		return mysql.TypeNewDate
+	case pgOID.T_numeric:
+		return mysql.TypeNewDecimal
+	case pgOID.T_bytea:
+		return mysql.TypeBlob
+	case pgOID.T_text, pgOID.T_varchar:
+		return mysql.TypeVarchar
+	default:
+		return mysql.TypeUnspecified
+	}
 }

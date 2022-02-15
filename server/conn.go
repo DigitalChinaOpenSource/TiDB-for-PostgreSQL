@@ -1369,10 +1369,10 @@ func (cc *clientConn) flush(ctx context.Context) error {
 	return cc.pkt.flush()
 }
 
-func (cc *clientConn) writeOK(ctx context.Context) error {
-	msg := cc.ctx.LastMessage()
-	return cc.writeOkWith(ctx, msg, cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), cc.ctx.Status(), cc.ctx.WarningCount())
-}
+//func (cc *clientConn) writeOK(ctx context.Context) error {
+//	msg := cc.ctx.LastMessage()
+//	return cc.writeOkWith(ctx, msg, cc.ctx.AffectedRows(), cc.ctx.LastInsertID(), cc.ctx.Status(), cc.ctx.WarningCount())
+//}
 
 func (cc *clientConn) writeOkWith(ctx context.Context, msg string, affectedRows, lastInsertID uint64, status, warnCnt uint16) error {
 	enclen := 0

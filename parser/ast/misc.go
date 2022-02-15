@@ -1208,7 +1208,9 @@ func (n *UserSpec) EncodedPassword() (string, bool) {
 		case mysql.AuthCachingSha2Password:
 			return auth.NewSha2Password(opt.AuthString), true
 		default:
-			return auth.EncodePassword(opt.AuthString), true
+			// return auth.EncodePassword(opt.AuthString), true
+			// PgSQL Modified
+			return auth.EncodePasswordByMD5(n.User.Username, opt.AuthString), true
 		}
 	}
 

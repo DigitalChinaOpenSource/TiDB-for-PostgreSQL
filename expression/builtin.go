@@ -515,6 +515,10 @@ type builtinFunc interface {
 	// Clone returns a copy of itself.
 	Clone() builtinFunc
 
+	// GetArgs 获取参数列表
+	// PgSQL Modified
+	GetArgs() []Expression
+
 	CollationInfo
 }
 
@@ -964,4 +968,10 @@ func (b *baseBuiltinFunc) setDecimalAndFlenForTime(fsp int) {
 		// Add the length for `.`.
 		b.tp.Flen++
 	}
+}
+
+// GetArgs 获取方法参数，是一个public方法
+// PgSQL Modified
+func (b *baseBuiltinFunc) GetArgs() []Expression {
+	return b.args
 }

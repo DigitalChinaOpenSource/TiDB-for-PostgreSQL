@@ -16,6 +16,7 @@ package core
 
 import (
 	"fmt"
+	"github.com/pingcap/tidb/parser/ast"
 	"math"
 	"strconv"
 
@@ -305,6 +306,11 @@ type LogicalPlan interface {
 
 	// canPushToCop check if we might push this plan to a specific store.
 	canPushToCop(store kv.StoreType) bool
+
+	// SetParamType 逻辑计划设置参数类型的方法
+	// 用于 PgSQL 的扩展查询
+	// PgSQL Modified
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 // PhysicalPlan is a tree of the physical operators.
@@ -353,6 +359,12 @@ type PhysicalPlan interface {
 
 	// Clone clones this physical plan.
 	Clone() (PhysicalPlan, error)
+
+	// SetParamType 从计划中获取参数信息，设置参数类型
+	// paramExprs:参数设置的目标，其中的Type成员就是具体设置的地方
+	// err：过程中的异常报错
+	// PgSQL Modified
+	SetParamType(paramExprs *[]ast.ParamMarkerExpr) (err error)
 }
 
 type baseLogicalPlan struct {
