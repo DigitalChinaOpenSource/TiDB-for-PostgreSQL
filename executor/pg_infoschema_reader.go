@@ -162,43 +162,43 @@ func (e *pgMemTableRetriever) setDataForPgTables(ctx context.Context, sctx sessi
 	var rows [][]types.Datum
 	createTimeTp := mysql.TypeDatetime
 	for _, schema := range schemas {
-		for _, table := range schema.Tables {
-			collation := table.Collate
+		for _, tableInfo := range schema.Tables {
+			collation := tableInfo.Collate
 			if collation == "" {
 				collation = mysql.DefaultCollationName
 			}
-			createTime := types.NewTime(types.FromGoTime(table.GetUpdateTime()), createTimeTp, types.DefaultFsp)
+			createTime := types.NewTime(types.FromGoTime(tableInfo.GetUpdateTime()), createTimeTp, types.DefaultFsp)
 
 			createOptions := ""
 
-			if table.IsSequence() {
+			if tableInfo.IsSequence() {
 				continue
 			}
 
-			if checker != nil && !checker.RequestVerification(sctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+			if checker != nil && !checker.RequestVerification(sctx.GetSessionVars().ActiveRoles, schema.Name.L, tableInfo.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
 
-			if !table.IsView() {
-				if table.GetPartitionInfo() != nil {
+			if !tableInfo.IsView() {
+				if tableInfo.GetPartitionInfo() != nil {
 					createOptions = "partitioned"
 				}
 				var autoIncID interface{}
-				hasAutoincID, _ := infoschema.HasAutoIncrementColumn(table)
+				hasAutoincID, _ := infoschema.HasAutoIncrementColumn(tableInfo)
 				if hasAutoincID {
-					autoIncID, err = getAutoIncrementID(sctx, schema, table)
+					autoIncID, err = getAutoIncrementID(sctx, schema, tableInfo)
 					if err != nil {
 						return err
 					}
 				}
 				var rowCount, dataLength, indexLength uint64
-				if table.GetPartitionInfo() == nil {
-					rowCount = tableRowsMap[table.ID]
-					dataLength, indexLength = getDataAndIndexLength(table, table.ID, rowCount, colLengthMap)
+				if tableInfo.GetPartitionInfo() == nil {
+					rowCount = tableRowsMap[tableInfo.ID]
+					dataLength, indexLength = getDataAndIndexLength(tableInfo, tableInfo.ID, rowCount, colLengthMap)
 				} else {
-					for _, pi := range table.GetPartitionInfo().Definitions {
+					for _, pi := range tableInfo.GetPartitionInfo().Definitions {
 						rowCount += tableRowsMap[pi.ID]
-						parDataLen, parIndexLen := getDataAndIndexLength(table, pi.ID, tableRowsMap[pi.ID], colLengthMap)
+						parDataLen, parIndexLen := getDataAndIndexLength(tableInfo, pi.ID, tableRowsMap[pi.ID], colLengthMap)
 						dataLength += parDataLen
 						indexLength += parIndexLen
 					}
@@ -215,74 +215,74 @@ func (e *pgMemTableRetriever) setDataForPgTables(ctx context.Context, sctx sessi
 				default:
 					tableType = "BASE TABLE"
 				}
-				shardingInfo := infoschema.GetShardingInfo(schema, table)
+				shardingInfo := infoschema.GetShardingInfo(schema, tableInfo)
 				record := types.MakeDatums(
-					"postgres",    // TABLE_CATALOG
-					schema.Name.O, // TABLE_SCHEMA
-					table.Name.O,  // TABLE_NAME
-					tableType,     // TABLE_TYPE
-					nil,           // self_referencing_column_name
-					nil,           // reference_generation
-					nil,           // user_defined_type_catalog
-					nil,           // user_defined_type_schema
-					nil,           // user_defined_type_name
-					nil,           // is_insertable_into
-					nil,           // is_typed
-					nil,           // commit_action
-					"InnoDB",      // ENGINE
-					uint64(10),    // VERSION
-					"Compact",     // ROW_FORMAT
-					rowCount,      // TABLE_ROWS
-					avgRowLength,  // AVG_ROW_LENGTH
-					dataLength,    // DATA_LENGTH
-					uint64(0),     // MAX_DATA_LENGTH
-					indexLength,   // INDEX_LENGTH
-					uint64(0),     // DATA_FREE
-					autoIncID,     // AUTO_INCREMENT
-					createTime,    // CREATE_TIME
-					nil,           // UPDATE_TIME
-					nil,           // CHECK_TIME
-					collation,     // TABLE_COLLATION
-					nil,           // CHECKSUM
-					createOptions, // CREATE_OPTIONS
-					table.Comment, // TABLE_COMMENT
-					table.ID,      // TIDB_TABLE_ID
-					shardingInfo,  // TIDB_ROW_ID_SHARDING_INFO
+					"postgres",        // TABLE_CATALOG
+					schema.Name.O,     // TABLE_SCHEMA
+					tableInfo.Name.O,  // TABLE_NAME
+					tableType,         // TABLE_TYPE
+					nil,               // self_referencing_column_name
+					nil,               // reference_generation
+					nil,               // user_defined_type_catalog
+					nil,               // user_defined_type_schema
+					nil,               // user_defined_type_name
+					nil,               // is_insertable_into
+					nil,               // is_typed
+					nil,               // commit_action
+					"InnoDB",          // ENGINE
+					uint64(10),        // VERSION
+					"Compact",         // ROW_FORMAT
+					rowCount,          // TABLE_ROWS
+					avgRowLength,      // AVG_ROW_LENGTH
+					dataLength,        // DATA_LENGTH
+					uint64(0),         // MAX_DATA_LENGTH
+					indexLength,       // INDEX_LENGTH
+					uint64(0),         // DATA_FREE
+					autoIncID,         // AUTO_INCREMENT
+					createTime,        // CREATE_TIME
+					nil,               // UPDATE_TIME
+					nil,               // CHECK_TIME
+					collation,         // TABLE_COLLATION
+					nil,               // CHECKSUM
+					createOptions,     // CREATE_OPTIONS
+					tableInfo.Comment, // TABLE_COMMENT
+					tableInfo.ID,      // TIDB_TABLE_ID
+					shardingInfo,      // TIDB_ROW_ID_SHARDING_INFO
 				)
 				rows = append(rows, record)
 			} else {
 				record := types.MakeDatums(
-					"postgres",    // TABLE_CATALOG
-					schema.Name.O, // TABLE_SCHEMA
-					table.Name.O,  // TABLE_NAME
-					"VIEW",        // TABLE_TYPE
-					nil,           // self_referencing_column_name
-					nil,           // reference_generation
-					nil,           // user_defined_type_catalog
-					nil,           // user_defined_type_schema
-					nil,           // user_defined_type_name
-					nil,           // is_insertable_into
-					nil,           // is_typed
-					nil,           // commit_action
-					nil,           // ENGINE
-					nil,           // VERSION
-					nil,           // ROW_FORMAT
-					nil,           // TABLE_ROWS
-					nil,           // AVG_ROW_LENGTH
-					nil,           // DATA_LENGTH
-					nil,           // MAX_DATA_LENGTH
-					nil,           // INDEX_LENGTH
-					nil,           // DATA_FREE
-					nil,           // AUTO_INCREMENT
-					createTime,    // CREATE_TIME
-					nil,           // UPDATE_TIME
-					nil,           // CHECK_TIME
-					nil,           // TABLE_COLLATION
-					nil,           // CHECKSUM
-					nil,           // CREATE_OPTIONS
-					"VIEW",        // TABLE_COMMENT
-					table.ID,      // TIDB_TABLE_ID
-					nil,           // TIDB_ROW_ID_SHARDING_INFO
+					"postgres",       // TABLE_CATALOG
+					schema.Name.O,    // TABLE_SCHEMA
+					tableInfo.Name.O, // TABLE_NAME
+					"VIEW",           // TABLE_TYPE
+					nil,              // self_referencing_column_name
+					nil,              // reference_generation
+					nil,              // user_defined_type_catalog
+					nil,              // user_defined_type_schema
+					nil,              // user_defined_type_name
+					nil,              // is_insertable_into
+					nil,              // is_typed
+					nil,              // commit_action
+					nil,              // ENGINE
+					nil,              // VERSION
+					nil,              // ROW_FORMAT
+					nil,              // TABLE_ROWS
+					nil,              // AVG_ROW_LENGTH
+					nil,              // DATA_LENGTH
+					nil,              // MAX_DATA_LENGTH
+					nil,              // INDEX_LENGTH
+					nil,              // DATA_FREE
+					nil,              // AUTO_INCREMENT
+					createTime,       // CREATE_TIME
+					nil,              // UPDATE_TIME
+					nil,              // CHECK_TIME
+					nil,              // TABLE_COLLATION
+					nil,              // CHECKSUM
+					nil,              // CREATE_OPTIONS
+					"VIEW",           // TABLE_COMMENT
+					tableInfo.ID,     // TIDB_TABLE_ID
+					nil,              // TIDB_ROW_ID_SHARDING_INFO
 				)
 				rows = append(rows, record)
 			}
@@ -332,13 +332,13 @@ func (e *hugeMemTableRetriever) setDataForPgColumns(ctx sessionctx.Context) erro
 	for ; e.dbsIdx < len(e.dbs); e.dbsIdx++ {
 		schema := e.dbs[e.dbsIdx]
 		for e.tblIdx < len(schema.Tables) {
-			table := schema.Tables[e.tblIdx]
+			tableInfo := schema.Tables[e.tblIdx]
 			e.tblIdx++
-			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, tableInfo.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
 
-			e.dataForPgColumnsInTable(schema, table)
+			e.dataForPgColumnsInTable(schema, tableInfo)
 			if len(e.rows) >= batch {
 				return nil
 			}
@@ -372,7 +372,7 @@ func (e *hugeMemTableRetriever) dataForPgColumnsInTable(schema *model.DBInfo, tb
 				colLen += len(ele)
 			}
 			if len(col.Elems) != 0 {
-				colLen += (len(col.Elems) - 1)
+				colLen += len(col.Elems) - 1
 			}
 			charMaxLen = colLen
 			charOctLen = colLen
@@ -522,34 +522,34 @@ func (e *pgMemTableRetriever) setDataForPgSequences(ctx sessionctx.Context, sche
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
 	for _, schema := range schemas {
-		for _, table := range schema.Tables {
-			if !table.IsSequence() {
+		for _, tableInfo := range schema.Tables {
+			if !tableInfo.IsSequence() {
 				continue
 			}
-			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, tableInfo.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
 			record := types.MakeDatums(
-				"postgres",                // sequence_catalog
-				schema.Name.O,             // sequence_schema
-				table.Name.O,              // sequence_name
-				nil,                       // data_type
-				nil,                       // numeric_precision
-				nil,                       // numeric_precision_radix
-				nil,                       // numeric_scale
-				nil,                       // start_value
-				nil,                       // minimum_value
-				nil,                       // maximum_value
-				table.Sequence.Increment,  // INCREMENT
-				nil,                       // cycle_option
-				"postgres",                // TABLE_CATALOG
-				table.Sequence.Cache,      // Cache
-				table.Sequence.CacheValue, // CACHE_VALUE
-				table.Sequence.Cycle,      // CYCLE
-				table.Sequence.MaxValue,   // MAX_VALUE
-				table.Sequence.MinValue,   // MIN_VALUE
-				table.Sequence.Start,      // START
-				table.Sequence.Comment,    // COMMENT
+				"postgres",                    // sequence_catalog
+				schema.Name.O,                 // sequence_schema
+				tableInfo.Name.O,              // sequence_name
+				nil,                           // data_type
+				nil,                           // numeric_precision
+				nil,                           // numeric_precision_radix
+				nil,                           // numeric_scale
+				nil,                           // start_value
+				nil,                           // minimum_value
+				nil,                           // maximum_value
+				tableInfo.Sequence.Increment,  // INCREMENT
+				nil,                           // cycle_option
+				"postgres",                    // TABLE_CATALOG
+				tableInfo.Sequence.Cache,      // Cache
+				tableInfo.Sequence.CacheValue, // CACHE_VALUE
+				tableInfo.Sequence.Cycle,      // CYCLE
+				tableInfo.Sequence.MaxValue,   // MAX_VALUE
+				tableInfo.Sequence.MinValue,   // MIN_VALUE
+				tableInfo.Sequence.Start,      // START
+				tableInfo.Sequence.Comment,    // COMMENT
 			)
 			rows = append(rows, record)
 		}
@@ -562,36 +562,36 @@ func (e *pgMemTableRetriever) setDataForPgViews(ctx sessionctx.Context, schemas 
 	checker := privilege.GetPrivilegeManager(ctx)
 	var rows [][]types.Datum
 	for _, schema := range schemas {
-		for _, table := range schema.Tables {
-			if !table.IsView() {
+		for _, tableInfo := range schema.Tables {
+			if !tableInfo.IsView() {
 				continue
 			}
-			collation := table.Collate
-			charset := table.Charset
+			collation := tableInfo.Collate
+			tableCharset := tableInfo.Charset
 			if collation == "" {
 				collation = mysql.DefaultCollationName
 			}
-			if charset == "" {
-				charset = mysql.DefaultCharset
+			if tableCharset == "" {
+				tableCharset = mysql.DefaultCharset
 			}
-			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, tableInfo.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
 			record := types.MakeDatums(
-				"postgres",                      // TABLE_CATALOG
-				schema.Name.O,                   // TABLE_SCHEMA
-				table.Name.O,                    // TABLE_NAME
-				table.View.SelectStmt,           // VIEW_DEFINITION
-				table.View.CheckOption.String(), // CHECK_OPTION
-				"NO",                            // IS_UPDATABLE
-				nil,                             // is_insertable_into
-				nil,                             // is_trigger_updatable
-				nil,                             // is_trigger_deletable
-				nil,                             // is_trigger_insertable_into
-				table.View.Definer.String(),     // DEFINER
-				table.View.Security.String(),    // SECURITY_TYPE
-				charset,                         // CHARACTER_SET_CLIENT
-				collation,                       // COLLATION_CONNECTION
+				"postgres",                          // TABLE_CATALOG
+				schema.Name.O,                       // TABLE_SCHEMA
+				tableInfo.Name.O,                    // TABLE_NAME
+				tableInfo.View.SelectStmt,           // VIEW_DEFINITION
+				tableInfo.View.CheckOption.String(), // CHECK_OPTION
+				"NO",                                // IS_UPDATABLE
+				nil,                                 // is_insertable_into
+				nil,                                 // is_trigger_updatable
+				nil,                                 // is_trigger_deletable
+				nil,                                 // is_trigger_insertable_into
+				tableInfo.View.Definer.String(),     // DEFINER
+				tableInfo.View.Security.String(),    // SECURITY_TYPE
+				tableCharset,                        // CHARACTER_SET_CLIENT
+				collation,                           // COLLATION_CONNECTION
 			)
 			rows = append(rows, record)
 		}
@@ -660,9 +660,9 @@ func (e *pgMemTableRetriever) setDataForPgTableConstraints(ctx sessionctx.Contex
 func (e *pgMemTableRetriever) setDataForPgCharacterSets() {
 	var rows [][]types.Datum
 	charsets := charset.GetSupportedCharsets()
-	for _, charset := range charsets {
+	for _, tableCharset := range charsets {
 		rows = append(rows,
-			types.MakeDatums(nil, nil, charset.Name, "UCS", charset.Name, "postgres", nil, charset.DefaultCollation, charset.Desc, charset.Maxlen),
+			types.MakeDatums(nil, nil, tableCharset.Name, "UCS", tableCharset.Name, "postgres", nil, tableCharset.DefaultCollation, tableCharset.Desc, tableCharset.Maxlen),
 		)
 	}
 	e.rows = rows
@@ -685,11 +685,11 @@ func (e *pgMemTableRetriever) setDataForPgKeyColumnUsage(ctx sessionctx.Context,
 	checker := privilege.GetPrivilegeManager(ctx)
 	rows := make([][]types.Datum, 0, len(schemas)) // The capacity is not accurate, but it is not a big problem.
 	for _, schema := range schemas {
-		for _, table := range schema.Tables {
-			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, table.Name.L, "", mysql.AllPrivMask) {
+		for _, tableInfo := range schema.Tables {
+			if checker != nil && !checker.RequestVerification(ctx.GetSessionVars().ActiveRoles, schema.Name.L, tableInfo.Name.L, "", mysql.AllPrivMask) {
 				continue
 			}
-			rs := pgKeyColumnUsageInTable(schema, table)
+			rs := pgKeyColumnUsageInTable(schema, tableInfo)
 			rows = append(rows, rs...)
 		}
 	}

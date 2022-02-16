@@ -6392,7 +6392,7 @@ ProcedureCall:
  *  TODO: support PARTITION
  **********************************************************************************/
 InsertIntoStmt:
-	"INSERT" TableOptimizerHintsOpt PriorityOpt IgnoreOptional IntoOpt TableName PartitionNameListOpt OverridingOpt InsertValues OnDuplicateKeyUpdate
+	"INSERT" TableOptimizerHintsOpt PriorityOpt IgnoreOptional IntoOpt TableName PartitionNameListOpt OverridingOpt InsertValues OnDuplicateKeyUpdate ReturningOptional
 	{
 		x := $9.(*ast.InsertStmt)
 		x.Priority = $3.(mysql.PriorityEnum)
@@ -6403,6 +6403,9 @@ InsertIntoStmt:
 		x.Table = &ast.TableRefsClause{TableRefs: &ast.Join{Left: ts}}
 		if $10 != nil {
 			x.OnDuplicate = $10.([]*ast.Assignment)
+		}
+		if $11 != nil {
+			x.Returning = $11.(*ast.ReturningClause)
 		}
 		if $2 != nil {
 			x.TableHints = $2.([]*ast.TableOptimizerHint)
