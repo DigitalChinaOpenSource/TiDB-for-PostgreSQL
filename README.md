@@ -92,13 +92,13 @@ We recommend using binary file to deploy TiDB for PostgreSQL cluster.
 First, download the official binary package file and unzip it.
 
 ```shell
-wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
-wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
+wget http://download.pingcap.org/tidb-v5.3.0-linux-amd64.tar.gz
+wget http://download.pingcap.org/tidb-v5.3.0-linux-amd64.sha256
 
-sha256sum -c tidb-v4.0.11-linux-amd64.sha256
+sha256sum -c tidb-v5.3.0-linux-amd64.sha256
 
-tar -xzf tidb-v4.0.11-linux-amd64.tar.gz
-cd tidb-v4.0.11-linux-amd64/bin
+tar -xzf tidb-v5.3.0-linux-amd64.tar.gz
+cd tidb-v5.3.0-linux-amd64/bin
 ```
 
 Second, deploy each node in the cluster in order. According to the cluster architecture of TiDB for PostgreSQL, pd nodes are deployed first, then the tikv node, and finally the TiDB for PostgreSQL node. The number of nodes in the cluster is not specified, but there is at least one of each type.
@@ -150,7 +150,7 @@ Compared with MySQL, PostgreSQL has many new syntax features. For example, Retur
 
 To keep our code improvement running stable, we currently choose a fixed version for development. The following is our selected version:
 
-TiDB v4.0.11
+TiDB v5.3.0
 
 PostgreSQL 13
 
