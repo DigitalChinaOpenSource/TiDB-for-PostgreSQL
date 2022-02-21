@@ -1,99 +1,159 @@
-![](docs/logo_with_text.png)
+# TiDB for PostgreSQL
 
-[![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/pingcap/tidb/blob/master/LICENSE)
+[![LICENSE](https://img.shields.io/github/license/pingcap/tidb.svg)](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LICENSE)
 [![Language](https://img.shields.io/badge/Language-Go-blue.svg)](https://golang.org/)
-[![Build Status](https://travis-ci.org/pingcap/tidb.svg?branch=master)](https://travis-ci.org/pingcap/tidb)
-[![Go Report Card](https://goreportcard.com/badge/github.com/pingcap/tidb)](https://goreportcard.com/report/github.com/pingcap/tidb)
-[![GitHub release](https://img.shields.io/github/tag/pingcap/tidb.svg?label=release)](https://github.com/pingcap/tidb/releases)
-[![GitHub release date](https://img.shields.io/github/release-date/pingcap/tidb.svg)](https://github.com/pingcap/tidb/releases)
-[![CircleCI Status](https://circleci.com/gh/pingcap/tidb.svg?style=shield)](https://circleci.com/gh/pingcap/tidb)
-[![Coverage Status](https://codecov.io/gh/pingcap/tidb/branch/master/graph/badge.svg)](https://codecov.io/gh/pingcap/tidb)
-[![GoDoc](https://img.shields.io/badge/Godoc-reference-blue.svg)](https://godoc.org/github.com/pingcap/tidb)
+[![Build Status](http://tidb4pgci.eastasia.cloudapp.azure.com/buildStatus/icon?job=jenkins-tidb4pg-build)](http://tidb4pgci.eastasia.cloudapp.azure.com/job/jenkins-tidb4pg-build/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)](https://goreportcard.com/report/github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+[![codecov](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL/branch/main/graph/badge.svg?token=OZ16DNE6JH)](https://codecov.io/gh/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/w/DigitalChinaOpenSource/TiDB-for-PostgreSQL)
 
-## What is TiDB?
+## Introduction
 
-TiDB ("Ti" stands for Titanium) is an open-source NewSQL database that supports Hybrid Transactional and Analytical Processing (HTAP) workloads. It is MySQL compatible and features horizontal scalability, strong consistency, and high availability.
+TiDB for PostgreSQL is an open source launched by Digital China Cloud Base to promote and integrate into the open source community of TiDB. In addition to its high availability, horizontal scalability, and cloud-native features, TiDB for PostgreSQL is compatible with the PostgreSQL protocol. On the one hand, you can use the PostgreSQL client to connect to TiDB for PostgreSQL, which we have basically completed. On the other hand, you can also use the unique grammatical features of PostgreSQL in your business system, which is in the development process.
 
-- __Horizontal Scalability__
+More details can be found in the [Design Document](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/DESIGN_DOCUMENT.md)
 
-    TiDB expands both SQL processing and storage by simply adding new nodes. This makes infrastructure capacity planning both easier and more cost-effective than traditional relational databases which only scale vertically.
+## Background
 
-- __MySQL Compatible Syntax__
+As the general trend of the massive explosion of information in the current data era becomes more and more obvious, the database is more and more likely to become the bottleneck of the upper-level business system. For this problem, TiDB solves most of migration problems of business system based on MySQL database through its highly compatibility of MySQL protocol. In view of its distributed transactions with strong consistency, flexible scalability, and excellent disaster recovery backup architecture, users prefer to use mature solutions of TiDB rather than scale MySQL by sharding. However, there is no mature solution for the upper-level business system based on PostgreSQL to migrate to TiDB. If you want to migrate a PostgreSQL-based business system to TiDB, you have to modify lots of code of business system. To solve this，we try to refactor the underlying source code of TiDB to make it compatible with the PostgreSQL protocol, making it possible to migrate PostgreSQL-based business systems to TiDB without modifying much code.
 
-    TiDB acts like it is a MySQL 5.7 server to your applications. You can continue to use all of the existing MySQL client libraries, and in many cases, you will not need to change a single line of code in your application. Because TiDB is built from scratch, not a MySQL fork, please check out the list of [known compatibility differences](https://docs.pingcap.com/tidb/stable/mysql-compatibility).
 
-- __Distributed Transactions__
 
-    TiDB internally shards table into small range-based chunks that we refer to as "Regions". Each Region defaults to approximately 100 MiB in size, and TiDB uses an [optimized](https://pingcap.com/blog/async-commit-the-accelerator-for-transaction-commit-in-tidb-5.0) Two-phase commit to ensure that Regions are maintained in a transactionally consistent way.
+## Development progress
 
-- __Cloud Native__
+The largest amount of work for the development of TiDB for PostgreSQL is compatibility with PostgreSQL, which has two things to do. One is to implement the PostgreSQL connection protocol, which we have basically achieved, So PostgreSQL client can connect to TiDB for PostgreSQL. The other is the unique PostgreSQL syntax. TiDB for PostgreSQL can support general sql syntax, but there are a certain amount of work to do to make it compatible with PostgreSQL’s unique syntax. This is one of the reasons why TiDB for PostgreSQL is open sourced. We hope that through the open source, engineers interested in our TiDB for PostgreSQL can work together to make our project bigger and better.
 
-    TiDB is designed to work in the cloud -- public, private, or hybrid -- making deployment, provisioning, operations, and maintenance simple.
 
-    The storage layer of TiDB, called TiKV, is a [Cloud Native Computing Foundation (CNCF) Graduated](https://www.cncf.io/announcements/2020/09/02/cloud-native-computing-foundation-announces-tikv-graduation/) project. The architecture of the TiDB platform also allows SQL processing and storage to be scaled independently of each other in a very cloud-friendly manner.
-
-- __Minimize ETL__
-
-    TiDB is designed to support both transaction processing (OLTP) and analytical processing (OLAP) workloads. This means that while you may have traditionally transacted on MySQL and then Extracted, Transformed and Loaded (ETL) data into a column store for analytical processing, this step is no longer required.
-
-- __High Availability__
-
-    TiDB uses the Raft consensus algorithm to ensure that data is highly available and safely replicated throughout storage in Raft groups. In the event of failure, a Raft group will automatically elect a new leader for the failed member, and self-heal the TiDB cluster without any required manual intervention. Failure and self-healing operations are also transparent to applications.
-
-For more details and latest updates, see [TiDB docs](https://docs.pingcap.com/tidb/stable) and [release notes](https://docs.pingcap.com/tidb/dev/release-notes).
-
-## Community
-
-You can join these groups and chats to discuss and ask TiDB related questions:
-
-- [TiDB Internals Forum](https://internals.tidb.io/)
-- [Slack Channel](https://slack.tidb.io/invite?team=tidb-community&channel=everyone&ref=pingcap-tidb)
-- [TiDB User Group Forum (Chinese)](https://asktug.com)
-
-In addition, you may enjoy following:
-
-- [@PingCAP](https://twitter.com/PingCAP) on Twitter
-- Question tagged [#tidb on StackOverflow](https://stackoverflow.com/questions/tagged/tidb)
-- The PingCAP Team [English Blog](https://en.pingcap.com/blog) and [Chinese Blog](https://pingcap.com/blog-cn/)
-
-For support, please contact [PingCAP](http://bit.ly/contact_us_via_github).
 
 ## Quick start
 
-### To start using TiDB
+First, make sure you have a Go environment, because TiDB for PostgreSQL is based on the Go language.
 
-See [Quick Start Guide](https://docs.pingcap.com/tidb/stable/quick-start-with-tidb).
+TiDB for PostgreSQL can be started on a single node without pd and tikv.
 
-### To start developing TiDB
+If there is no pd and tikv, it will create mock pd and mock tikv to maintain the stable operation of the system.
 
-See [Get Started](https://pingcap.github.io/tidb-dev-guide/get-started/introduction.html) chapter of [TiDB Dev Guide](https://pingcap.github.io/tidb-dev-guide/index.html).
+The following is an example of locally compiling and running TiDB for PostgreSQL on localhost.
 
-## Contributing
+```shell
+mkdir -p  $GOPATH/src/github.com/digitalchina
 
-The [community repository](https://github.com/pingcap/community) hosts all information about the TiDB community, including how to contribute to TiDB, how TiDB community is governed, how special interest groups are organized, etc.
+cd  $GOPATH/src/github.com/digitalchina
 
-[<img src="docs/contribution-map.png" alt="contribution-map" width="180">](https://github.com/pingcap/tidb-map/blob/master/maps/contribution-map.md#tidb-is-an-open-source-distributed-htap-database-compatible-with-the-mysql-protocol)
+git clone https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL.git
 
-Contributions are welcomed and greatly appreciated. See [Contribution to TiDB](https://pingcap.github.io/tidb-dev-guide/contribute-to-tidb/introduction.html) for details on typical contribution workflows. For more contributing information, click on the contributor icon above.
+cd TiDB-for-PostgreSQL/tidb-server
 
-## Adopters
+go run main.go
 
-View the current list of in-production TiDB adopters [here](https://docs.pingcap.com/tidb/stable/adopters).
+# If you get an error: export ordinal to larger
+# Please run the following cmd:
+go run -buildmode=exe  main.go
+```
 
-## Case studies
+After starting the main program of TiDB for PostgreSQL , it will run on port 4000 of the host.
 
-- [English](https://pingcap.com/case-studies)
-- [简体中文](https://pingcap.com/cases-cn/)
+How to use PostgreSQL client to connect to TiDB for PostgreSQL? Here, we take the command line tool psql that comes with PostgreSQL as an example.
 
-## Architecture
+```
+Server [localhost]:
+Database [postgres]: test
+Port [5433]: 4000
+Username [postgres]: root
+psql (13.1, server 8.3.11)
+Type "help" to get help information.
 
-![architecture](./docs/architecture.png)
+test=# show tables;
+ Tables_in_test
+----------------
+ t1
+ t2
+(2 行记录)
+```
+
+## Docker 
+
+```shell
+# Log in to your dockerhub account
+docker login
+
+# Pull the image and start the container
+docker pull dcleeray/tidb-for-pg
+docker run -it --name tidbforpg -p 4000:4000 -d  dcleeray/tidb-for-pg:latest
+```
+
+## Cluster deployment
+TiDB for PostgreSQL also supports cluster deployment.
+
+Our current modification work does not involve the communication module of each component in the cluster. Therefore, the connection of TiDB for PostgreSQL to pd and tikv will not be affected in any way.
+
+We recommend using binary file to deploy TiDB for PostgreSQL cluster.
+
+First, download the official binary package file and unzip it.
+
+```shell
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.tar.gz
+wget http://download.pingcap.org/tidb-v4.0.11-linux-amd64.sha256
+
+sha256sum -c tidb-v4.0.11-linux-amd64.sha256
+
+tar -xzf tidb-v4.0.11-linux-amd64.tar.gz
+cd tidb-v4.0.11-linux-amd64/bin
+```
+
+Second, deploy each node in the cluster in order. According to the cluster architecture of TiDB for PostgreSQL, pd nodes are deployed first, then the tikv node, and finally the TiDB for PostgreSQL node. The number of nodes in the cluster is not specified, but there is at least one of each type.
+
+Deploy a pd node
+
+```shell
+./pd-server --name=pd1 --data-dir=pd1 --client-urls="http://pdhost:2379" --peer-urls="http://host:2380" -L "info" --log-file=pd.log
+```
+
+Deploy three tikv nodes
+
+```shell
+./tikv-server --pd="pdhost:2379" --addr="kvhost1:20160"  --data-dir=tikv  --log-file=tikv1.log
+./tikv-server --pd="pdhost:2379" --addr="kvhost2:20160"  --data-dir=tikv  --log-file=tikv2.log
+./tikv-server --pd="pdhost:2379" --addr="kvhost3:20160"  --data-dir=tikv  --log-file=tikv3.log
+```
+
+Deploy a TiDB for PostgreSQL node. You need to compile the TiDB for PostgreSQL project into a binary file named tidb-server and upload it to this server for replace the original tidb-server
+
+```shell
+## If compiled on windows, the following parameters need to be set
+SET GOARCH=amd64
+SET GOOS=linux
+
+## Running tidb-server on linux
+./tidb-server --store=tikv  --path="pdhost:2379" --log-file=tidb.log
+```
+
+With the above done, a TiDB for PostgreSQL cluster is successfully deployed, and you can connect to TiDB for PostgreSQL cluster in the same way as you did with single TiDB for PostgreSQL demonstrated earlier.
+
+## Contribute code to TiDB for postgresql
+
+We greatly welcome and appreciate developers who are interested in TiDB for PostgreSQL to make contributions. At present, we provide several directions to get started.
+
+[Learning Guide](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/LEARNING_GUIDANCE.zh.md)
+
+[Contribution Guide](https://github.com/DigitalChinaOpenSource/TiDB-for-PostgreSQL/blob/main/CONTRIBUTING.md)
+
+### Schema structure
+
+The database structure of PostgreSQL is very different from that of MySQL, which is also a big problem we encountered in our development. It involves the realization of database system tables, system views, and system functions. It’s a lot of work and very hard. Developers are required to be very familiar with the database table structure of both PostgreSQL and MySQL.
+
+### Postgresql grammatical features
+
+Compared with MySQL, PostgreSQL has many new syntax features. For example, Returning can return specified column or all columns of the modified row. Implementing a syntax involves modifying codes of the Parser module, TiDB for PostgreSQL's internal plan structure, plan optimization, plan execution, and data write-back, and many other parts. It’s really very hard. We recommend that developers start with clauses such as RETURNING and modify them on the basis of the original code. After being familiar with the logic of TiDB for PostgreSQL planning and execution, you can try to implement a brand new statement.
+
+## Version notice
+
+To keep our code improvement running stable, we currently choose a fixed version for development. The following is our selected version:
+
+TiDB v4.0.11
+
+PostgreSQL 13
 
 ## License
 
-TiDB is under the Apache 2.0 license. See the [LICENSE](./LICENSE) file for details.
-
-## Acknowledgments
-
-- Thanks [cznic](https://github.com/cznic) for providing some great open source tools.
-- Thanks [GolevelDB](https://github.com/syndtr/goleveldb), [BoltDB](https://github.com/boltdb/bolt), and [RocksDB](https://github.com/facebook/rocksdb) for their powerful storage engines.
+Apache-2.0 License

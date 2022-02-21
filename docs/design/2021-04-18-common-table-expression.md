@@ -1,5 +1,5 @@
 <!--
-This is a template for TiDB's change proposal process, documented [here](./README.md).
+This is a template for TiDB's change proposal process, documented [here](./README.md.PingCAP).
 -->
 
 # Proposal: Support Common Table Expression
